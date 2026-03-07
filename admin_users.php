@@ -15,6 +15,36 @@ function post($k, $default = '') {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = post('action');
+  if ($action === 'create_user') {
+    $username = post('username', '');
+    $password = post('password', '');
+    $role = post('role', 'user') === 'admin' ? 'admin' : 'user';
+    $lpRaw = post('limitpaket', '');
+    $lgRaw = post('limitgambar', '');
+    $lp = $lpRaw === '' ? 300 : (int)max(0, (int)$lpRaw);
+    $lg = $lgRaw === '' ? 5 : (int)max(0, (int)$lgRaw);
+
+    if ($username === '' || $password === '') {
+      $error = 'Username dan password wajib diisi.';
+    } elseif (strlen($username) > 100) {
+      $error = 'Username terlalu panjang.';
+    } else {
+      $hash = password_hash($password, PASSWORD_BCRYPT);
+      $stmt = $mysqli->prepare("INSERT INTO users (username, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?)");
+      if ($stmt) {
+        $stmt->bind_param('sssii', $username, $hash, $role, $lp, $lg);
+        if ($stmt->execute()) $message = 'Pengguna berhasil dibuat.';
+        else {
+          $code = (int)($stmt->errno ?: $mysqli->errno);
+          if ($code === 1062) $error = 'Username sudah digunakan.';
+          else $error = 'Gagal membuat pengguna.';
+        }
+        $stmt->close();
+      } else {
+        $error = 'Gagal menyiapkan pembuatan pengguna.';
+      }
+    }
+  }
   if ($action === 'set_role') {
     $id = (int)post('id', '0');
     $role = post('role', 'user') === 'admin' ? 'admin' : 'user';
@@ -93,7 +123,7 @@ if ($page > $totalPages) $page = $totalPages;
 $offset = ($page - 1) * $perPage;
 
 // Ambil data per halaman
-$stmt = $mysqli->prepare("SELECT id, username, role, limitpaket, limitgambar, created_at FROM users ORDER BY id ASC LIMIT ? OFFSET ?");
+$stmt = $mysqli->prepare("SELECT id, username, role, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?");
 if ($stmt) {
   $stmt->bind_param('ii', $perPage, $offset);
   $stmt->execute();
@@ -127,6 +157,10 @@ if ($stmt) {
     <?php if ($error): ?>
       <div class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-800"><?php echo htmlspecialchars($error); ?></div>
     <?php endif; ?>
+
+    <div class="mb-4 flex items-center justify-end">
+      <button id="btnCreateUser" type="button" class="px-4 h-10 rounded-lg border bg-white hover:bg-gray-50">Tambah Pengguna</button>
+    </div>
 
     <div class="bg-white rounded-xl border shadow-sm p-6">
       <div class="overflow-auto">
@@ -274,6 +308,43 @@ if ($stmt) {
       </form>
     </div>
   </div>
+  <div id="createModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-xl border shadow-lg w-full max-w-md p-6">
+      <h2 class="text-lg font-semibold mb-4">Tambah Pengguna</h2>
+      <form id="createForm" class="space-y-4">
+        <input type="hidden" name="action" value="create_user">
+        <div>
+          <label class="block text-sm font-medium mb-1">Username</label>
+          <input id="createUsername" name="username" type="text" class="w-full rounded border h-10 px-3" required>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Password</label>
+          <input id="createPassword" name="password" type="password" class="w-full rounded border h-10 px-3" required>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">Role</label>
+            <select id="createRole" name="role" class="w-full rounded border h-10 px-3">
+              <option value="user">user</option>
+              <option value="admin">admin</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Limit Paket</label>
+            <input id="createLimitPaket" name="limitpaket" type="number" min="0" class="w-full rounded border h-10 px-3" placeholder="300">
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Limit Gambar</label>
+          <input id="createLimitGambar" name="limitgambar" type="number" min="0" class="w-full rounded border h-10 px-3" placeholder="5">
+        </div>
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" id="createCancel" class="px-4 h-10 rounded border bg-white hover:bg-gray-50">Batal</button>
+          <button type="submit" class="px-4 h-10 rounded border bg-blue-600 text-white hover:bg-blue-700">Tambah</button>
+        </div>
+      </form>
+    </div>
+  </div>
   <script>
     const modal = document.getElementById('editModal');
     const form = document.getElementById('modalForm');
@@ -292,6 +363,14 @@ if ($stmt) {
     const pwdUserId = document.getElementById('pwdUserId');
     const pwdUsername = document.getElementById('pwdUsername');
     const pwdInput = document.getElementById('pwdInput');
+    const createModal = document.getElementById('createModal');
+    const createForm = document.getElementById('createForm');
+    const btnCreateUser = document.getElementById('btnCreateUser');
+    const createUsername = document.getElementById('createUsername');
+    const createPassword = document.getElementById('createPassword');
+    const createRole = document.getElementById('createRole');
+    const createLimitPaket = document.getElementById('createLimitPaket');
+    const createLimitGambar = document.getElementById('createLimitGambar');
 
     function openModalFromRow(row) {
       inputId.value = row.getAttribute('data-row');
@@ -327,7 +406,25 @@ if ($stmt) {
       pwdModal.classList.add('hidden');
       pwdModal.classList.remove('flex');
     }
+    function openCreateModal() {
+      createUsername.value = '';
+      createPassword.value = '';
+      createRole.value = 'user';
+      createLimitPaket.value = '';
+      createLimitGambar.value = '';
+      createModal.classList.remove('hidden');
+      createModal.classList.add('flex');
+      setTimeout(() => createUsername.focus(), 0);
+    }
+    function closeCreateModal() {
+      createModal.classList.add('hidden');
+      createModal.classList.remove('flex');
+    }
     document.addEventListener('click', function(e) {
+      if (btnCreateUser && (e.target === btnCreateUser || e.target.closest('#btnCreateUser'))) {
+        openCreateModal();
+        return;
+      }
       const editBtn = e.target.closest('.btn-row-edit');
       if (editBtn) {
         const id = editBtn.getAttribute('data-id');
@@ -355,12 +452,16 @@ if ($stmt) {
       if (e.target.id === 'pwdCancel' || e.target === pwdModal) {
         closePwdModal();
       }
+      if (e.target.id === 'createCancel' || e.target === createModal) {
+        closeCreateModal();
+      }
     });
     document.addEventListener('keydown', function(e){
       if (e.key === 'Escape') {
         closeModal();
         closeRoleModal();
         closePwdModal();
+        closeCreateModal();
       }
     });
     form.addEventListener('submit', async function(e){
@@ -418,6 +519,25 @@ if ($stmt) {
         }
       } catch (err) {
         alert('Gagal mereset password');
+      }
+    });
+    createForm.addEventListener('submit', async function(e){
+      e.preventDefault();
+      const fd = new FormData(createForm);
+      try {
+        const res = await fetch(`admin_users.php?ajax=1&page=${encodeURIComponent(currentPage)}`, {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+          body: fd
+        });
+        const data = await res.json();
+        if (data && data.ok) {
+          location.href = `admin_users.php?page=${encodeURIComponent(currentPage)}`;
+        } else {
+          alert(data && data.message ? data.message : 'Gagal menambah pengguna');
+        }
+      } catch (err) {
+        alert('Gagal menambah pengguna');
       }
     });
   </script>
