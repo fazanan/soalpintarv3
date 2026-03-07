@@ -291,6 +291,52 @@ if ($type === 'chat') {
   proxy_chat($mysqli, $data, $user_id);
   exit;
 }
+if ($type === 'modul_ajar') {
+  // Full messages array, returns plain text (markdown), no JSON mode
+  $messages = $data['messages'] ?? [];
+  $model    = (string)($data['model'] ?? 'gpt-4o-mini');
+  if (empty($messages)) {
+    http_response_code(400); echo json_encode(['error'=>'Messages kosong']); exit;
+  }
+  $cfg     = get_model_config($mysqli, $model, 'chat');
+  $provider= $cfg['provider'] ?? 'openai';
+  $api_key = get_api_key($mysqli, $provider, $user_id);
+  if (!$api_key) {
+    http_response_code(500); echo json_encode(['error'=>'API key tidak tersedia']); exit;
+  }
+  $url      = $cfg['endpoint_url'] ?? 'https://api.openai.com/v1/chat/completions';
+  $postData = json_encode([
+    'model'       => $model,
+    'messages'    => $messages,
+    'temperature' => 0.7,
+    'max_tokens'  => 4000,
+  ], JSON_UNESCAPED_UNICODE);
+  $ch = curl_init($url);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'Authorization: Bearer '.$api_key,
+  ]);
+  curl_setopt($ch, CURLOPT_POST, true);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+  curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+  $result = curl_exec($ch);
+  $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  $err    = curl_error($ch);
+  curl_close($ch);
+  if ($result===false || $status<200 || $status>=300) {
+    http_response_code(502);
+    echo json_encode(['error'=>'OpenAI error','status'=>$status,'detail'=>$err?:$result]);
+    log_audit($mysqli,$user_id,'error','modul_ajar','HTTP error dari OpenAI',$status?:502,['err'=>$err]);
+    exit;
+  }
+  $decoded = json_decode($result, true);
+  $content = $decoded['choices'][0]['message']['content'] ?? '';
+  $usage   = $decoded['usage'] ?? [];
+  log_audit($mysqli,$user_id,'info','modul_ajar','Modul Ajar generated',200,['model'=>$model,'tokens'=>$usage]);
+  echo json_encode(['content'=>$content,'choices'=>[['message'=>['content'=>$content]]],'usage'=>$usage], JSON_UNESCAPED_UNICODE);
+  exit;
+}
 if ($type === 'image') {
   proxy_image($mysqli, $data, $user_id);
   exit;

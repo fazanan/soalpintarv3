@@ -115,19 +115,19 @@ if (!isset($_SESSION['user_id'])) {
                 <span class="material-symbols-outlined">menu_book</span>
               </div>
               <div>
-                <div class="text-lg font-extrabold tracking-tight">
+                <div class="text-lg font-semibold tracking-tight">
                   <span class="text-primary">Soal</span><span class="text-text-main-light dark:text-text-main-dark">Pintar</span>
                 </div>
               <div class="text-xs italic text-text-sub-light dark:text-text-sub-dark mt-0.5">Sahabat Pendidik Indonesia</div>
               </div>
             </div>
           </div>
-          <div id="limitSidebar" class="no-print -mt-1 text-[13px] font-extrabold text-blue-700 dark:text-blue-300"></div>
+          <div id="limitSidebar" class="no-print -mt-1 text-[13px] font-semibold text-blue-700 dark:text-blue-300"></div>
           <div id="nav" class="flex flex-col gap-1"></div>
           <div class="h-px bg-border-light dark:bg-border-dark my-2"></div>
           <button
             id="btnReset"
-            class="flex w-full items-center justify-center gap-2 rounded-lg h-10 px-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 text-sm font-bold transition-colors"
+            class="flex w-full items-center justify-center gap-2 rounded-lg h-10 px-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 text-sm font-medium transition-colors"
           >
             <span class="material-symbols-outlined text-[18px]">restart_alt</span>
             Reset
@@ -139,7 +139,7 @@ if (!isset($_SESSION['user_id'])) {
           <button id="btnQuiz" class="hidden"></button>
           <div class="mt-auto text-xs text-text-sub-light dark:text-text-sub-dark">
             <div class="mt-2">
-              <span id="badgeSaved" class="hidden text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Tersimpan</span>
+              <span id="badgeSaved" class="hidden text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">Tersimpan</span>
             </div>
           </div>
         </div>
@@ -160,7 +160,7 @@ if (!isset($_SESSION['user_id'])) {
                 <span class="material-symbols-outlined">menu</span>
               </button>
               <div>
-                <div id="pageTitle" class="text-xl md:text-2xl font-bold tracking-tight">Identitas Soal</div>
+                <div id="pageTitle" class="text-xl md:text-2xl font-semibold tracking-tight">Identitas Soal</div>
                 <div id="pageDesc" class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">
                   Lengkapi identitas sebelum menyusun paket
                 </div>
@@ -168,14 +168,14 @@ if (!isset($_SESSION['user_id'])) {
             </div>
             <div class="flex flex-col items-end">
               <div class="text-right">
-                <div class="text-3xl md:text-4xl font-extrabold tracking-tight">
+                <div class="text-3xl md:text-4xl font-bold tracking-tight">
                   <span class="text-primary">Soal</span><span class="text-text-main-light dark:text-text-main-dark">Pintar</span>
                 </div>
                 <div class="italic text-xs md:text-sm text-text-sub-light dark:text-text-sub-dark">Sahabat Pendidik Indonesia</div>
               </div>
               <button
                 id="btnExportTop"
-                class="md:hidden mt-2 flex items-center gap-2 px-3 py-1.5 rounded-md border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold transition-colors"
+                class="md:hidden mt-2 flex items-center gap-2 px-3 py-1.5 rounded-md border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-medium transition-colors"
               >
                 <span class="material-symbols-outlined text-[16px]">description</span>
                 Unduh .docx
@@ -184,27 +184,18 @@ if (!isset($_SESSION['user_id'])) {
           </div>
           <div class="flex items-center justify-between gap-2 pb-3">
             <div id="tabs" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
-            <div class="hidden md:flex items-center gap-3">
-              <button
-                id="btnSave"
-                class="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors"
-              >
+            <div class="hidden md:flex items-center gap-1.5">
+              <button id="btnSave" class="inline-flex items-center justify-center h-10 w-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors">
                 <span class="material-symbols-outlined text-[18px]">save</span>
-                Simpan
+                <span class="hidden 2xl:inline ml-2 text-sm font-medium">Simpan</span>
               </button>
-              <button
-                id="btnLoad"
-                class="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors"
-              >
+              <button id="btnLoad" class="inline-flex items-center justify-center h-10 w-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors">
                 <span class="material-symbols-outlined text-[18px]">folder_open</span>
-                Muat
+                <span class="hidden 2xl:inline ml-2 text-sm font-medium">Muat</span>
               </button>
-              <button
-                id="btnPrint"
-                class="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors"
-              >
+              <button id="btnPrint" class="inline-flex items-center justify-center h-10 w-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors">
                 <span class="material-symbols-outlined text-[18px]">print</span>
-                Cetak
+                <span class="hidden 2xl:inline ml-2 text-sm font-medium">Cetak</span>
               </button>
             </div>
           </div>
@@ -308,7 +299,7 @@ if (!isset($_SESSION['user_id'])) {
         { id: "preview", label: "Naskah Soal", icon: "description" },
         { id: "quiz", label: "Quiz", icon: "quiz" },
         { id: "lkpd", label: "LKPD", icon: "assignment" },
-        { id: "modul", label: "Modul Ajar", icon: "library_books" },
+        { id: "modul_ajar", label: "Modul Ajar", icon: "menu_book" },
         { id: "riwayat", label: "Riwayat", icon: "history" },
       ];
 
@@ -448,25 +439,14 @@ if (!isset($_SESSION['user_id'])) {
           tujuan: "",
           link: "",
         },
-        modul: {
-          satuanPendidikan: "",
-          namaSekolah: "",
-          namaGuru: "",
-          jenjang: "",
-          fase: "",
-          kelas: "",
-          mataPelajaran: "",
-          cp: "",
-          tp: "",
-          materiTambahan: "",
-          jamPelajaran: "",
-          modelPembelajaran: "Problem Based Learning (PBL)",
-          karakteristikSiswa: "",
-          metode: [],
-          mediaTIK: "",
-          sumberBelajar: "",
-          lingkungan: "",
-          ppp: [],
+        modulAjar: {
+          namaGuru: "", institusi: "",
+          kurikulum: "Kurikulum Merdeka",
+          jenjang: "", fase: "", kelas: "", mapel: "",
+          judulModul: "", jumlahPertemuan: "2",
+          durasi: "50", jumlahSiswa: "30",
+          modelPembelajaran: "Project Based Learning (PjBL)",
+          dimensi: [], hasil: "", isGenerating: false,
         },
         identity: {
           namaGuru: "",
@@ -1243,130 +1223,599 @@ if (!isset($_SESSION['user_id'])) {
         `;
       };
 
-      const MODUL_MODELS = [
-        "Problem Based Learning (PBL)",
-        "Project Based Learning (PjBL)",
-        "Discovery Learning",
-        "Inquiry Learning",
-        "Direct Instruction",
-      ];
-      const MODUL_METHODS = [
-        "Diskusi Kelas",
-        "Diskusi Kelompok",
-        "Presentasi",
-        "Tanya Jawab",
-        "Demonstrasi",
-        "Penugasan",
-        "Observasi",
-        "Role Playing",
-      ];
-      const PPP_OPTIONS = ["Beriman & Bertakwa", "Berkebinekaan Global", "Gotong Royong", "Mandiri", "Bernalar Kritis", "Kreatif"];
+      
 
-      const modulChip = (key, label) => {
-        const m = state.modul || {};
-        const arr = Array.isArray(m[key]) ? m[key] : [];
-        const active = arr.includes(label);
-        const cls = active
-          ? "bg-primary text-white border-primary"
-          : "bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark";
-        return `<button onclick="window.__sp.modulToggle('${key}','${label.replace(/'/g,"&#39;")}')" class="rounded-full px-4 py-2 text-sm font-bold border ${cls}">${safeText(label)}</button>`;
+      // ═══════════════════════════════════════════════
+      //  MODUL AJAR — renderModulAjar / build / export
+      // ═══════════════════════════════════════════════
+      const MA_FASE_MAP = {
+        "SD/MI":   ["Fase A (Kelas 1–2)","Fase B (Kelas 3–4)","Fase C (Kelas 5–6)"],
+        "SMP/MTs": ["Fase D (Kelas 7–9)"],
+        "SMA/MA":  ["Fase E (Kelas 10)","Fase F (Kelas 11–12)"],
+        "SMK":     ["Fase D (Kelas 7–9)","Fase E (Kelas 10)","Fase F (Kelas 11–12)"],
+        "PAUD":    ["Fase Fondasi"],
       };
+      const MA_MODEL = [
+        "Project Based Learning (PjBL)",
+        "Problem Based Learning (PBL)",
+        "Discovery Learning","Inquiry Learning",
+        "Direct Learning","Cooperative Learning",
+      ];
+      const MA_DIMENSI = [
+        {v:"Keimanan, Ketakwaan & Akhlak Mulia", ic:"volunteer_activism"},
+        {v:"Kewargaan",          ic:"account_balance"},
+        {v:"Penalaran Kritis",   ic:"psychology"},
+        {v:"Kreativitas",        ic:"palette"},
+        {v:"Kolaborasi",         ic:"group"},
+        {v:"Kemandirian",        ic:"self_improvement"},
+        {v:"Kesehatan",          ic:"favorite"},
+        {v:"Komunikasi",         ic:"forum"},
+      ];
 
-      const renderModul = () => {
-        const M = state.modul || {};
-        return `
+      const renderModulAjar = () => {
+        const M = state.modulAjar || {};
+        const faseOpts  = MA_FASE_MAP[M.jenjang] || [];
+        const kelasOpts = CLASS_OPTIONS[M.jenjang] || [];
+        const dimArr    = Array.isArray(M.dimensi) ? M.dimensi : [];
+        const hasilAda  = !!M.hasil;
+
+        const mkSel = (lbl, key, val, opts) => `
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">${safeText(lbl)}</label>
+            <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
+              onchange="window.__sp.setMA('${key}',this.value,true)">
+              <option value="">— Pilih —</option>
+              ${opts.map(o=>`<option value="${safeText(o)}" ${String(o)===String(val||'')?'selected':''}>${safeText(o)}</option>`).join('')}
+            </select>
+          </div>`;
+
+        const mkInp = (lbl, key, val, ph='') => `
+          <div class="flex flex-col gap-2">
+            <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">${safeText(lbl)}</label>
+            <input class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
+              placeholder="${safeText(ph)}" value="${safeText(val||'')}"
+              oninput="window.__sp.setMA('${key}',this.value,false)"
+              onchange="window.__sp.setMA('${key}',this.value,true)"
+              onblur="window.__sp.setMA('${key}',this.value,true)" />
+          </div>`;
+
+        const dimChecks = MA_DIMENSI.map(d => {
+          const on = dimArr.includes(d.v);
+          return `<label class="flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors select-none
+            ${on ? 'border-primary bg-primary/5 dark:bg-primary/10' : 'border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:border-primary/40'}">
+            <input type="checkbox" class="accent-primary shrink-0" ${on?'checked':''}
+              onchange="window.__sp.toggleMADimensi('${safeText(d.v)}',this.checked)">
+            <span class="material-symbols-outlined text-[16px] ${on?'text-primary':'text-text-sub-light'}">${d.ic}</span>
+            <span class="text-sm font-medium leading-snug">${safeText(d.v)}</span>
+          </label>`;
+        }).join('');
+
+        const formHtml = `
           <div class="space-y-6">
-            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
-              <div class="p-6 space-y-6">
-                <div class="flex items-center justify-between gap-3">
-                  <div>
-                    <div class="text-xs font-bold text-primary bg-primary/10 inline-flex px-3 py-1 rounded-full">Langkah 1</div>
-                    <div class="text-xl font-bold mt-2">Identitas</div>
-                  </div>
+            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
+              <div class="p-6 space-y-5">
+                <div>
+                  <div class="text-xs font-bold text-primary bg-primary/10 inline-flex px-3 py-1 rounded-full">Langkah 1</div>
+                  <div class="text-xl font-bold mt-2">Informasi Dasar</div>
+                  <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Identitas pendidik dan konteks akademik</div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  ${mkInp('Nama Guru','namaGuru',M.namaGuru,'Contoh: Sunarwan, S.Pd.')}
+                  ${mkInp('Nama Institusi','institusi',M.institusi,'Contoh: SDN 1 Cilodong')}
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  ${selectField("Jenjang", "modul.jenjang", M.jenjang, ["SD/MI", "SMP/MTs", "SMA/MA", "SMK"])}
-                  ${selectField("Fase", "modul.fase", M.fase, ["Fase A","Fase B","Fase C","Fase D","Fase E","Fase F"])}
-                  ${selectField("Kelas", "modul.kelas", M.kelas, CLASS_OPTIONS[M.jenjang] || [])}
+                  ${mkSel('Kurikulum','kurikulum',M.kurikulum,['Kurikulum Merdeka','Kurikulum Berbasis Cinta'])}
+                  ${mkSel('Jenjang','jenjang',M.jenjang,['SD/MI','SMP/MTs','SMA/MA','SMK','PAUD'])}
+                  ${mkSel('Fase','fase',M.fase,faseOpts)}
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  ${selectField("Mata Pelajaran", "modul.mataPelajaran", M.mataPelajaran, SUBJECT_OPTIONS[M.jenjang] || [])}
-                  ${inputText("Nama Sekolah", "modul.namaSekolah", M.namaSekolah, "Contoh: SMP Negeri 1")}
-                  ${inputText("Nama Guru", "modul.namaGuru", M.namaGuru, "Contoh: Budi Santoso")}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  ${mkSel('Kelas','kelas',M.kelas,kelasOpts)}
+                  ${mkInp('Mata Pelajaran','mapel',M.mapel,'Contoh: Bahasa Indonesia, Matematika, IPAS')}
                 </div>
               </div>
             </div>
-            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
-              <div class="p-6 space-y-6">
+
+            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
+              <div class="p-6 space-y-5">
                 <div>
                   <div class="text-xs font-bold text-primary bg-primary/10 inline-flex px-3 py-1 rounded-full">Langkah 2</div>
                   <div class="text-xl font-bold mt-2">Detail Pembelajaran</div>
+                  <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Materi, durasi, model, dan profil lulusan</div>
                 </div>
                 <div class="grid grid-cols-1 gap-5">
-                  ${inputTextarea("Capaian Pembelajaran (CP)", "modul.cp", M.cp, "Paste CP jika ada...")}
-                  ${inputTextarea("Tujuan Pembelajaran (TP)", "modul.tp", M.tp, "Tuliskan tujuan pembelajaran...")}
-                  ${inputTextarea("Materi Tambahan / Ringkasan", "modul.materiTambahan", M.materiTambahan, "Materi pendukung...")}
+                  ${mkInp('Materi Pokok / Judul Modul','judulModul',M.judulModul,'Contoh: Pengenalan Bunyi dan Kosa Kata')}
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  ${selectField("Model Pembelajaran", "modul.modelPembelajaran", M.modelPembelajaran, MODUL_MODELS)}
-                  ${inputText("Alokasi JP", "modul.jamPelajaran", M.jamPelajaran, "Contoh: 2 JP")}
-                  ${inputText("Karakteristik Siswa", "modul.karakteristikSiswa", M.karakteristikSiswa, "Contoh: heterogen, aktif")}
+                  ${mkSel('Jumlah Pertemuan','jumlahPertemuan',M.jumlahPertemuan,['1','2','3','4','5','6','7','8','9','10','11','12'])}
+                  ${mkInp('Durasi per Pertemuan (menit)','durasi',M.durasi,'Contoh: 50')}
+                  ${mkInp('Jumlah Peserta Didik','jumlahSiswa',M.jumlahSiswa,'Contoh: 30')}
                 </div>
-              </div>
-            </div>
-            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
-              <div class="p-6 space-y-6">
-                <div class="text-xl font-bold">Metode Pembelajaran</div>
-                <div class="flex flex-wrap gap-2">
-                  ${MODUL_METHODS.map(m => modulChip("metode", m)).join("")}
-                </div>
-              </div>
-            </div>
-            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
-              <div class="p-6 space-y-6">
-                <div class="text-xl font-bold">Sarana & Lingkungan</div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  ${inputText("Media/Alat TIK", "modul.mediaTIK", M.mediaTIK, "Contoh: LCD, Laptop, Internet")}
-                  ${inputText("Sumber Belajar", "modul.sumberBelajar", M.sumberBelajar, "Contoh: Buku, Video, Artikel")}
-                  ${inputText("Lingkungan Belajar", "modul.lingkungan", M.lingkungan, "Contoh: Kelas, Lab, Luar Ruang")}
+                  ${mkSel('Model Pembelajaran','modelPembelajaran',M.modelPembelajaran,MA_MODEL)}
+                </div>
+                <div>
+                  <div class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark mb-2">
+                    Dimensi Profil Lulusan
+                    <span class="font-normal italic ml-1 text-xs">(min. 1 — sesuai SKL 2025)</span>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">${dimChecks}</div>
+                </div>
+                <div id="maError" class="hidden rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300"></div>
+                <div class="pt-1 flex flex-wrap items-center gap-3">
+                  <button onclick="window.__sp.buildModulAjar()"
+                    class="flex items-center gap-2 rounded-lg h-10 px-6 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                    GENERATE MODUL AJAR
+                  </button>
+                  ${hasilAda ? `
+                  <button id="btnExportMA" onclick="window.__sp.exportModulAjarDocx()"
+                    class="flex items-center gap-2 rounded-lg h-10 px-5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">download</span>
+                    Download .docx
+                  </button>` : ''}
                 </div>
               </div>
             </div>
-            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
-              <div class="p-6 space-y-6">
-                <div class="text-xl font-bold">Profil Pelajar Pancasila (P5)</div>
-                <div class="flex flex-wrap gap-2">
-                  ${PPP_OPTIONS.map(p => modulChip("ppp", p)).join("")}
+
+            ${hasilAda ? `
+            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
+              <div class="flex items-center justify-between px-6 py-4 border-b border-border-light dark:border-border-dark">
+                <div class="flex items-center gap-3">
+                  <div class="size-8 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[18px]">check_circle</span>
+                  </div>
+                  <div>
+                    <div class="font-bold text-sm">Modul Ajar Berhasil Dibuat</div>
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${safeText(M.mapel||'')} · ${safeText(M.judulModul||'')}</div>
+                  </div>
+                </div>
+                <button id="btnExportMA2" onclick="window.__sp.exportModulAjarDocx()"
+                  class="flex items-center gap-2 rounded-lg h-9 px-4 bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors">
+                  <span class="material-symbols-outlined text-[16px]">download</span>
+                  Download .docx
+                </button>
+              </div>
+              <div class="p-6">
+                <div class="bg-white dark:bg-gray-950 border border-border-light dark:border-border-dark rounded-lg p-8
+                  font-serif text-[15px] leading-relaxed max-h-[72vh] overflow-y-auto custom-scrollbar
+                  [&_h1]:text-[17px] [&_h1]:font-bold [&_h1]:mt-8 [&_h1]:mb-3
+                  [&_h2]:text-[16px] [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-2
+                  [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:mt-5 [&_h3]:mb-2
+                  [&_table]:w-full [&_table]:border-collapse [&_table]:my-3 [&_table]:text-[13px]
+                  [&_td]:border [&_td]:border-gray-300 dark:[&_td]:border-gray-600 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top
+                  [&_th]:border [&_th]:border-gray-300 dark:[&_th]:border-gray-600 [&_th]:px-3 [&_th]:py-2 [&_th]:bg-gray-100 dark:[&_th]:bg-gray-800 [&_th]:font-bold
+                  [&_.ma-tbl>tbody>tr:nth-child(even)>td]:bg-gray-50 dark:[&_.ma-tbl>tbody>tr:nth-child(even)>td]:bg-gray-900/20
+                  [&_ul]:pl-6 [&_ul]:my-2 [&_li]:mb-1.5
+                  [&_ol]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol>li]:mb-1.5
+                  [&_em]:italic [&_strong]:font-bold
+                  [&_p]:mb-3 [&_p]:text-justify">
+                  ${maMarkdownToHtml(M.hasil)}
                 </div>
               </div>
+            </div>` : ''}
+          </div>`;
+
+        if (M.isGenerating) return `
+          <div class="flex flex-col items-center justify-center p-10 md:p-20 gap-4 max-w-2xl mx-auto">
+            <div class="size-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+              <span class="material-symbols-outlined animate-spin">progress_activity</span>
             </div>
-            <div class="flex items-center justify-end">
-              <button id="btnBuildModul" onclick="window.__sp.buildModul()" class="flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors">
-                <span class="material-symbols-outlined text-[18px]">menu_book</span>
-                BUAT MODUL SEKARANG
-              </button>
+            <div class="text-center">
+              <div class="font-bold text-lg">Menyusun Modul Ajar...</div>
+              <div class="text-sm text-text-sub-light mt-1">AI sedang membuat modul lengkap, tunggu 15–45 detik</div>
             </div>
-          </div>
-        `;
+            <div class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 max-w-md w-full">
+              <div class="flex items-start gap-3 p-4">
+                <span class="material-symbols-outlined text-amber-500 mt-0.5">warning</span>
+                <div class="text-sm text-amber-700 dark:text-amber-200">Jangan tutup halaman ini. Pastikan layar tidak mati.</div>
+              </div>
+            </div>
+          </div>`;
+
+        return formHtml;
       };
+
+      function maMarkdownToHtml(md) {
+        if (!md) return '';
+        const esc = (s) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const lines = md.split('\n');
+        const parts = [];
+        let i = 0;
+        while (i < lines.length) {
+          const line = lines[i];
+          const hasPipe = line.includes('|') && line.trim() !== '';
+          if (hasPipe) {
+            const next = lines[i + 1] || '';
+            const sepRe = /^\s*\|?\s*:?-{2,}\s*(\|\s*:?-{2,}\s*)+\|?\s*$/;
+            let headerSep = sepRe.test(next);
+            let rows = [];
+            let j = i;
+            while (j < lines.length && lines[j].includes('|') && lines[j].trim() !== '') {
+              if (sepRe.test(lines[j])) { j++; continue; }
+              rows.push(lines[j]);
+              j++;
+            }
+            if (rows.length) {
+              const cells = rows.map(r => r.trim().replace(/^\|?/, '').replace(/\|?$/, '').split('|').map(c => esc(c.trim())));
+              let html = '<table class="ma-tbl">';
+              if (headerSep && cells.length > 0) {
+                html += '<thead><tr>' + cells[0].map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+                for (let ri = 1; ri < cells.length; ri++) {
+                  html += '<tr>' + cells[ri].map(c => `<td>${c}</td>`).join('') + '</tr>';
+                }
+                html += '</tbody></table>';
+              } else {
+                html += '<tbody>';
+                for (let ri = 0; ri < cells.length; ri++) {
+                  html += '<tr>' + cells[ri].map(c => `<td>${c}</td>`).join('') + '</tr>';
+                }
+                html += '</tbody></table>';
+              }
+              parts.push(html);
+              i = j;
+              continue;
+            }
+          }
+          // Deteksi heading markdown (dengan/ tanpa spasi setelah '#')
+          const head = line.match(/^\s*(#{1,4})\s*(.+)$/);
+          if (head) {
+            const lvl = head[1].length;
+            const text = head[2];
+            if (lvl === 1 || lvl === 2) {
+              const isMain = /^MODUL AJAR\b/i.test(text);
+              parts.push(isMain ? `<h1 class="ma-title">${esc(text)}</h1>` : `<h1>${esc(text)}</h1>`);
+            } else if (lvl === 3) {
+              parts.push(`<h2>${esc(text)}</h2>`);
+            } else {
+              parts.push(`<h3>${esc(text)}</h3>`);
+            }
+            i++; 
+            continue;
+          }
+          const numHeadRe = /^\s*(\d+)\.\s+(.+)$/;
+          if (numHeadRe.test(line)) {
+            let k = i + 1;
+            let nextNonEmpty = '';
+            while (k < lines.length && lines[k].trim() === '') k++;
+            nextNonEmpty = lines[k] || '';
+            const isFollowingNum = numHeadRe.test(nextNonEmpty);
+            const isFollowingBullet = /^\s*[-•]\s+/.test(nextNonEmpty);
+            if (!isFollowingNum && !isFollowingBullet) {
+              const title = line.replace(numHeadRe, (_m, n, t) => `${n}. ${t}` );
+              parts.push(`<h2>${esc(title)}</h2>`);
+              i++;
+              continue;
+            }
+          }
+          if (/^\s*[-•]\s+/.test(line)) {
+            let j = i;
+            let html = '<ul>';
+            while (j < lines.length && /^\s*[-•]\s+/.test(lines[j])) {
+              const txt = lines[j].replace(/^\s*[-•]\s+/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(.+?)\*/g, '<em>$1</em>');
+              html += `<li>${txt}</li>`;
+              j++;
+            }
+            html += '</ul>';
+            parts.push(html);
+            i = j;
+            continue;
+          }
+          if (/^\s*\d+\.\s+/.test(line)) {
+            let j = i;
+            let html = '<ol>';
+            while (j < lines.length && /^\s*\d+\.\s+/.test(lines[j])) {
+              const txt = lines[j].replace(/^\s*\d+\.\s+/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(.+?)\*/g, '<em>$1</em>');
+              html += `<li>${txt}</li>`;
+              j++;
+            }
+            html += '</ol>';
+            parts.push(html);
+            i = j;
+            continue;
+          }
+          if (line.trim() === '') { parts.push(''); i++; continue; }
+          let j = i + 1;
+          let para = [line];
+          while (j < lines.length) {
+            const l = lines[j];
+            if (l.trim() === '' || l.includes('|') || /^\s*#{1,4}\s*/.test(l) || /^\s*[-•]\s+/.test(l) || /^\s*\d+\.\s+/.test(l)) break;
+            para.push(l);
+            j++;
+          }
+          const ptxt = para.join(' ').replace(/\s+/g,' ').trim().replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>');
+          parts.push(`<p>${ptxt}</p>`);
+          i = j;
+          continue;
+          parts.push(line);
+          i++;
+        }
+        let h = parts.join('\n');
+        return h;
+      }
+
+      async function buildModulAjar() {
+        const M = state.modulAjar || {};
+        const req = [M.namaGuru,M.institusi,M.jenjang,M.mapel,M.judulModul,M.jumlahPertemuan,M.durasi,M.modelPembelajaran];
+        const errEl = () => document.getElementById('maError');
+        const showErr = (msg) => { const e=errEl(); if(e){e.textContent='⚠️ '+msg; e.classList.remove('hidden');} };
+
+        if (req.some(v=>!String(v||'').trim())) { showErr('Harap lengkapi semua field sebelum generate.'); return; }
+        if (!Array.isArray(M.dimensi)||M.dimensi.length===0) { showErr('Pilih minimal 1 Dimensi Profil Lulusan.'); return; }
+
+        state.modulAjar.isGenerating = true;
+        state.modulAjar.hasil = '';
+        render();
+
+        const sys = `Anda adalah pakar desainer kurikulum Indonesia yang ahli dalam Kurikulum Merdeka 2025 dan Pembelajaran Mendalam (Deep Learning). Buat Modul Ajar lengkap mengikuti format resmi Kemendikbudristek. Tulis dalam Bahasa Indonesia baku dan formal. Hasilkan konten LENGKAP, DETAIL, SIAP PAKAI — tidak boleh ada placeholder. Rubrik wajib skala 1–4.`;
+
+        const usr = `Buatkan Modul Ajar LENGKAP dengan data berikut:
+
+=== DATA INPUT ===
+Nama Guru         : ${M.namaGuru}
+Institusi         : ${M.institusi}
+Tahun             : ${new Date().getFullYear()}
+Kurikulum         : ${M.kurikulum||'Kurikulum Merdeka'}
+Jenjang           : ${M.jenjang}
+Kelas             : ${M.kelas||'-'}
+Fase              : ${M.fase||'-'}
+Mata Pelajaran    : ${M.mapel}
+Judul Modul       : ${M.judulModul}
+Jumlah Pertemuan  : ${M.jumlahPertemuan}
+Durasi/Pertemuan  : ${M.durasi} menit
+Model Pembelajaran: ${M.modelPembelajaran}
+Jumlah Siswa      : ${M.jumlahSiswa||'30'} siswa
+Dimensi Profil    : ${M.dimensi.join(', ')}
+=================
+
+Hasilkan Modul Ajar dengan SEMUA bagian berikut secara LENGKAP dan DETAIL:
+
+## MODUL AJAR ${M.mapel.toUpperCase()}
+### "${M.judulModul}"
+
+## A. INFORMASI UMUM
+Tabel 2 kolom (Komponen | Keterangan): Nama Penyusun, Institusi, Tahun, Jenjang, Kelas, Fase, Alokasi Waktu, Kompetensi Awal (2-3 kalimat), Dimensi Profil Lulusan (tiap dimensi 1-2 kalimat kontekstual), Sarana dan Prasarana, Target Peserta Didik, Model Pembelajaran.
+
+## B. KOMPONEN INTI
+
+### 1. Tujuan Pembelajaran
+Min. 4 tujuan. Format: "Peserta didik mampu [kata kerja Bloom] [objek] [kondisi/kriteria]"
+
+### 2. Kriteria Ketercapaian Tujuan Pembelajaran (KKTP)
+Min. 4 indikator konkret dan terukur.
+
+### 3. Asesmen
+a. Diagnostik (Awal) — aktivitas konkret
+b. Formatif (Proses) — cara guru memantau
+c. Sumatif (Akhir) — produk/instrumen penilaian
+
+### 4. Pertanyaan Pemantik
+3 pertanyaan open-ended, kontekstual, mendorong berpikir kritis.
+
+### 5. Kegiatan Pembelajaran
+Untuk SETIAP pertemuan buat tabel: Kegiatan | Deskripsi | Alokasi Waktu
+Struktur: Pendahuluan (~15%) dengan Mindful Learning, Inti (~70%) dengan fase ${M.modelPembelajaran}, Penutup (~15%).
+
+### 6. Refleksi
+2–3 pertanyaan refleksi untuk Peserta Didik dan 2–3 untuk Pendidik.
+
+## C. LAMPIRAN
+
+### 1. LKPD
+Judul, Identitas siswa, Tujuan, Petunjuk, Alat dan Bahan, min. 5 Langkah Kegiatan, 3 Pertanyaan Refleksi, Kolom Kesimpulan.
+
+### 2. Pengayaan dan Remedial
+Pengayaan konkret. Remedial dengan strategi spesifik.
+
+### 3. Bahan Bacaan
+Untuk Peserta Didik: 3–4 paragraf sesuai jenjang.
+          Untuk Pendidik: 3–4 paragraf panduan pedagogis Deep Learning dan ${M.modelPembelajaran}.
+
+### 4. Media Pembelajaran
+Sumber video YouTube relevan, alat peraga, platform digital.
+
+### 5. Glosarium
+Min. 5 istilah kunci dengan definisi sesuai jenjang.
+
+### 6. Rubrik Penilaian
+Tabel: Aspek | Skor 4 (Sangat Baik) | Skor 3 (Baik) | Skor 2 (Cukup) | Skor 1 (Perlu Bimbingan)
+Min. 5 aspek, deskripsi KONKRET dan DAPAT DIAMATI.
+
+### 7. Daftar Pustaka
+Min. 3 referensi format APA (1 Kemendikbudristek, 1 buku pedagogi, 1 lainnya).
+
+PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas ${M.kelas||M.fase}. Bahasa Indonesia baku.`;
+
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(()=>ctrl.abort(), 90000);
+          const resp = await fetch("api/openai_proxy.php", {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({ type:"modul_ajar", messages:[{role:"system",content:sys},{role:"user",content:usr}], model:OPENAI_MODEL }),
+            signal: ctrl.signal,
+          });
+          clearTimeout(timer);
+          if (!resp.ok) throw new Error(`Proxy ${resp.status}: ${await resp.text()}`);
+          const data = await resp.json();
+          const text = data?.content || data?.choices?.[0]?.message?.content || '';
+          if (!text) throw new Error("Respons API kosong.");
+          state.modulAjar.hasil = text;
+          state.modulAjar.isGenerating = false;
+          saveDebounced(true);
+          render();
+          // Catat token & biaya + kurangi limit seperti generate soal
+          try {
+            const usageIn = Number(data?.usage?.prompt_tokens ?? data?.usage?.input_tokens ?? data?._usage?.in ?? 0);
+            const usageOut = Number(data?.usage?.completion_tokens ?? data?.usage?.output_tokens ?? data?._usage?.out ?? 0);
+            const title = `Modul Ajar - ${M.mapel || ''} - ${M.judulModul || ''}`.trim();
+            const snapshot = {
+              identity: { jenjang: M.jenjang||'', kelas: M.kelas||'', mataPelajaran: M.mapel||'' },
+              modulAjar: { ...M, hasil: text },
+              questions: []
+            };
+            await fetch("api/soal_user.php", {
+              method: "POST",
+              headers: {"Content-Type":"application/json"},
+              body: JSON.stringify({ type: "save", title, state: snapshot, token_input: usageIn, token_output: usageOut, model: OPENAI_MODEL })
+            });
+            await fetch("api/openai_proxy.php", {
+              method: "POST",
+              headers: {"Content-Type":"application/json"},
+              body: JSON.stringify({ type: "add_tokens", input_tokens: usageIn, output_tokens: usageOut })
+            });
+            await fetch("api/openai_proxy.php", {
+              method: "POST",
+              headers: {"Content-Type":"application/json"},
+              body: JSON.stringify({ type: "decrement_package" })
+            });
+            try { await computeStats(); } catch {}
+          } catch {}
+        } catch(e) {
+          state.modulAjar.isGenerating = false;
+          render();
+          setTimeout(()=>{ const el=document.getElementById('maError'); if(el){el.textContent='⚠️ Gagal: '+e.message; el.classList.remove('hidden');} }, 120);
+        }
+      }
+
+      async function exportModulAjarDocx() {
+        const M = state.modulAjar || {};
+        if (!M.hasil) return;
+        const btn = document.getElementById('btnExportMA') || document.getElementById('btnExportMA2');
+        const origHTML = btn?.innerHTML;
+        if (btn) { btn.disabled=true; btn.textContent='Membuat file...'; }
+
+        try {
+          const { Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,
+                  AlignmentType,BorderStyle,WidthType,ShadingType,
+                  Footer,PageNumber } = docx;
+
+          const FONT='Times New Roman', SZ=22, CW=9638;
+          const bdr={style:BorderStyle.SINGLE,size:4,color:'999999'};
+          const borders={top:bdr,bottom:bdr,left:bdr,right:bdr};
+          const sp=(b=60,a=60)=>({spacing:{before:b,after:a}});
+
+          function parseContent(raw) {
+            const lines = raw.split('\n');
+            const out = [];
+            let tblRows=[], inTbl=false;
+
+            const flushTbl = () => {
+              if (!tblRows.length) return;
+              const nc = Math.max(...tblRows.map(r=>r.length));
+              const cw = Math.floor(CW/nc);
+              out.push(new Table({
+                width:{size:CW,type:WidthType.DXA},
+                columnWidths:Array(nc).fill(cw),
+                rows: tblRows.map((row,ri)=>new TableRow({
+                  children: Array.from({length:nc},(_,ci)=>{
+                    const txt=(row[ci]||'').trim().replace(/\*\*/g,'');
+                    return new TableCell({
+                      borders, width:{size:cw,type:WidthType.DXA},
+                      shading: ri===0?{fill:'D9D9D9',type:ShadingType.CLEAR}:{fill:'FFFFFF',type:ShadingType.CLEAR},
+                      margins:{top:80,bottom:80,left:100,right:100},
+                      children:[new Paragraph({children:[new TextRun({text:txt,font:FONT,size:20,bold:ri===0})]})]
+                    });
+                  })
+                }))
+              }));
+              tblRows=[]; inTbl=false;
+            };
+
+            for (let i=0;i<lines.length;i++) {
+              const line=lines[i];
+              if (line.match(/^\|[-|: ]+\|?$/)) continue;
+              if (line.trim().startsWith('|')) {
+                inTbl=true;
+                tblRows.push(line.split('|').slice(1,-1).map(c=>c.trim()));
+                continue;
+              }
+              if (inTbl) flushTbl();
+              if (!line.trim()) { out.push(new Paragraph({...sp()})); continue; }
+              if (/^#\s*/.test(line)) {
+                out.push(new Paragraph({...sp(280,120),children:[new TextRun({text:line.replace(/^#\s*/,''),font:FONT,size:28,bold:true})]}));
+              } else if (/^##\s*/.test(line)) {
+                out.push(new Paragraph({...sp(240,100),children:[new TextRun({text:line.replace(/^##\s*/,''),font:FONT,size:26,bold:true})]}));
+              } else if (/^###\s*/.test(line)) {
+                out.push(new Paragraph({...sp(180,80),children:[new TextRun({text:line.replace(/^###\s*/,''),font:FONT,size:24,bold:true})]}));
+              } else if (/^####\s*/.test(line)) {
+                out.push(new Paragraph({...sp(140,60),children:[new TextRun({text:line.replace(/^####\s*/,''),font:FONT,size:SZ,bold:true})]}));
+              } else if (line.match(/^[-•] /)) {
+                out.push(new Paragraph({...sp(40,40),indent:{left:400,hanging:200},children:[new TextRun({text:'• '+line.replace(/^[-•] /,'').replace(/\*\*(.+?)\*\*/g,'$1'),font:FONT,size:SZ})]}));
+              } else if (line.match(/^\d+\. /)) {
+                const m=line.match(/^(\d+)\. (.*)/);
+                out.push(new Paragraph({...sp(40,40),indent:{left:400,hanging:200},children:[new TextRun({text:`${m[1]}. ${m[2].replace(/\*\*(.+?)\*\*/g,'$1')}`,font:FONT,size:SZ})]}));
+              } else {
+                const txt=line.replace(/\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1');
+                out.push(new Paragraph({...sp(60,60),children:[new TextRun({text:txt,font:FONT,size:SZ})]}));
+              }
+            }
+            if (inTbl) flushTbl();
+            return out;
+          }
+
+          // Hapus judul ganda dari konten jika sudah ada di M.hasil
+          let contentText = String(M.hasil || '');
+          contentText = contentText.replace(/^\s*#{1,3}\s*MODUL AJAR[^\n]*\n?/i, '');
+          contentText = contentText.replace(/^\s*#{1,3}\s*["“][^\n"”]+["”]\s*\n?/i, '');
+
+          const children = [
+            new Paragraph({alignment:AlignmentType.CENTER,...sp(200,60),
+              children:[new TextRun({text:`MODUL AJAR ${(M.mapel||'').toUpperCase()}`,font:FONT,size:28,bold:true})]}),
+            new Paragraph({alignment:AlignmentType.CENTER,...sp(0,280),
+              children:[new TextRun({text:`"${M.judulModul||''}"`,font:FONT,size:24,italics:true})]}),
+            ...parseContent(contentText)
+          ];
+
+          const doc2 = new Document({
+            styles:{default:{document:{run:{font:FONT,size:SZ}}}},
+            sections:[{
+              properties:{page:{size:{width:11906,height:16838},margin:{top:1134,right:1134,bottom:1134,left:1134}}},
+              footers:{default:new Footer({children:[new Paragraph({
+                alignment:AlignmentType.CENTER,
+                children:[
+                  new TextRun({text:`Modul Ajar ${M.mapel||''} — ${M.institusi||''} ${new Date().getFullYear()} | Halaman `,font:FONT,size:18,color:'888888'}),
+                  new TextRun({children:[PageNumber.CURRENT],font:FONT,size:18,color:'888888'})
+                ]
+              })]})},
+              children
+            }]
+          });
+
+          const blob = await Packer.toBlob(doc2);
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href=url;
+          a.download=`ModulAjar_${(M.mapel||'Mapel').replace(/\s+/g,'')}_${(M.judulModul||'Modul').replace(/[\s/]+/g,'_')}.docx`;
+          a.click();
+          URL.revokeObjectURL(url);
+        } catch(e) {
+          alert('Gagal membuat file: '+e.message);
+        } finally {
+          if (btn) { btn.disabled=false; btn.innerHTML=origHTML||'<span class="material-symbols-outlined text-[16px]">download</span> Download .docx'; }
+        }
+      }
+      // ═══════════════════════════════════════════════
+      //  END MODUL AJAR
+      // ═══════════════════════════════════════════════
 
       const buildNavAndTabs = async () => {
         const nav = el("nav");
         const tabs = el("tabs");
         if (!nav || !tabs) return;
         const baseBtn = (icon, label, extra = '', attrs = '') =>
-          `<button ${attrs} class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold hover:bg-background-light dark:hover:bg-background-dark ${extra}">
+          `<button ${attrs} class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-background-light dark:hover:bg-background-dark ${extra}">
             <span class="material-symbols-outlined text-[18px]">${icon}</span>
             <span>${label}</span>
           </button>`;
         const baseLink = (href, icon, label) =>
-          `<a href="${href}" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold hover:bg-background-light dark:hover:bg-background-dark">
+          `<a href="${href}" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-background-light dark:hover:bg-background-dark">
             <span class="material-symbols-outlined text-[18px]">${icon}</span>
             <span>${label}</span>
           </a>`;
 
-        const coreNav = VIEWS.map(v => `
-            <button onclick="__sp.setView('${v.id}')" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold hover:bg-background-light dark:hover:bg-background-dark ${state.activeView === v.id ? 'bg-primary/10 text-primary' : ''}">
+        const navViews = VIEWS.filter(v => v.id !== 'lkpd');
+        const coreNav = navViews.map(v => `
+            <button onclick="__sp.setView('${v.id}')" class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium hover:bg-background-light dark:hover:bg-background-dark ${state.activeView === v.id ? 'bg-primary/10 text-primary' : ''}">
               <span class="material-symbols-outlined text-[18px]">${v.icon}</span>
               <span>${v.label}</span>
             </button>
@@ -1388,8 +1837,8 @@ if (!isset($_SESSION['user_id'])) {
         nav.innerHTML = coreNav + extraNav;
         try {} catch {}
         tabs.innerHTML = `
-          ${VIEWS.map(v => `
-            <button onclick="__sp.setView('${v.id}')" class="flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold border ${state.activeView === v.id ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-surface-dark border-border-light dark:border-border-dark'}">
+          ${navViews.map(v => `
+            <button onclick="__sp.setView('${v.id}')" class="flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium border ${state.activeView === v.id ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-surface-dark border-border-light dark:border-border-dark'}">
               <span class="material-symbols-outlined text-[16px]">${v.icon}</span>
               <span>${v.label}</span>
             </button>
@@ -1402,7 +1851,6 @@ if (!isset($_SESSION['user_id'])) {
         if (state.theme === "dark") root.classList.add("dark");
         else root.classList.remove("dark");
       };
-      
       const toggleTheme = () => {
         state.theme = state.theme === "dark" ? "light" : "dark";
         saveDebounced(true);
@@ -1445,7 +1893,7 @@ if (!isset($_SESSION['user_id'])) {
           return parts.join("");
         }
         if (state.activeView === "lkpd") return renderLKPD();
-        if (state.activeView === "modul") return renderModul();
+        if (state.activeView === "modul_ajar") return renderModulAjar();
         if (state.activeView === "quiz") return renderQuizLanding();
         if (state.activeView === "riwayat") return renderRiwayat();
         return renderIdentitas();
@@ -1462,7 +1910,7 @@ if (!isset($_SESSION['user_id'])) {
             konfigurasi: "Atur bentuk, jumlah, kesulitan, dimensi, dan gambar per bagian",
             preview: "Naskah soal, dilengkapi kunci jawaban dan kisi-kisi",
             lkpd: "Generator LKPD otomatis sesuai tema aplikasi",
-            modul: "Generator Modul Ajar sesuai kebutuhan",
+            modul_ajar: "Generator Modul Ajar Kurikulum Merdeka 2025 · Deep Learning",
             quiz: "Mode kuis interaktif untuk kelas",
             riwayat: "Riwayat paket soal yang tersimpan",
           }[state.activeView] || "";
@@ -2227,252 +2675,6 @@ OUTPUT JSON:
           alert("Gagal OCR gambar. Silakan coba file lain.");
         } finally {
           if (btn) { btn.disabled = false; btn.innerHTML = original; }
-        }
-      };
-      const modulToggle = (key, label) => {
-        state.modul = state.modul || {};
-        const arr = Array.isArray(state.modul[key]) ? state.modul[key] : [];
-        const idx = arr.indexOf(label);
-        if (idx >= 0) arr.splice(idx, 1);
-        else arr.push(label);
-        state.modul[key] = arr;
-        saveDebounced(true);
-        render();
-      };
-      const buildModul = async () => {
-        const btn = document.getElementById("btnBuildModul");
-        const original = btn ? btn.innerHTML : "";
-        if (btn) {
-          btn.disabled = true;
-          btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Memproses...';
-        }
-        const M = state.modul || {};
-        const jenjang = String(M.jenjang || state.identity?.jenjang || "-");
-        const fase = String(M.fase || state.identity?.fase || "-");
-        const kelas = String(M.kelas || state.identity?.kelas || "-");
-        const mapel = String(M.mataPelajaran || state.identity?.mataPelajaran || "-");
-        const sekolah = String(M.namaSekolah || state.identity?.namaSekolah || "-");
-        const guru = String(M.namaGuru || state.identity?.namaGuru || "-");
-        const model = String(M.modelPembelajaran || "Problem Based Learning (PBL)");
-        const metode = (Array.isArray(M.metode) ? M.metode : []).join(", ");
-        const ppp = (Array.isArray(M.ppp) ? M.ppp : []).join(", ");
-        const alokasi = String(M.jamPelajaran || "");
-        const prompt = `Buat modul ajar ringkas dalam Bahasa Indonesia berbasis Kurikulum Merdeka. Kembalikan JSON PERSIS sesuai skema di bawah.
-KONTEKS:
-- Jenjang: ${jenjang} ${fase} Kelas ${kelas}
-- Mata Pelajaran: ${mapel}
-- Nama Sekolah: ${sekolah}
-- Nama Guru: ${guru}
-- Model Pembelajaran: ${model}
-- Metode yang dipilih: ${metode || "-"}
-- CP (opsional): ${String(M.cp || "").slice(0, 300)}
-- TP (opsional): ${String(M.tp || "").slice(0, 300)}
-- Profil Pelajar Pancasila (P5): ${ppp || "-"}
-- Media/Alat TIK: ${String(M.mediaTIK || "-")}
-- Sumber Belajar: ${String(M.sumberBelajar || "-")}
-- Lingkungan: ${String(M.lingkungan || "-")}
-- Alokasi JP: ${alokasi || "-"}
-
-OUTPUT JSON PERSIS:
-{
-  "identitas": {
-    "satuan_pendidikan": "...",
-    "guru_penyusun": "...",
-    "kelas_fase": "...",
-    "mata_pelajaran": "...",
-    "alokasi_waktu": "..."
-  },
-  "komponen_inti": {
-    "capaian_pembelajaran": "...",
-    "materi_esensial": "...",
-    "profil_pancasila": ["...","..."],
-    "tujuan_pembelajaran": ["...","..."],
-    "pertanyaan_pemantik": ["...","..."]
-  },
-  "desain_lingkungan": {
-    "strategi": {
-      "model": "...",
-      "metode": ["...","..."],
-      "pendekatan": "..."
-    },
-    "lingkungan_media": {
-      "ruang_fisik": "...",
-      "media_teknologi": "...",
-      "budaya_belajar": "..."
-    },
-    "sarana_prasarana": {
-      "sumber_belajar": ["..."],
-      "prasarana_lain": ["..."]
-    }
-  },
-  "rangkaian_kegiatan": [
-    {
-      "fase": "Pendahuluan",
-      "sintaks": "Pertanyaan Mendasar",
-      "prinsip": "Aktivasi",
-      "deskripsi": ["...","...","..."],
-      "waktu": "10 menit"
-    },
-    {
-      "fase": "Kegiatan Inti",
-      "sintaks": "Eksplorasi / Kolaborasi / Produksi",
-      "prinsip": "Eksplorasi",
-      "deskripsi": ["...","...","..."],
-      "waktu": "50 menit"
-    },
-    {
-      "fase": "Penutup",
-      "sintaks": "Evaluasi & Refleksi",
-      "prinsip": "Konfirmasi",
-      "deskripsi": ["...","..."],
-      "waktu": "10 menit"
-    }
-  ],
-  "asesmen": {
-    "jenis": {
-      "diagnostik": ["...","..."],
-      "formatif": ["...","..."],
-      "sumatif": ["..."]
-    },
-    "instrumen_diagnostik": [
-      { "aspek": "...", "pertanyaan": ["...","..."] },
-      { "aspek": "...", "pertanyaan": ["...","..."] }
-    ]
-  }
-}`;
-        let data = null;
-        try {
-          const res = await callOpenAI(prompt);
-          if (res && typeof res === "object") data = res;
-          else {
-            try { data = JSON.parse(String(res)); } catch {}
-          }
-        } catch {}
-        const ident = data?.identitas || {
-          satuan_pendidikan: sekolah || "-",
-          guru_penyusun: guru || "-",
-          kelas_fase: `${kelas} / ${fase}`,
-          mata_pelajaran: mapel || "-",
-          alokasi_waktu: alokasi || "-",
-        };
-        const inti = data?.komponen_inti || {};
-        const desain = data?.desain_lingkungan || {};
-        const kegiatan = Array.isArray(data?.rangkaian_kegiatan) ? data.rangkaian_kegiatan : [];
-        const asesmen = data?.asesmen || {};
-        const mkList = (items) => Array.isArray(items) && items.length ? `<ul>${items.map(s=>`<li>${safeText(String(s||''))}</li>`).join('')}</ul>` : "";
-        const kegiatanRows = kegiatan.map((k, idx) => `
-          <tr>
-            <td align="center"><b>${safeText(k.fase || (idx === 0 ? "Pendahuluan" : idx === kegiatan.length - 1 ? "Penutup" : "Kegiatan Inti"))}</b><br><br><span style="color:purple"><b>${safeText(k.prinsip || "")}</b></span></td>
-            <td><b>${safeText(k.sintaks || "")}</b><br><br><span style="color:green">${safeText(k.prinsip || "")}</span></td>
-            <td>${mkList(k.deskripsi)}</td>
-            <td align="center">${safeText(k.waktu || "")}</td>
-          </tr>
-        `).join('');
-        const instrumDiagTable = Array.isArray(asesmen?.instrumen_diagnostik) && asesmen.instrumen_diagnostik.length
-          ? `
-            <table width="100%" border="1" cellspacing="0" cellpadding="5" style="margin-top:5px; border-collapse:collapse; table-layout:fixed; word-wrap:break-word;">
-              <tr style="background-color:#f0f0f0;"><th>Aspek</th><th>Pertanyaan Kunci (Wawancara/Angket)</th></tr>
-              ${asesmen.instrumen_diagnostik.map(it => `<tr><td>${safeText(it.aspek || "")}</td><td>${mkList(it.pertanyaan)}</td></tr>`).join('')}
-            </table>
-          `
-          : "";
-        const titleTop = `MODUL AJAR KURIKULUM MERDEKA<br>${safeText(mapel)}`;
-        const fileName = `ModulAjar_${mapel.replace(/[^a-z0-9]/gi,'_')}_${kelas.replace(/[^a-z0-9]/gi,'_')}.doc`;
-        const html = `
-<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Dokumen Modul Ajar</title></head><body>
-<h2 style="text-align:center; font-family:Times New Roman;">${titleTop}</h2>
-<table border="1" cellspacing="0" cellpadding="5" width="100%" style="border-collapse:collapse; font-family:Times New Roman; margin-bottom:20px;">
-  <tr><td colspan="2" style="background-color:black; color:white; font-weight:bold;">A. IDENTITAS UMUM</td></tr>
-  <tr><td width="25%">Satuan Pendidikan</td><td>${safeText(ident.satuan_pendidikan || "-")}</td></tr>
-  <tr><td>Guru Penyusun</td><td>${safeText(ident.guru_penyusun || "-")}</td></tr>
-  <tr><td>Kelas / Fase</td><td>${safeText(ident.kelas_fase || "-")}</td></tr>
-  <tr><td>Mata Pelajaran</td><td>${safeText(ident.mata_pelajaran || "-")}</td></tr>
-  <tr><td>Alokasi Waktu</td><td>${safeText(ident.alokasi_waktu || "-")}</td></tr>
-</table>
-<table border="1" cellspacing="0" cellpadding="5" width="100%" style="border-collapse:collapse; font-family:Times New Roman; margin-bottom:20px;">
-  <tr><td colspan="2" style="background-color:black; color:white; font-weight:bold;">B. KOMPONEN INTI</td></tr>
-  <tr><td width="25%" valign="top"><b>Capaian Pembelajaran</b></td><td>${safeText(inti.capaian_pembelajaran || M.cp || "-")}</td></tr>
-  <tr><td valign="top"><b>Materi Esensial</b></td><td>${safeText(inti.materi_esensial || M.materiTambahan || "-")}</td></tr>
-  <tr><td valign="top"><b>Profil Pelajar Pancasila</b></td><td>${mkList(inti.profil_pancasila || M.ppp)}</td></tr>
-  <tr><td valign="top"><b>Tujuan Pembelajaran</b></td><td>${mkList(inti.tujuan_pembelajaran || (M.tp ? M.tp.split(/\\n+/) : []))}</td></tr>
-  <tr><td valign="top"><b>Pertanyaan Pemantik</b></td><td>${mkList(inti.pertanyaan_pemantik)}</td></tr>
-</table>
-<table border="1" cellspacing="0" cellpadding="5" width="100%" style="border-collapse:collapse; font-family:Times New Roman; margin-bottom:20px;">
-  <tr><td colspan="2" style="background-color:black; color:white; font-weight:bold;">C. DESAIN &amp; LINGKUNGAN PEMBELAJARAN</td></tr>
-  <tr><td valign="top"><b>Strategi Pembelajaran</b></td><td>
-    <ul>
-      <li><b>Model Pembelajaran:</b> ${safeText(desain?.strategi?.model || model)}</li>
-      <li><b>Metode Pembelajaran:</b> ${(desain?.strategi?.metode && desain.strategi.metode.length) ? safeText(desain.strategi.metode.join(", ")) : safeText(metode)}</li>
-      <li><b>Pendekatan Pembelajaran:</b> ${safeText(desain?.strategi?.pendekatan || "Deep Learning (Pembelajaran Mendalam)")}</li>
-    </ul>
-  </td></tr>
-  <tr><td width="25%" valign="top"><b>Lingkungan &amp; Media Pembelajaran</b></td><td>
-    <ul>
-      <li><b>Ruang Fisik:</b> ${safeText(desain?.lingkungan_media?.ruang_fisik || (M.lingkungan || "-"))}</li>
-      <li><b>Media &amp; Teknologi:</b> ${safeText(desain?.lingkungan_media?.media_teknologi || (M.mediaTIK || "-"))}</li>
-      <li><b>Budaya Belajar:</b> ${safeText(desain?.lingkungan_media?.budaya_belajar || "Inklusif, Menggembirakan, Berkesadaran")}</li>
-    </ul>
-  </td></tr>
-  <tr><td valign="top"><b>Sarana dan Prasarana</b></td><td>
-    <b>Sumber Belajar:</b> ${(desain?.sarana_prasarana?.sumber_belajar || [M.sumberBelajar]).filter(Boolean).join(", ")}<br>
-    <b>Prasarana Lain:</b> ${(desain?.sarana_prasarana?.prasarana_lain || ["LKPD","Alat Tulis","Papan Tulis"]).join(", ")}
-  </td></tr>
-</table>
-<table border="1" cellspacing="0" cellpadding="5" width="100%" style="border-collapse:collapse; font-family:Times New Roman; margin-top:10px; margin-bottom:20px;">
-  <thead>
-    <tr style="background-color:#ffe4b5;">
-      <th width="15%">Kegiatan<br><small style="color:purple">Pengalaman Belajar</small></th>
-      <th width="20%">Sintaks ${safeText(model)}<br><small style="color:green">Prinsip</small></th>
-      <th>Deskripsi Kegiatan</th>
-      <th width="10%">Waktu</th>
-    </tr>
-  </thead>
-  <tbody>
-    ${kegiatanRows}
-  </tbody>
-</table>
-<br><hr><br>
-<table border="1" cellspacing="0" cellpadding="5" width="100%" style="border-collapse:collapse; table-layout:fixed; font-family:Times New Roman; margin-top:10px; margin-bottom:20px;">
-  <tr style="background-color:#000; color:#fff;"><td colspan="2"><b>E. PENILAIAN / ASESMEN</b></td></tr>
-  <tr><td width="30%" valign="top"><b>1. Jenis Asesmen</b></td><td>
-    <ul>
-      ${(asesmen?.jenis?.diagnostik || []).map(s=>`<li><b>Diagnostik:</b> ${safeText(s)}</li>`).join('')}
-      ${(asesmen?.jenis?.formatif || []).map(s=>`<li><b>Formatif:</b> ${safeText(s)}</li>`).join('')}
-      ${(asesmen?.jenis?.sumatif || []).map(s=>`<li><b>Sumatif:</b> ${safeText(s)}</li>`).join('')}
-    </ul>
-  </td></tr>
-  <tr><td colspan="2">
-    <b>2. Instrumen Asesmen Diagnostik (Non-Kognitif)</b><br>
-    ${instrumDiagTable}
-  </td></tr>
-</table>
-</body></html>`;
-        downloadDOC(html, fileName);
-        try {
-          const usageIn = Number(data?._usage?.in || 0);
-          const usageOut = Number(data?._usage?.out || 0);
-          const title = `Modul Ajar - ${mapel} - ${kelas}`;
-          const snapshot = { identity: state.identity || {}, modul: M, questions: [] };
-          await fetch("api/soal_user.php", {
-            method: "POST",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({ type: "save", title, state: snapshot, token_input: usageIn, token_output: usageOut, model: OPENAI_MODEL })
-          });
-          await fetch("api/openai_proxy.php", {
-            method: "POST",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({ type: "add_tokens", input_tokens: usageIn, output_tokens: usageOut })
-          });
-          await fetch("api/openai_proxy.php", {
-            method: "POST",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({ type: "decrement_package" })
-          });
-          try { await computeStats(); } catch {}
-        } catch {}
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = original;
         }
       };
       const buildLKPD = async () => {
@@ -3889,8 +4091,6 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         setView,
         setLkpdSource,
         buildLKPD,
-        modulToggle,
-        buildModul,
         pickLkpdImage,
         pickLkpdText,
         buildPackage,
@@ -3907,6 +4107,28 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         updateSection,
         pickLogo,
         clearLogo,
+        // Modul Ajar
+        setMA: (key, val, renderNow = false) => {
+          if (!state.modulAjar) state.modulAjar = {};
+          state.modulAjar[key] = val;
+          if (key === 'jenjang') { state.modulAjar.fase=''; state.modulAjar.kelas=''; }
+          if (renderNow) {
+            saveDebounced(true);
+            render();
+          } else {
+            saveDebounced(false);
+          }
+        },
+        toggleMADimensi: (val, checked) => {
+          if (!state.modulAjar) state.modulAjar = {};
+          if (!Array.isArray(state.modulAjar.dimensi)) state.modulAjar.dimensi = [];
+          if (checked) { if (!state.modulAjar.dimensi.includes(val)) state.modulAjar.dimensi.push(val); }
+          else { state.modulAjar.dimensi = state.modulAjar.dimensi.filter(d=>d!==val); }
+          saveDebounced(false);
+          render();
+        },
+        buildModulAjar,
+        exportModulAjarDocx,
       };
 
       const btnThemeEl = el("btnTheme");

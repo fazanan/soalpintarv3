@@ -12,6 +12,34 @@ if ($role !== 'admin') {
 }
 require_once __DIR__ . '/db.php';
 
+$modelCfgCache = [];
+function table_exists(mysqli $db, string $table): bool {
+  $table = $db->real_escape_string($table);
+  $sql = "SHOW TABLES LIKE '$table'";
+  if ($res = $db->query($sql)) {
+    $ok = $res->num_rows > 0;
+    $res->close();
+    return $ok;
+  }
+  return false;
+}
+function get_model_config(mysqli $db, string $model): ?array {
+  if (!table_exists($db, 'api_models')) return null;
+  $sql = "SELECT token_input_price, token_output_price, currency_rate_to_idr
+            FROM api_models
+           WHERE is_active = 1 AND modality='chat' AND model = ?
+        ORDER BY updated_at DESC
+           LIMIT 1";
+  $stmt = $db->prepare($sql);
+  if (!$stmt) return null;
+  $stmt->bind_param('s', $model);
+  $stmt->execute();
+  $res = $stmt->get_result();
+  $row = $res ? $res->fetch_assoc() : null;
+  $stmt->close();
+  return $row ?: null;
+}
+
 $page = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 20;
 $offset = ($page - 1) * $perPage;
@@ -41,7 +69,7 @@ if ($page > $totalPages) { $page = $totalPages; $offset = ($page - 1) * $perPage
 
 $sql = "
   SELECT su.id, su.title, su.question_count, su.token_input, su.token_output,
-         su.token_input_price, su.token_output_price, su.currency, su.currency_rate_to_idr,
+         su.token_input_price, su.token_output_price, su.currency, su.currency_rate_to_idr, su.model,
          su.created_at, u.username
   FROM soal_user su
   JOIN users u ON u.id = su.user_id
@@ -116,7 +144,23 @@ $stmt->close();
               $outTok = (int)$r['token_output'];
               $inPrice = (float)($r['token_input_price'] ?? 0);
               $outPrice = (float)($r['token_output_price'] ?? 0);
-              $fx = (float)($r['currency_rate_to_idr'] ?? 1);
+              $fx = (float)($r['currency_rate_to_idr'] ?? 0);
+              // Fallback harga dari api_models jika belum tersimpan di soal_user
+              if (($inPrice <= 0 && $outPrice <= 0) || $fx <= 0) {
+                $model = (string)($r['model'] ?? '');
+                if ($model !== '') {
+                  if (!isset($modelCfgCache[$model])) {
+                    $modelCfgCache[$model] = get_model_config($mysqli, $model);
+                  }
+                  $cfg = $modelCfgCache[$model] ?: null;
+                  if ($cfg) {
+                    if ($inPrice <= 0) $inPrice = (float)($cfg['token_input_price'] ?? 0);
+                    if ($outPrice <= 0) $outPrice = (float)($cfg['token_output_price'] ?? 0);
+                    if ($fx <= 0) $fx = (float)($cfg['currency_rate_to_idr'] ?? 1);
+                  }
+                }
+              }
+              if ($fx <= 0) $fx = 1;
               $costBase = ($inTok / 1000.0) * $inPrice + ($outTok / 1000.0) * $outPrice;
               $costIdr = $costBase * ($fx > 0 ? $fx : 1);
               $costFmt = 'Rp' . number_format($costIdr, 0, ',', '.');
