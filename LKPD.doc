@@ -1,0 +1,207 @@
+<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Dokumen BahanAjar</title></head><body>
+<div class="style-container">
+<style>
+/* CSS Reset / Base */
+body { font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.5; color: #000; margin: 0; padding: 0; background-color: #f0f0f0; }
+.main-wrapper { max-width: 21cm; margin: 0 auto; background: #fff; padding: 2cm; border: 1px solid #ccc; box-shadow: 0 0 10px rgba(0,0,0,0.1); box-sizing: border-box; }
+
+@media print { 
+    body { background-color: #fff; }
+    .main-wrapper { margin: 0; padding: 0; border: none; box-shadow: none; width: 100%; max-width: none; } 
+    .page-break { page-break-before: always; }
+}
+
+/* Header */
+.header { text-align: center; border-bottom: 3px double #000; padding-bottom: 20px; margin-bottom: 30px; }
+.header h1 { font-size: 18pt; margin: 0; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+.header h3 { font-size: 12pt; margin: 5px 0 0 0; font-weight: normal; }
+
+/* Identity */
+.identity-box { border: 1px solid #000; padding: 10px; margin-bottom: 30px; width: 100%; box-sizing: border-box; }
+.identity-table { width: 100%; border-collapse: collapse; border: none; }
+.identity-table td { padding: 8px 5px; vertical-align: bottom; width: 50%; border: none; }
+
+/* Sections */
+.section-title { 
+    background: #000; color: #fff; padding: 8px 15px; 
+    font-weight: bold; font-size: 12pt; text-transform: uppercase; 
+    margin-bottom: 15px; border: 1px solid #000; text-align: center;
+}
+
+/* Layout Table (Replaces Flexbox) */
+.layout-table { width: 100%; border-collapse: collapse; border: none; margin-bottom: 20px; }
+.layout-table td { vertical-align: top; padding: 0; border: none; }
+.petunjuk-cell { padding-right: 20px; }
+.qr-cell { width: 160px; text-align: center; vertical-align: top; }
+
+.qr-box { 
+    border: 1px solid #000; padding: 10px; text-align: center; 
+    background: #fff; display: inline-block; width: 120px;
+}
+.qr-box img { width: 100px; height: 100px; }
+.qr-label { font-size: 8pt; font-weight: bold; margin-top: 5px; }
+
+/* Content */
+.content-text { margin-bottom: 20px; text-align: justify; }
+.activity-box { border: 1px solid #000; padding: 20px; margin-bottom: 25px; page-break-inside: avoid; background: #fff; position: relative; }
+.activity-header { 
+    background: #e0e0e0; padding: 5px 10px; font-weight: bold; 
+    border-bottom: 1px solid #000; margin: -20px -20px 20px -20px; 
+    font-size: 11pt; text-transform: uppercase;
+}
+.q-list { margin-left: 20px; }
+.q-item { margin-bottom: 15px; }
+
+/* Answer Spaces */
+.answer-line { border-bottom: 1px dotted #000; height: 25px; width: 100%; display: block; margin-top: 5px; }
+.answer-box { border: 1px solid #000; height: 100px; width: 100%; display: block; margin-top: 10px; }
+.diagram-box { border: 1px dashed #000; height: 150px; display: flex; align-items: center; justify-content: center; margin-top: 10px; color: #999; }
+
+/* Table Style (Rubric) */
+table.rubric { width: 100%; border-collapse: collapse; border: 1px solid #000; margin-top: 10px; }
+table.rubric th { background: #e0e0e0; border: 1px solid #000; padding: 8px; text-align: center; font-weight: bold; }
+table.rubric td { border: 1px solid #000; padding: 8px; vertical-align: top; }
+
+/* Teacher Section */
+.page-break-marker { page-break-before: always; border-top: 2px dashed #999; margin-top: 50px; padding-top: 20px; text-align: center; color: #999; font-style: italic; }
+.teacher-box { border: 4px double #000; padding: 30px; margin-top: 20px; background: #fff; }
+</style>
+</div>
+
+<div class="main-wrapper">
+  
+  <!-- HEADER -->
+  <div class="header">
+    <h1>LEMBAR KERJA PESERTA DIDIK</h1>
+    <h3>Mata Pelajaran: SEJARAH | Topik: Perlawanan Pahlawan Diponegoro</h3>
+  </div>
+
+  <!-- IDENTITAS -->
+  <div class="identity-box">
+    <table class="identity-table">
+      <tbody><tr><td>Nama: ........................................</td><td>Kelompok: ........................................</td></tr>
+      <tr><td>Kelas: ........................................</td><td>Tanggal: ........................................</td></tr>
+    </tbody></table>
+  </div>
+
+  <!-- PETUNJUK (SIDE BY SIDE TABLE LAYOUT) -->
+  <table class="layout-table">
+    <tbody><tr>
+      <td class="petunjuk-cell">
+        <div class="section-title" style="margin-top:0">PETUNJUK BELAJAR</div>
+        <div class="content-text">
+            <ul>
+            <li>Berdoalah sebelum memulai kegiatan.</li>
+            <li>Baca setiap instruksi dengan teliti.</li>
+            <li>Kerjakan aktivitas urut dari awal hingga akhir.</li>
+            <li>Tanyakan pada guru jika mengalami kesulitan.</li>
+            </ul>
+        </div>
+      </td>
+      
+    </tr>
+  </tbody></table>
+  
+  <!-- AKTIVITAS UTAMA -->
+  <div class="section-title">LEMBAR KERJA &amp; AKTIVITAS SISWA</div>
+  
+  <!-- GENERATE 3-5 ACTIVITY BOXES HERE -->
+  <div class="activity-box">
+    <div class="activity-header">Aktivitas 1: Diskusi Sejarah</div>
+    <div class="content-text">
+      Diskusikan dengan kelompokmu tentang latar belakang Perang Diponegoro. 
+      Setiap anggota kelompok harus memberikan pendapat dan informasi yang telah dipelajari.
+      Buatlah catatan tentang poin-poin penting yang dibahas dan presentasikan kepada kelas.
+    </div>
+  </div>
+
+  <div class="activity-box">
+    <div class="activity-header">Aktivitas 2: Peta Perang</div>
+    <div class="content-text">
+      Buatlah peta yang menunjukkan lokasi-lokasi penting selama Perang Diponegoro. 
+      Tandai tempat-tempat pertempuran dan jelaskan peran masing-masing lokasi. 
+      Gunakan warna dan simbol yang berbeda untuk menandai informasi yang berbeda.
+    </div>
+  </div>
+
+  <div class="activity-box">
+    <div class="activity-header">Aktivitas 3: Menciptakan Poster</div>
+    <div class="content-text">
+      Ciptakan poster yang menggambarkan sosok Pahlawan Diponegoro. 
+      Sertakan gambar, kutipan, dan fakta-fakta menarik tentang beliau. 
+      Poster ini akan dipamerkan di kelas, jadi pastikan menarik dan informatif.
+    </div>
+  </div>
+
+  <div class="activity-box">
+    <div class="activity-header">Aktivitas 4: Peran Pahlawan</div>
+    <div class="content-text">
+      Diskusikan dengan kelompok mengenai peran Pahlawan Diponegoro dalam perjuangan bangsa. 
+      Buatlah presentasi singkat mengenai kontribusi beliau terhadap sejarah Indonesia.
+    </div>
+  </div>
+
+  <!-- RUBRIK -->
+  <div class="section-title">RUBRIK PENILAIAN</div>
+  <table class="rubric">
+    <tbody><tr>
+      <th>Kriteria</th>
+      <th>Skor 1</th>
+      <th>Skor 2</th>
+      <th>Skor 3</th>
+      <th>Skor 4</th>
+    </tr>
+    <tr>
+      <td>Kemampuan Diskusi</td>
+      <td>Kurang aktif dalam diskusi</td>
+      <td>Beberapa kontribusi, kurang jelas</td>
+      <td>Aktif dan jelas dalam diskusi</td>
+      <td>Sangat aktif dan memberikan informasi yang sangat relevan</td>
+    </tr>
+    <tr>
+      <td>Kreativitas Poster</td>
+      <td>Poster tidak menarik</td>
+      <td>Poster biasa saja</td>
+      <td>Poster menarik dan informatif</td>
+      <td>Poster sangat kreatif dan penuh informasi</td>
+    </tr>
+    <tr>
+      <td>Kualitas Peta</td>
+      <td>Peta tidak jelas</td>
+      <td>Peta ada, tapi kurang informatif</td>
+      <td>Peta jelas dan informatif</td>
+      <td>Peta sangat jelas, informatif, dan menarik</td>
+    </tr>
+    <tr>
+      <td>Presentasi</td>
+      <td>Presentasi kurang jelas</td>
+      <td>Presentasi ada, tapi kurang terstruktur</td>
+      <td>Presentasi terstruktur dan jelas</td>
+      <td>Presentasi sangat terstruktur dan menarik perhatian</td>
+    </tr>
+  </tbody></table>
+
+</div>
+
+<!-- AREA GURU -->
+<div class="page-break-marker">-- POTONG DI SINI (KHUSUS GURU) --</div>
+
+<div class="main-wrapper teacher-box">
+  <div class="header">
+    <h1>PANDUAN GURU &amp; JAWABAN</h1>
+  </div>
+  
+  <h3>A. KUNCI JAWABAN</h3>
+  1. Diskusi Sejarah: Siswa harus dapat menyebutkan latar belakang sosial, politik, dan ekonomi yang memicu Perang Diponegoro. 
+  2. Peta Perang: Peta harus mencakup lokasi seperti Yogyakarta, Semarang, dan Magelang, serta menjelaskan konteks pertempuran.
+  3. Poster: Poster harus menggambarkan sosok pahlawan dengan informasi penting dan kutipan yang relevan.
+  4. Presentasi: Siswa harus mampu menjelaskan kontribusi Diponegoro dalam konteks perjuangan kemerdekaan.
+
+  <h3>B. STRATEGI DIFERENSIASI</h3>
+  Berikan bimbingan tambahan bagi siswa yang mengalami kesulitan dengan cara memberikan contoh konkret dan diskusi individu.
+  Siswa yang lebih cepat memahami dapat diberikan tugas tambahan seperti penelitian tentang pahlawan lainnya.
+
+  <h3>C. REMEDIAL</h3>
+  Untuk siswa yang kesulitan, adakan sesi remedial di mana mereka dapat bekerja dalam kelompok kecil untuk mendiskusikan materi dan membuat rangkuman bersama.
+</div>
+</body></html>

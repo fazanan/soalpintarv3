@@ -1,0 +1,100 @@
+CREATE DATABASE IF NOT EXISTS soalpintar
+  DEFAULT CHARACTER SET utf8mb4
+  DEFAULT COLLATE utf8mb4_unicode_ci;
+
+USE soalpintar;
+
+CREATE TABLE IF NOT EXISTS users (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(100) NOT NULL UNIQUE,
+  password VARCHAR(255) NOT NULL,
+  role ENUM('admin','user') NOT NULL DEFAULT 'user',
+  limitpaket INT NOT NULL DEFAULT 300,
+  limitgambar INT NOT NULL DEFAULT 5,
+  token_input BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  token_output BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NULL,
+  level ENUM('error','warn','info') NOT NULL DEFAULT 'error',
+  category VARCHAR(64) NOT NULL,
+  message TEXT NOT NULL,
+  http_status INT NULL,
+  endpoint VARCHAR(255) NULL,
+  ip_address VARCHAR(45) NULL,
+  context LONGTEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_level_created (level, created_at),
+  INDEX idx_category_created (category, created_at),
+  INDEX idx_user_created (user_id, created_at),
+  CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS api_models (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  provider VARCHAR(64) NOT NULL,
+  modality ENUM('chat','image','audio','embedding','other') NOT NULL DEFAULT 'chat',
+  model VARCHAR(128) NOT NULL,
+  display_name VARCHAR(128) NULL,
+  endpoint_url VARCHAR(512) NOT NULL,
+  token_input_price DECIMAL(16,8) NOT NULL DEFAULT 0.0,
+  token_output_price DECIMAL(16,8) NOT NULL DEFAULT 0.0,
+  currency VARCHAR(8) NOT NULL DEFAULT 'USD',
+  currency_rate_to_idr DECIMAL(16,8) NOT NULL DEFAULT 1.0,
+  unit VARCHAR(32) NOT NULL DEFAULT 'per_1k_tokens',
+  max_input_tokens INT UNSIGNED NULL,
+  max_output_tokens INT UNSIGNED NULL,
+  supports_json_mode TINYINT(1) NOT NULL DEFAULT 1,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_provider_model_modality (provider, model, modality),
+  INDEX idx_active (is_active)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS api_keys (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  provider VARCHAR(64) NOT NULL,
+  api_key TEXT NOT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT UNSIGNED NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_provider_active (provider, is_active),
+  CONSTRAINT fk_api_keys_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS soal_user (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  jenjang VARCHAR(32) NULL,
+  kelas VARCHAR(32) NULL,
+  mata_pelajaran VARCHAR(128) NULL,
+  question_count INT NOT NULL DEFAULT 0,
+  token_input BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  token_output BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  model VARCHAR(128) NULL,
+  token_input_price DECIMAL(16,8) NOT NULL DEFAULT 0.0,
+  token_output_price DECIMAL(16,8) NOT NULL DEFAULT 0.0,
+  currency VARCHAR(8) NOT NULL DEFAULT 'USD',
+  currency_rate_to_idr DECIMAL(16,8) NOT NULL DEFAULT 1.0,
+  snapshot LONGTEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_user_created (user_id, created_at),
+  CONSTRAINT fk_soal_user_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;

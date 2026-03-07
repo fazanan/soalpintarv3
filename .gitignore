@@ -1,0 +1,29 @@
+### OS / Editor ###
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.code-workspace
+
+### PHP / Common ###
+vendor/
+composer.lock
+
+### Temp / Cache / Logs ###
+tmp/
+temp/
+cache/
+storage/
+*.log
+
+### Build / Exports ###
+*.docx
+*.xlsx
+*.pdf
+*.zip
+
+### Secrets ###
+.env
+.env.*
+db.php
+
