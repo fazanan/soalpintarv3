@@ -420,6 +420,18 @@ if (!isset($_SESSION['user_id'])) {
         ],
       };
 
+      const uuid = () => {
+        const c = globalThis.crypto;
+        if (c && typeof c.randomUUID === "function") return c.randomUUID();
+        const rnds = new Uint8Array(16);
+        if (c && typeof c.getRandomValues === "function") c.getRandomValues(rnds);
+        else for (let i = 0; i < rnds.length; i++) rnds[i] = Math.floor(Math.random() * 256);
+        rnds[6] = (rnds[6] & 0x0f) | 0x40;
+        rnds[8] = (rnds[8] & 0x3f) | 0x80;
+        const hex = Array.from(rnds, (b) => b.toString(16).padStart(2, "0"));
+        return `${hex[0]}${hex[1]}${hex[2]}${hex[3]}-${hex[4]}${hex[5]}-${hex[6]}${hex[7]}-${hex[8]}${hex[9]}-${hex[10]}${hex[11]}${hex[12]}${hex[13]}${hex[14]}${hex[15]}`;
+      };
+
       const DEFAULT_STATE = () => ({
         theme: "light",
         activeView: "identitas",
@@ -477,7 +489,7 @@ if (!isset($_SESSION['user_id'])) {
         previewFlags: { kunci: true, kisi: true },
         sections: [
           {
-            id: crypto.randomUUID(),
+            id: uuid(),
             judul: "Bagian 1",
             bentuk: "pg",
             opsiPG: 4,
@@ -582,7 +594,7 @@ if (!isset($_SESSION['user_id'])) {
 
       const addSection = () => {
         state.sections.push({
-          id: crypto.randomUUID(),
+          id: uuid(),
           judul: `Bagian ${state.sections.length + 1}`,
           bentuk: "pg",
           opsiPG: 4,
@@ -606,7 +618,7 @@ if (!isset($_SESSION['user_id'])) {
       const duplicateSection = (id) => {
         const s = state.sections.find((x) => x.id === id);
         if (!s) return;
-        state.sections.push({ ...structuredClone(s), id: crypto.randomUUID(), judul: `${s.judul} (Copy)` });
+        state.sections.push({ ...structuredClone(s), id: uuid(), judul: `${s.judul} (Copy)` });
         saveDebounced(true);
         render();
       };
@@ -732,7 +744,7 @@ if (!isset($_SESSION['user_id'])) {
         }
 
         return {
-          id: crypto.randomUUID(),
+          id: uuid(),
           sectionId: sec?.id,
           pakaiGambar: Boolean(sec?.pakaiGambar),
           type,
