@@ -484,6 +484,11 @@ if (!isset($_SESSION['user_id'])) {
         globalSeed: Math.floor(Math.random() * 1e9),
         questions: [],
         quiz: { idx: 0, answered: {}, input: "", reveal: false },
+        quizSubtab: "live",
+        quizPublishForm: { slug: "", jumlah: 32, expire: "" },
+        quizPublications: [],
+        quizResults: [],
+        quizSelectedSlug: "",
       });
 
       let state = DEFAULT_STATE();
@@ -2220,17 +2225,119 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         `;
       };
 
-      const renderQuizLanding = () => `
-        <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
+      const renderQuizLanding = () => {
+        const sub = state.quizSubtab || "live";
+        const mapel = String(state.identity.mataPelajaran || "");
+        const judulPaket = String(state.paket?.judul || "");
+        const baseForSlug = mapel || judulPaket || 'soal';
+        const slugDefault = baseForSlug.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+        if (!state.quizPublishForm.slug) state.quizPublishForm.slug = slugDefault || 'kelas';
+        const tabs = `
+          <div class="flex items-center gap-2 border-b border-border-light dark:border-border-dark px-4 pt-4">
+            <button onclick="window.__sp.setQuizTab('live')" class="px-3 py-2 text-sm font-semibold ${sub==='live'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Live</button>
+            ${IS_ADMIN ? `<button onclick="window.__sp.setQuizTab('publish')" class="px-3 py-2 text-sm font-semibold ${sub==='publish'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Generate Link</button>` : ``}
+            ${IS_ADMIN ? `<button onclick="window.__sp.setQuizTab('results')" class="px-3 py-2 text-sm font-semibold ${sub==='results'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Hasil</button>` : ``}
+          </div>
+        `;
+        const haveQuestions = Array.isArray(state.questions) && state.questions.length > 0;
+        const live = `
           <div class="p-6 space-y-3">
             <div class="text-xl font-bold">Mode Kuis</div>
-            <div class="text-sm text-text-sub-light dark:text-text-sub-dark">Jalankan kuis interaktif di kelas</div>
-            <button onclick="openQuiz()" class="px-4 py-2 rounded-lg bg-primary text-white font-bold">Mulai</button>
+            <div class="text-sm text-text-sub-light dark:text-text-sub-dark">${haveQuestions ? 'Jalankan kuis interaktif di kelas' : 'Buat naskah soal terlebih dahulu di tab Identitas/Konfigurasi'}</div>
+            <button ${haveQuestions ? '' : 'disabled'} onclick="openQuiz()" class="px-4 py-2 rounded-lg ${haveQuestions ? 'bg-primary hover:bg-blue-600 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'} font-bold">Mulai</button>
           </div>
-        </div>
-      `;
+        `;
+        const pub = !IS_ADMIN ? `` : (() => {
+          const f = state.quizPublishForm || {};
+          return `
+            <div class="p-6 space-y-5">
+              <div>
+                <div class="text-xl font-bold">Generate Link Publik</div>
+                <div class="text-sm text-text-sub-light mt-1">Buat tautan yang bisa diakses siswa tanpa login</div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="space-y-1.5">
+                  <label class="text-sm font-semibold">Slug Mapel</label>
+                  <input class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(f.slug || '')}" placeholder="mis. biologi" oninput="window.__sp.setQuizPublish('slug', this.value)">
+                </div>
+                <div class="space-y-1.5">
+                  <label class="text-sm font-semibold">Jumlah Siswa</label>
+                  <input type="number" min="1" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${Number(f.jumlah||32)}" placeholder="mis. 32" oninput="window.__sp.setQuizPublish('jumlah', Number(this.value))">
+                </div>
+                <div class="space-y-1.5">
+                  <label class="text-sm font-semibold">Expire (opsional, YYYY-MM-DD)</label>
+                  <input placeholder="2026-12-31" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(f.expire || '')}" oninput="window.__sp.setQuizPublish('expire', this.value)">
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <button onclick="window.__sp.publishQuiz()" class="px-4 h-11 rounded-lg bg-primary hover:bg-blue-600 text-white font-semibold">Publish</button>
+                <div id="pubMsg" class="text-sm text-text-sub-light"></div>
+              </div>
+              ${Number(f.jumlah||0) > 0 && f.slug ? (() => {
+                const sample = location.origin + '/' + (f.slug || '') + '/1';
+                const esc = String(sample).replace(/"/g,'&quot;');
+                return `
+                  <div class="space-y-2">
+                    <div class="text-xs text-text-sub-light">Contoh link</div>
+                    <code class="block px-2.5 py-1 rounded-md border bg-white dark:bg-surface-dark font-mono text-xs">${esc}</code>
+                    <div class="text-xs text-text-sub-light">Cara akses: ganti angka di akhir sesuai nomor absen siswa (misal /5 untuk absen 5).</div>
+                    <div>
+                      <button type="button" data-link="${esc}" onclick="navigator.clipboard.writeText(this.getAttribute('data-link')); this.textContent='Disalin'; setTimeout(()=>this.textContent='Salin',1500)" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm">Salin</button>
+                    </div>
+                  </div>
+                `;
+              })() : ``}
+            </div>
+          `;
+        })();
+        const res = !IS_ADMIN ? `` : (() => {
+          const items = Array.isArray(state.quizPublications) ? state.quizPublications : [];
+          const sel = state.quizSelectedSlug || (items[0]?.slug || '');
+          const options = items.map(it => `<option value="${safeText(it.slug)}" ${it.slug===sel?'selected':''}>${safeText(it.slug)} • ${safeText(it.mapel)} • ${safeText(it.created_at || '')}</option>`).join('');
+          const dataRows = Array.isArray(state.quizResults) ? state.quizResults.slice() : [];
+          dataRows.sort((a,b)=>{
+            const pa = a && a.total ? (a.score/a.total) : 0;
+            const pb = b && b.total ? (b.score/b.total) : 0;
+            if (pb !== pa) return pb - pa;
+            return (a.absen||0) - (b.absen||0);
+          });
+          const rows = dataRows.map((r, idx) => {
+            const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
+            return `<tr><td class="border px-3 py-2 text-center">${idx+1}</td><td class="border px-3 py-2">${safeText(state.quizResultsMapel || '')}</td><td class="border px-3 py-2 text-center">${Number(r.absen)}</td><td class="border px-3 py-2 text-center">${pct}</td></tr>`;
+          }).join('');
+          return `
+            <div class="p-6 space-y-4">
+              <div class="text-xl font-bold">Hasil</div>
+              <div class="flex items-center gap-2">
+                <select id="selPub" class="h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark">${options}</select>
+                <button onclick="window.__sp.loadResults()" class="px-4 h-11 rounded-lg border bg-white dark:bg-surface-dark">Muat</button>
+                <button onclick="window.__sp.loadPublications()" class="px-3 h-11 rounded-lg border bg-white dark:bg-surface-dark">Segarkan</button>
+              </div>
+              <div class="overflow-auto">
+                <table class="min-w-full text-sm border">
+                  <thead class="bg-background-light dark:bg-background-dark">
+                    <tr><th class="border px-3 py-2 text-center">Peringkat</th><th class="border px-3 py-2 text-left">Mata Pelajaran</th><th class="border px-3 py-2">No Absen</th><th class="border px-3 py-2">Nilai</th></tr>
+                  </thead>
+                  <tbody>${rows || `<tr><td colspan="4" class="border px-3 py-6 text-center text-text-sub-light">Belum ada hasil.</td></tr>`}</tbody>
+                </table>
+              </div>
+            </div>
+          `;
+        })();
+        const body = sub==='publish' ? pub : sub==='results' ? res : live;
+        return `
+          <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
+            ${tabs}
+            ${body}
+          </div>
+        `;
+      };
 
       const openQuiz = () => {
+        if (!Array.isArray(state.questions) || state.questions.length === 0) {
+          alert("Buat naskah soal terlebih dahulu.");
+          return;
+        }
         document.getElementById('quizOverlay')?.classList.remove('hidden');
         state.quiz.idx = 0;
         state.quiz.reveal = false;
@@ -2282,6 +2389,92 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         state.quiz.answered[state.quiz.idx] = i;
         state.quiz.reveal = true;
         renderQuizContent();
+      };
+      const setQuizTab = (t) => {
+        state.quizSubtab = t;
+        saveDebounced(true);
+        render();
+      };
+      const setQuizPublish = (k, v) => {
+        state.quizPublishForm = state.quizPublishForm || {};
+        state.quizPublishForm[k] = v;
+        saveDebounced(false);
+      };
+      const publishQuiz = async () => {
+        const mapel = String(state.identity.mataPelajaran || "").trim();
+        if (!mapel) { alert("Lengkapi mata pelajaran di Identitas."); return; }
+        if (!Array.isArray(state.questions) || state.questions.length === 0) {
+          alert("Buat naskah soal terlebih dahulu.");
+          return;
+        }
+        const items = Array.isArray(state.questions) ? state.questions : [];
+        const pg = items.filter(q => q && q.type === 'pg' && Array.isArray(q.options) && q.options.length >= 3);
+        if (pg.length === 0) { alert("Hanya mendukung PG. Tidak ada PG pada paket ini."); return; }
+        const payload = pg.map(q => ({ question: String(q.question||''), options: q.options.map(x=>String(x||'')) }));
+        const answer_key = pg.map(q => Number(Array.isArray(q.answer)? q.answer[0] : q.answer || 0));
+        const slug = String(state.quizPublishForm?.slug || "").trim().toLowerCase().replace(/[^a-z0-9\-]+/g,'-').replace(/^-+|-+$/g,'');
+        const expire = String(state.quizPublishForm?.expire || "").trim();
+        if (!slug) { alert("Isi slug."); return; }
+        const btn = document.getElementById('pubMsg');
+        if (btn) btn.textContent = "Memproses...";
+        try {
+          const params = new URLSearchParams();
+          params.set('slug', slug);
+          params.set('mapel', mapel);
+          params.set('kelas', String(state.identity.kelas||''));
+          params.set('sekolah', String(state.identity.namaSekolah||''));
+          params.set('guru', String(state.identity.namaGuru||''));
+          params.set('payload_public', JSON.stringify(payload));
+          params.set('answer_key', JSON.stringify(answer_key));
+          params.set('max_absen', String(Number(state.quizPublishForm?.jumlah || 0) || 0));
+          if (expire) params.set('expire_at', expire);
+          const res = await fetch('api/publish_quiz.php', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'}, body: params.toString(), credentials: 'same-origin' });
+          const raw = await res.text();
+          let js = null;
+          try { js = JSON.parse(raw); } catch {}
+          if (res.ok && js && js.ok) {
+            if (btn) btn.textContent = `Published. Gunakan ${js.public_link}`;
+            await loadPublications();
+            state.quizSelectedSlug = String(js.slug);
+            saveDebounced(true);
+            render();
+          } else {
+            const snippet = raw ? String(raw).slice(0,120).replace(/\s+/g,' ').trim() : '';
+            const detail = js?.error || (res.status === 409 ? 'slug_exists' : `http_${res.status}${snippet ? ': '+snippet : ''}`);
+            if (btn) btn.textContent = `Gagal publish (${detail}).`;
+          }
+        } catch (e) {
+          if (btn) btn.textContent = "Gagal publish (network).";
+        }
+      };
+      const loadPublications = async () => {
+        try {
+          const res = await fetch('api/published_quiz_list.php');
+          if (!res.ok) return;
+          const js = await res.json();
+          if (js && js.ok) {
+            state.quizPublications = js.items || [];
+            if (!state.quizSelectedSlug && state.quizPublications[0]) state.quizSelectedSlug = state.quizPublications[0].slug;
+            saveDebounced(false);
+          }
+        } catch {}
+      };
+      const loadResults = async () => {
+        const selEl = document.getElementById('selPub');
+        if (selEl) state.quizSelectedSlug = selEl.value;
+        const slug = state.quizSelectedSlug;
+        if (!slug) return;
+        try {
+          const res = await fetch('api/published_quiz_results.php?'+new URLSearchParams({ slug }));
+          if (!res.ok) return;
+          const js = await res.json();
+          if (js && js.ok) {
+            state.quizResults = js.items || [];
+            state.quizResultsMapel = js.mapel || '';
+            saveDebounced(false);
+            render();
+          }
+        } catch {}
       };
 
       const buildPackage = async () => {
@@ -4094,6 +4287,11 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
 
       window.__sp = {
         setView,
+        setQuizTab,
+        setQuizPublish,
+        publishQuiz,
+        loadPublications,
+        loadResults,
         setLkpdSource,
         buildLKPD,
         pickLkpdImage,

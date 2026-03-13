@@ -98,3 +98,35 @@ CREATE TABLE IF NOT EXISTS soal_user (
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS published_quizzes (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  slug VARCHAR(128) NOT NULL UNIQUE,
+  mapel VARCHAR(128) NOT NULL,
+  kelas VARCHAR(32) NULL,
+  total_soal INT NOT NULL DEFAULT 0,
+  payload_public LONGTEXT NOT NULL,
+  answer_key LONGTEXT NOT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  expire_at TIMESTAMP NULL DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_active_created (is_active, created_at),
+  CONSTRAINT fk_published_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS published_quiz_results (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  published_id INT UNSIGNED NOT NULL,
+  absen INT UNSIGNED NOT NULL,
+  score INT NOT NULL DEFAULT 0,
+  total INT NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_pub_absen (published_id, absen),
+  INDEX idx_pub_created (published_id, created_at),
+  CONSTRAINT fk_published_results FOREIGN KEY (published_id) REFERENCES published_quizzes(id) ON DELETE CASCADE
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
