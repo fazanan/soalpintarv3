@@ -603,7 +603,7 @@ if (!isset($_SESSION['user_id'])) {
         render();
       };
 
-      const updateSection = (id, key, value) => {
+      const updateSection = (id, key, value, renderNow = true) => {
         const s = state.sections.find((x) => x.id === id);
         if (!s) return;
         s[key] = value;
@@ -617,8 +617,11 @@ if (!isset($_SESSION['user_id'])) {
           const codes = bloomPresets[value]?.codes;
           if (codes) s.dimensi = codes;
         }
-        saveDebounced(true);
-        render();
+        saveDebounced(false);
+        if (renderNow) {
+          render();
+          saveDebounced(true);
+        }
       };
 
       let saveTimer = null;
@@ -2122,7 +2125,8 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                   <input
                     class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
                     value="${safeText(s.judul || "")}"
-                    oninput="window.__sp.updateSection('${s.id}','judul',this.value)"
+                    oninput="window.__sp.updateSection('${s.id}','judul',this.value,false)"
+                    onblur="window.__sp.updateSection('${s.id}','judul',this.value,true)"
                   />
                 </div>
                 <div class="flex flex-col gap-2">
@@ -2166,7 +2170,8 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                     min="0"
                     class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
                     value="${safeText(Number(isObjective ? s.jumlahPG : s.jumlahIsian) || 0)}"
-                    oninput="window.__sp.updateSection('${s.id}','${isObjective ? 'jumlahPG' : 'jumlahIsian'}',Number(this.value))"
+                    oninput="window.__sp.updateSection('${s.id}','${isObjective ? 'jumlahPG' : 'jumlahIsian'}',Number(this.value),false)"
+                    onblur="window.__sp.updateSection('${s.id}','${isObjective ? 'jumlahPG' : 'jumlahIsian'}',Number(this.value),true)"
                   />
                 </div>
               </div>
