@@ -2249,6 +2249,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         `;
         const pub = !IS_ADMIN ? `` : (() => {
           const f = state.quizPublishForm || {};
+          const sampleLink = (Number(f.jumlah||0) > 0 && f.slug) ? (location.origin + '/' + (f.slug || '') + '/1') : '';
           return `
             <div class="p-6 space-y-5">
               <div>
@@ -2273,20 +2274,16 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 <button onclick="window.__sp.publishQuiz()" class="px-4 h-11 rounded-lg bg-primary hover:bg-blue-600 text-white font-semibold">Publish</button>
                 <div id="pubMsg" class="text-sm text-text-sub-light"></div>
               </div>
-              ${Number(f.jumlah||0) > 0 && f.slug ? (() => {
-                const sample = location.origin + '/' + (f.slug || '') + '/1';
-                const esc = String(sample).replace(/"/g,'&quot;');
-                return `
+              ${sampleLink ? `
                   <div class="space-y-2">
                     <div class="text-xs text-text-sub-light">Contoh link</div>
-                    <code class="block px-2.5 py-1 rounded-md border bg-white dark:bg-surface-dark font-mono text-xs">${esc}</code>
+                    <code class="block px-2.5 py-1 rounded-md border bg-white dark:bg-surface-dark font-mono text-xs">${sampleLink}</code>
                     <div class="text-xs text-text-sub-light">Cara akses: ganti angka di akhir sesuai nomor absen siswa (misal /5 untuk absen 5).</div>
                     <div>
-                      <button type="button" data-link="${esc}" onclick="navigator.clipboard.writeText(this.getAttribute('data-link')); this.textContent='Disalin'; setTimeout(()=>this.textContent='Salin',1500)" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm">Salin</button>
+                      <button type="button" data-link="${sampleLink}" onclick="navigator.clipboard.writeText(this.getAttribute('data-link')); this.textContent='Disalin'; setTimeout(()=>this.textContent='Salin',1500)" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm">Salin</button>
                     </div>
                   </div>
-                `;
-              })() : ``}
+                ` : ``}
             </div>
           `;
         })();
