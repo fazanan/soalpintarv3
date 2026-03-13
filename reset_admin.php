@@ -5,11 +5,20 @@ $cli = PHP_SAPI === 'cli';
 $host = $_SERVER['HTTP_HOST'] ?? '';
 $local = $cli || $remote === '127.0.0.1' || $remote === '::1';
 $allowDomain = in_array($host, ['pinterin.my.id','www.pinterin.my.id'], true);
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$message = '';
+$error = '';
 $needToken = !$local && $allowDomain;
-$tokenOk = true;
-if ($needToken) {
+
+if (!$local && !$allowDomain) {
+  http_response_code(403);
+  echo 'Forbidden';
+  exit;
+}
+
+// Helper untuk ambil token ekspektasi
+$getExpectedToken = function() {
   $expected = getenv('ADMIN_RESET_TOKEN') ?: '';
-  $provided = $_POST['token'] ?? $_GET['token'] ?? '';
   if ($expected === '') {
     $p = __DIR__ . '/ADMIN_RESET_TOKEN.txt';
     if (is_file($p) && is_readable($p)) {
@@ -17,18 +26,23 @@ if ($needToken) {
       if ($c !== false) $expected = trim($c);
     }
   }
-  $tokenOk = ($expected !== '') && hash_equals($expected, $provided);
+  return $expected;
+};
+
+// Validasi token hanya saat POST dari domain (GET tetap menampilkan form)
+$tokenValidated = $local || !$needToken;
+if ($method === 'POST' && !$local && $allowDomain) {
+  $expected = $getExpectedToken();
+  $provided = $_POST['token'] ?? '';
+  if ($expected !== '' && hash_equals($expected, $provided)) {
+    $tokenValidated = true;
+  } else {
+    $tokenValidated = false;
+    $error = 'Token salah atau belum diset.';
+  }
 }
-if (!$local && !($allowDomain && $tokenOk)) {
-  http_response_code(403);
-  echo 'Forbidden';
-  exit;
-}
-$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-$message = '';
-$error = '';
 function g($k,$d=''){return isset($_POST[$k])?trim((string)$_POST[$k]):$d;}
-if ($method === 'POST') {
+if ($method === 'POST' && $tokenValidated) {
   $u = g('username');
   $p = g('password');
   if ($u === '' || $p === '') {
