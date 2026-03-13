@@ -10,7 +10,7 @@ if (!isset($_SESSION['user_id'])) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SoalPintar</title>
+    <title>GuruPintar</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -116,7 +116,7 @@ if (!isset($_SESSION['user_id'])) {
               </div>
               <div>
                 <div class="text-lg font-semibold tracking-tight">
-                  <span class="text-primary">Soal</span><span class="text-text-main-light dark:text-text-main-dark">Pintar</span>
+                  <span class="text-primary">Guru</span><span class="text-text-main-light dark:text-text-main-dark">Pintar</span>
                 </div>
               <div class="text-xs italic text-text-sub-light dark:text-text-sub-dark mt-0.5">Sahabat Pendidik Indonesia</div>
               </div>
@@ -169,7 +169,7 @@ if (!isset($_SESSION['user_id'])) {
             <div class="flex flex-col items-end">
               <div class="text-right">
                 <div class="text-3xl md:text-4xl font-bold tracking-tight">
-                  <span class="text-primary">Soal</span><span class="text-text-main-light dark:text-text-main-dark">Pintar</span>
+                  <span class="text-primary">Guru</span><span class="text-text-main-light dark:text-text-main-dark">Pintar</span>
                 </div>
                 <div class="italic text-xs md:text-sm text-text-sub-light dark:text-text-sub-dark">Sahabat Pendidik Indonesia</div>
               </div>
@@ -779,7 +779,7 @@ if (!isset($_SESSION['user_id'])) {
       function saveProject() {
         const { mataPelajaran, kelas } = state.identity;
         const date = new Date().toISOString().slice(0, 10);
-        const fileName = `SoalPintar_${mataPelajaran.replace(/\s+/g, "_")}_${kelas.replace(/\s+/g, "_")}_${date}.json`;
+        const fileName = `GuruPintar_${mataPelajaran.replace(/\s+/g, "_")}_${kelas.replace(/\s+/g, "_")}_${date}.json`;
         downloadJSON(state, fileName);
       }
 
@@ -3206,7 +3206,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
             const safeMapel = (state.identity.mataPelajaran || "Soal").replace(/[^a-z0-9]/gi, '_');
-            link.download = `SoalPintar_${safeMapel}.docx`;
+            link.download = `GuruPintar_${safeMapel}.docx`;
             link.click();
         } catch (e) {
             console.error(e);

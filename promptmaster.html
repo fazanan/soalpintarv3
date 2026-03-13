@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SoalPintar – Sahabat Pendidik Indonesia</title>
+    <title>GuruPintar – Sahabat Pendidik Indonesia</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -270,7 +270,7 @@
     }[b] || b);
 
     // ===================================================================
-    // DEFAULT STATE (APAL section structure inside SoalPintar shell)
+    // DEFAULT STATE (APAL section structure inside shell)
     // ===================================================================
     const DEFAULT_STATE = () => ({
       theme: 'light',
@@ -699,7 +699,7 @@ OUTPUT JSON:
             }
           }
 
-          // Convert APAL format to SoalPintar format
+          // Convert APAL format to internal format
           accSoal.forEach((soal, idx) => {
             const kisi = accKisi.find(k => k.no === soal.no) || accKisi[idx] || {};
             const cleanOpts = (soal.opsi || []).map(opt => String(opt).replace(/^[A-Ea-e][\.\)\s]\s*/, ''));
@@ -775,7 +775,7 @@ OUTPUT JSON:
     };
 
     // ===================================================================
-    // UI RENDERING (SoalPintar design)
+    // UI RENDERING (design)
     // ===================================================================
     const autoFillPaket = () => {
       const y = new Date().getFullYear();
@@ -1388,7 +1388,7 @@ OUTPUT JSON:
     function saveProject() {
       const { mataPelajaran, kelas } = state.identity;
       const date = new Date().toISOString().slice(0,10);
-      const fileName = `SoalPintar_${(mataPelajaran||'Soal').replace(/\s+/g,'_')}_${(kelas||'').replace(/\s+/g,'_')}_${date}.json`;
+      const fileName = `GuruPintar_${(mataPelajaran||'Soal').replace(/\s+/g,'_')}_${(kelas||'').replace(/\s+/g,'_')}_${date}.json`;
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));
       a.download = fileName; a.click();
@@ -1512,7 +1512,7 @@ OUTPUT JSON:
     };
 
     // ===================================================================
-    // EXPORT DOCX (SoalPintar's format)
+    // EXPORT DOCX
     // ===================================================================
     async function makeImageRun(dataUrl, width, height) {
       try {
@@ -1654,7 +1654,7 @@ OUTPUT JSON:
         const blob = await Packer.toBlob(doc);
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = `SoalPintar_${(state.identity.mataPelajaran||'Soal').replace(/[^a-z0-9]/gi,'_')}.docx`;
+        a.download = `GuruPintar_${(state.identity.mataPelajaran||'Soal').replace(/[^a-z0-9]/gi,'_')}.docx`;
         a.click();
       } catch(e) { console.error(e); alert('Gagal export: '+e.message); }
       finally { if (btn) btn.disabled=false; }

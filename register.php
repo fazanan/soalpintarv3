@@ -24,7 +24,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Daftar | SoalPintar</title>
+  <title>Daftar | GuruPintar</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600&display=swap" rel="stylesheet" />
@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="min-h-screen flex items-center justify-center bg-slate-100 font-[Lexend]">
   <div class="w-full max-w-sm bg-white rounded-2xl shadow p-6">
     <div class="text-center mb-6">
-      <div class="text-2xl font-extrabold"><span class="text-sky-600">Soal</span>Pintar</div>
+      <div class="text-2xl font-extrabold"><span class="text-sky-600">Guru</span>Pintar</div>
       <div class="text-xs text-slate-500">Buat akun</div>
     </div>
     <?php if ($msg): ?>

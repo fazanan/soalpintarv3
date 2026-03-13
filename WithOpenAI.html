@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>SoalPintar</title>
+    <title>GuruPintar</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -1151,7 +1151,7 @@
       function saveProject() {
         const { mataPelajaran, kelas } = state.identity;
         const date = new Date().toISOString().slice(0, 10);
-        const fileName = `SoalPintar_${mataPelajaran.replace(/\s+/g, "_")}_${kelas.replace(/\s+/g, "_")}_${date}.json`;
+        const fileName = `GuruPintar_${mataPelajaran.replace(/\s+/g, "_")}_${kelas.replace(/\s+/g, "_")}_${date}.json`;
         downloadJSON(state, fileName);
       }
 
@@ -2188,7 +2188,7 @@ OUTPUT JSON:
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
             const safeMapel = (state.identity.mataPelajaran || "Soal").replace(/[^a-z0-9]/gi, '_');
-            link.download = `SoalPintar_${safeMapel}.docx`;
+            link.download = `GuruPintar_${safeMapel}.docx`;
             link.click();
         } catch (e) {
             console.error(e);
