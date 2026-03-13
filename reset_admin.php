@@ -10,6 +10,13 @@ $tokenOk = true;
 if ($needToken) {
   $expected = getenv('ADMIN_RESET_TOKEN') ?: '';
   $provided = $_POST['token'] ?? $_GET['token'] ?? '';
+  if ($expected === '') {
+    $p = __DIR__ . '/ADMIN_RESET_TOKEN.txt';
+    if (is_file($p) && is_readable($p)) {
+      $c = file_get_contents($p);
+      if ($c !== false) $expected = trim($c);
+    }
+  }
   $tokenOk = ($expected !== '') && hash_equals($expected, $provided);
 }
 if (!$local && !($allowDomain && $tokenOk)) {
@@ -95,7 +102,7 @@ if ($method === 'POST') {
         </div>
         <button class="w-full h-10 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold">Simpan</button>
       </form>
-      <div class="text-xs text-gray-600"><?php echo $local ? 'Hanya bisa diakses dari localhost.' : 'Akses domain memerlukan token.'; ?></div>
+      <div class="text-xs text-gray-600"><?php echo $local ? 'Hanya bisa diakses dari localhost.' : 'Akses domain memerlukan token (ENV ADMIN_RESET_TOKEN atau file ADMIN_RESET_TOKEN.txt).'; ?></div>
     </div>
   </div>
 </body>
