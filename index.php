@@ -2235,7 +2235,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         const tabs = `
           <div class="flex items-center gap-2 border-b border-border-light dark:border-border-dark px-4 pt-4">
             <button onclick="window.__sp.setQuizTab('live')" class="px-3 py-2 text-sm font-semibold ${sub==='live'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Live</button>
-            ${IS_ADMIN ? `<button onclick="window.__sp.setQuizTab('publish')" class="px-3 py-2 text-sm font-semibold ${sub==='publish'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Generate Link</button>` : ``}
+            ${IS_ADMIN ? `<button onclick="window.__sp.setQuizTab('publish')" class="px-3 py-2 text-sm font-semibold ${sub==='publish'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Buat Link</button>` : ``}
             ${IS_ADMIN ? `<button onclick="window.__sp.setQuizTab('results')" class="px-3 py-2 text-sm font-semibold ${sub==='results'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Hasil</button>` : ``}
           </div>
         `;
@@ -2249,11 +2249,13 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         `;
         const pub = !IS_ADMIN ? `` : (() => {
           const f = state.quizPublishForm || {};
-          const sampleLink = (Number(f.jumlah||0) > 0 && f.slug) ? (location.origin + '/' + (f.slug || '') + '/1') : '';
+          const sampleLink = (Number(f.jumlah||0) > 0 && f.slug)
+            ? ('https://pinterin.my.id/soal_view.php?slug=' + encodeURIComponent(f.slug || '') + '&n=1')
+            : '';
           return `
             <div class="p-6 space-y-5">
               <div>
-                <div class="text-xl font-bold">Generate Link Publik</div>
+                <div class="text-xl font-bold">Buat Link Publik</div>
                 <div class="text-sm text-text-sub-light mt-1">Buat tautan yang bisa diakses siswa tanpa login</div>
               </div>
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2266,8 +2268,8 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                   <input type="number" min="1" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${Number(f.jumlah||32)}" placeholder="mis. 32" oninput="window.__sp.setQuizPublish('jumlah', Number(this.value))">
                 </div>
                 <div class="space-y-1.5">
-                  <label class="text-sm font-semibold">Expire (opsional, YYYY-MM-DD)</label>
-                  <input placeholder="2026-12-31" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(f.expire || '')}" oninput="window.__sp.setQuizPublish('expire', this.value)">
+                  <label class="text-sm font-semibold">Expire (opsional, YYYY-MM-DD HH:MM)</label>
+                  <input placeholder="2026-12-31 23:59" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(f.expire || '')}" oninput="window.__sp.setQuizPublish('expire', this.value)">
                 </div>
               </div>
               <div class="flex items-center gap-3">
@@ -2298,6 +2300,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             if (pb !== pa) return pb - pa;
             return (a.absen||0) - (b.absen||0);
           });
+          const exampleLink = sel ? `${location.origin}/soal_view.php?slug=${encodeURIComponent(sel)}&n=1` : '';
           const rows = dataRows.map((r, idx) => {
             const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
             return `<tr><td class="border px-3 py-2 text-center">${idx+1}</td><td class="border px-3 py-2">${safeText(state.quizResultsMapel || '')}</td><td class="border px-3 py-2 text-center">${Number(r.absen)}</td><td class="border px-3 py-2 text-center">${pct}</td></tr>`;
@@ -2310,6 +2313,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 <button onclick="window.__sp.loadResults()" class="px-4 h-11 rounded-lg border bg-white dark:bg-surface-dark">Muat</button>
                 <button onclick="window.__sp.loadPublications()" class="px-3 h-11 rounded-lg border bg-white dark:bg-surface-dark">Segarkan</button>
               </div>
+              ${exampleLink ? `<div class="text-xs text-text-sub-light">Contoh link: <a href="${exampleLink}" class="text-blue-600 underline" target="_blank" rel="noopener">${exampleLink}</a></div>` : ``}
               <div class="overflow-auto">
                 <table class="min-w-full text-sm border">
                   <thead class="bg-background-light dark:bg-background-dark">
@@ -2430,7 +2434,9 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           let js = null;
           try { js = JSON.parse(raw); } catch {}
           if (res.ok && js && js.ok) {
-            if (btn) btn.textContent = `Published. Gunakan ${js.public_link}`;
+            const expText = (expire && expire.trim()) ? expire.trim() : 'tanpa batas';
+            const msgLink = `https://pinterin.my.id/soal_view.php?slug=${encodeURIComponent(slug)}&n=1`;
+            if (btn) btn.innerHTML = `Berhasil publish.<br>Contoh akses: <a class="text-blue-600 underline" href="${msgLink}" target="_blank" rel="noopener">${msgLink}</a><br>Maks absen: ${Number(state.quizPublishForm?.jumlah||0) || '-'} • Expire: ${expText}`;
             await loadPublications();
             state.quizSelectedSlug = String(js.slug);
             saveDebounced(true);
