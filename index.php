@@ -2273,6 +2273,12 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 </div>
               </div>
               <div class="flex items-center gap-3">
+                <label class="inline-flex items-center gap-2 text-sm">
+                  <input type="checkbox" ${f.showSolution ? 'checked' : ''} onchange="window.__sp.setQuizPublish('showSolution', this.checked)">
+                  <span>Tampilkan jawaban & pembahasan setelah submit</span>
+                </label>
+              </div>
+              <div class="flex items-center gap-3">
                 <button onclick="window.__sp.publishQuiz()" class="px-4 h-11 rounded-lg bg-primary hover:bg-blue-600 text-white font-semibold">Publish</button>
                 <div id="pubMsg" class="text-sm text-text-sub-light"></div>
               </div>
@@ -2425,9 +2431,16 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           params.set('kelas', String(state.identity.kelas||''));
           params.set('sekolah', String(state.identity.namaSekolah||''));
           params.set('guru', String(state.identity.namaGuru||''));
-          params.set('payload_public', JSON.stringify(payload));
+          // tambahkan pembahasan jika ada
+          const payloadWithExplain = pg.map(q => ({
+            question: String(q.question||''),
+            options: q.options.map(x=>String(x||'')),
+            explain: String(q.explanation || q.pembahasan || q.rationale || '')
+          }));
+          params.set('payload_public', JSON.stringify(payloadWithExplain));
           params.set('answer_key', JSON.stringify(answer_key));
           params.set('max_absen', String(Number(state.quizPublishForm?.jumlah || 0) || 0));
+          params.set('show_solution', String(state.quizPublishForm?.showSolution ? 1 : 0));
           if (expire) params.set('expire_at', expire);
           const res = await fetch('api/publish_quiz.php', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'}, body: params.toString(), credentials: 'same-origin' });
           const raw = await res.text();

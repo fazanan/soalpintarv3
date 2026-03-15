@@ -31,10 +31,14 @@ if ($expireAt && strtotime($expireAt) < time()) {
 $decoded = json_decode($payloadJson, true);
 $items = [];
 $maxAbsen = 0;
+$showSolution = 0;
+$answerKeySettings = [];
 if (is_array($decoded)) {
   if (isset($decoded['items']) && is_array($decoded['items'])) {
     $items = $decoded['items'];
     $maxAbsen = isset($decoded['settings']['max_absen']) ? (int)$decoded['settings']['max_absen'] : 0;
+    $showSolution = isset($decoded['settings']['show_solution']) ? (int)$decoded['settings']['show_solution'] : 0;
+    $answerKeySettings = isset($decoded['settings']['answer_key']) && is_array($decoded['settings']['answer_key']) ? $decoded['settings']['answer_key'] : [];
   } else {
     $items = $decoded;
   }
@@ -94,6 +98,10 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
   <script>
     const payload = <?php echo json_encode($items, JSON_UNESCAPED_UNICODE); ?>;
     const absen = <?php echo (int)$n; ?>;
+    const showSolution = <?php echo (int)$showSolution; ?> === 1;
+    const answerKey = <?php echo json_encode($answerKeySettings, JSON_UNESCAPED_UNICODE); ?>;
+    let submitted = false;
+    let activeTab = 'soal';
     function shuffleWithSeed(arr, seed) {
       const a = arr.slice();
       let s = seed;
@@ -104,12 +112,29 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       }
       return a;
     }
-    function render() {
+    function renderTabs() {
       const container = document.getElementById('root');
+      const hasSolutionTab = showSolution && submitted;
+      const tabs = `
+        <div class="flex items-center gap-2 border-b mb-4">
+          <button class="px-3 py-2 text-sm font-semibold ${activeTab==='soal'?'text-blue-600 border-b-2 border-blue-600':''}" onclick="activeTab='soal'; renderTabs()">Soal</button>
+          ${hasSolutionTab ? `<button class="px-3 py-2 text-sm font-semibold ${activeTab==='solusi'?'text-blue-600 border-b-2 border-blue-600':''}" onclick="activeTab='solusi'; renderTabs()">Jawaban & Pembahasan</button>` : ``}
+        </div>
+      `;
+      let body = '';
+      if (activeTab === 'soal') {
+        body = renderSoal();
+      } else {
+        body = renderSolusi();
+      }
+      container.innerHTML = tabs + body;
+      bindSubmit();
+    }
+    function renderSoal() {
       const questions = Array.isArray(payload) ? payload : [];
       const indices = questions.map((_, i) => i);
       const order = shuffleWithSeed(indices, absen);
-      const html = order.map((origIdx, i) => {
+      const cards = order.map((origIdx, i) => {
         const q = questions[origIdx] || {};
         const opts = Array.isArray(q.options) ? q.options : [];
         const optsHtml = opts.map((t, oi) => `
@@ -125,14 +150,38 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
           </div>
         `;
       }).join('');
-      container.innerHTML = `
-        ${html}
+      return `
+        ${cards}
         <div class="pt-2">
           <button id="btnSubmit" class="h-11 px-5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">Submit</button>
           <div id="info" class="text-sm text-gray-600 mt-2"></div>
         </div>
       `;
-      document.getElementById('btnSubmit')?.addEventListener('click', async () => {
+    }
+    function renderSolusi() {
+      const questions = Array.isArray(payload) ? payload : [];
+      const rows = questions.map((q, i) => {
+        const correct = typeof answerKey[i] === 'number' ? answerKey[i] : -1;
+        const correctText = (Array.isArray(q.options) && q.options[correct]) ? q.options[correct] : '';
+        const letter = correct >= 0 ? String.fromCharCode(65 + correct) : '-';
+        const explain = String(q.explain || '');
+        return `
+          <div class="mb-4 rounded-xl border p-4">
+            <div class="font-semibold mb-1">${i+1}. ${String(q.question || '')}</div>
+            <div class="text-sm"><span class="font-semibold">Kunci:</span> ${letter}${correctText ? ` — ${correctText}` : ''}</div>
+            ${explain ? `<div class="text-sm mt-2"><span class="font-semibold">Pembahasan:</span> ${explain}</div>` : ``}
+          </div>
+        `;
+      }).join('');
+      return rows || `<div class="text-sm text-gray-600">Belum ada data pembahasan.</div>`;
+    }
+    function bindSubmit() {
+      const btn = document.getElementById('btnSubmit');
+      if (!btn) return;
+      btn.addEventListener('click', async () => {
+        const questions = Array.isArray(payload) ? payload : [];
+        const indices = questions.map((_, i) => i);
+        const order = shuffleWithSeed(indices, absen);
         const answers = [];
         for (let i=0;i<order.length;i++) {
           const el = document.querySelector(`input[name="q_${i}"]:checked`);
@@ -149,6 +198,11 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
           const js = await res.json();
           if (js && js.ok) {
             info.textContent = 'Terkirim. Terima kasih.';
+            submitted = true;
+            if (showSolution) {
+              activeTab = 'solusi';
+              renderTabs();
+            }
           } else {
             info.textContent = 'Gagal mengirim.';
           }
@@ -157,7 +211,7 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         }
       });
     }
-    render();
+    renderTabs();
   </script>
 </body>
 </html>

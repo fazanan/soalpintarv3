@@ -39,6 +39,7 @@ $payload = $data['payload_public'] ?? null;
 $answerKey = $data['answer_key'] ?? null;
 $expire = isset($data['expire_at']) ? trim((string)$data['expire_at']) : '';
 $maxAbsen = isset($data['max_absen']) ? (int)$data['max_absen'] : 0;
+$showSolution = isset($data['show_solution']) ? (int)$data['show_solution'] : 0;
 if (is_string($payload)) {
   $tmp = json_decode($payload, true);
   if (is_array($tmp)) $payload = $tmp;
@@ -72,6 +73,8 @@ $payloadObject['settings']['meta'] = [
   'mapel' => $mapel,
   'kelas' => $kelas
 ];
+$payloadObject['settings']['show_solution'] = $showSolution ? 1 : 0;
+$payloadObject['settings']['answer_key'] = is_array($answerKey) ? array_map('intval', $answerKey) : [];
 $payloadJson = json_encode($payloadObject, JSON_UNESCAPED_UNICODE);
 $answerJson = is_string($answerKey) ? $answerKey : json_encode($answerKey, JSON_UNESCAPED_UNICODE);
 $arr = json_decode($payloadJson, true);
