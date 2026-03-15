@@ -486,6 +486,7 @@ if (!isset($_SESSION['user_id'])) {
         quiz: { idx: 0, answered: {}, input: "", reveal: false },
         quizSubtab: "live",
         quizPublishForm: { slug: "", jumlah: 32, expire: "" },
+        quizLastLink: "",
         quizPublications: [],
         quizResults: [],
         quizSelectedSlug: "",
@@ -2249,9 +2250,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         `;
         const pub = !IS_ADMIN ? `` : (() => {
           const f = state.quizPublishForm || {};
-          const sampleLink = (Number(f.jumlah||0) > 0 && f.slug)
-            ? ('https://pinterin.my.id/soal_view.php?slug=' + encodeURIComponent(f.slug || '') + '&n=1')
-            : '';
+          const last = state.quizLastLink || '';
           return `
             <div class="p-6 space-y-5">
               <div>
@@ -2282,16 +2281,15 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 <button onclick="window.__sp.publishQuiz()" class="px-4 h-11 rounded-lg bg-primary hover:bg-blue-600 text-white font-semibold">Publish</button>
                 <div id="pubMsg" class="text-sm text-text-sub-light"></div>
               </div>
-              ${sampleLink ? `
-                  <div class="space-y-2">
-                    <div class="text-xs text-text-sub-light">Contoh link</div>
-                    <code class="block px-2.5 py-1 rounded-md border bg-white dark:bg-surface-dark font-mono text-xs">${sampleLink}</code>
-                    <div class="text-xs text-text-sub-light">Cara akses: ganti angka di akhir sesuai nomor absen siswa (misal /5 untuk absen 5).</div>
-                    <div>
-                      <button type="button" data-link="${sampleLink}" onclick="navigator.clipboard.writeText(this.getAttribute('data-link')); this.textContent='Disalin'; setTimeout(()=>this.textContent='Salin',1500)" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm">Salin</button>
-                    </div>
+              ${last ? `
+                <div class="space-y-2">
+                  <div class="text-xs text-text-sub-light">Link publik:</div>
+                  <code class="block px-2.5 py-1 rounded-md border bg-white dark:bg-surface-dark font-mono text-xs">${last}</code>
+                  <div>
+                    <button type="button" data-link="${last}" onclick="navigator.clipboard.writeText(this.getAttribute('data-link')); this.textContent='Disalin'; setTimeout(()=>this.textContent='Salin',1500)" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm">Salin</button>
                   </div>
-                ` : ``}
+                </div>
+              ` : ``}
             </div>
           `;
         })();
@@ -2306,7 +2304,8 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             if (pb !== pa) return pb - pa;
             return (a.absen||0) - (b.absen||0);
           });
-          const exampleLink = sel ? `${location.origin}/soal_view.php?slug=${encodeURIComponent(sel)}&n=1` : '';
+          const pubObj = items.find(it => it.slug === sel);
+          const exampleLink = pubObj ? `${location.origin}/soal_view.php?id=${encodeURIComponent(String(pubObj.id))}&n=1` : '';
           const rows = dataRows.map((r, idx) => {
             const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
             return `<tr><td class="border px-3 py-2 text-center">${idx+1}</td><td class="border px-3 py-2">${safeText(state.quizResultsMapel || '')}</td><td class="border px-3 py-2 text-center">${Number(r.absen)}</td><td class="border px-3 py-2 text-center">${pct}</td></tr>`;
@@ -2448,8 +2447,9 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           try { js = JSON.parse(raw); } catch {}
           if (res.ok && js && js.ok) {
             const expText = (expire && expire.trim()) ? expire.trim() : 'tanpa batas';
-            const msgLink = `https://pinterin.my.id/soal_view.php?slug=${encodeURIComponent(slug)}&n=1`;
+            const msgLink = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(js.id))}&n=1`;
             if (btn) btn.innerHTML = `Berhasil publish.<br>Contoh akses: <a class="text-blue-600 underline" href="${msgLink}" target="_blank" rel="noopener">${msgLink}</a><br>Maks absen: ${Number(state.quizPublishForm?.jumlah||0) || '-'} • Expire: ${expText}`;
+            state.quizLastLink = msgLink;
             await loadPublications();
             state.quizSelectedSlug = String(js.slug);
             saveDebounced(true);

@@ -4,16 +4,21 @@ require_once __DIR__ . '/../db.php';
 $raw = file_get_contents('php://input');
 $data = json_decode($raw, true);
 $slug = isset($data['slug']) ? trim((string)$data['slug']) : '';
+$pubIdParam = isset($data['id']) ? (int)$data['id'] : 0;
 $absen = isset($data['absen']) ? (int)$data['absen'] : 0;
 $answers = isset($data['answers']) && is_array($data['answers']) ? $data['answers'] : [];
 $orderMap = isset($data['order_map']) && is_array($data['order_map']) ? $data['order_map'] : [];
-if ($slug === '' || $absen <= 0 || empty($answers) || empty($orderMap)) {
+if (($slug === '' && $pubIdParam <= 0) || $absen <= 0 || empty($answers) || empty($orderMap)) {
   http_response_code(400);
   echo json_encode(['ok'=>false,'error'=>'invalid_input']);
   exit;
 }
-$stmt = $mysqli->prepare("SELECT id, answer_key, is_active, expire_at, total_soal, payload_public FROM published_quizzes WHERE slug=? LIMIT 1");
-$stmt->bind_param('s', $slug);
+$sql = $pubIdParam > 0
+  ? "SELECT id, answer_key, is_active, expire_at, total_soal, payload_public FROM published_quizzes WHERE id=? LIMIT 1"
+  : "SELECT id, answer_key, is_active, expire_at, total_soal, payload_public FROM published_quizzes WHERE slug=? LIMIT 1";
+$stmt = $mysqli->prepare($sql);
+if ($pubIdParam > 0) $stmt->bind_param('i', $pubIdParam);
+else $stmt->bind_param('s', $slug);
 $stmt->execute();
 $stmt->bind_result($pubId, $answerJson, $active, $expireAt, $total, $payloadJson);
 if (!$stmt->fetch()) {

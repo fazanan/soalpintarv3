@@ -1,16 +1,21 @@
 <?php
 require __DIR__ . '/db.php';
 $slug = isset($_GET['slug']) ? trim((string)$_GET['slug']) : '';
+$pubIdParam = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $n = isset($_GET['n']) ? (int)$_GET['n'] : 0;
-if ($slug === '' || $n <= 0) {
+if (($slug === '' && $pubIdParam <= 0) || $n <= 0) {
   http_response_code(400);
   echo 'Bad Request';
   exit;
 }
-$stmt = $mysqli->prepare("SELECT mapel, kelas, payload_public, is_active, expire_at FROM published_quizzes WHERE slug=? LIMIT 1");
-$stmt->bind_param('s', $slug);
+$sql = $pubIdParam > 0
+  ? "SELECT id, slug, mapel, kelas, payload_public, is_active, expire_at FROM published_quizzes WHERE id=? LIMIT 1"
+  : "SELECT id, slug, mapel, kelas, payload_public, is_active, expire_at FROM published_quizzes WHERE slug=? LIMIT 1";
+$stmt = $mysqli->prepare($sql);
+if ($pubIdParam > 0) $stmt->bind_param('i', $pubIdParam);
+else $stmt->bind_param('s', $slug);
 $stmt->execute();
-$stmt->bind_result($mapel, $kelas, $payloadJson, $active, $expireAt);
+$stmt->bind_result($pubId, $slugDb, $mapel, $kelas, $payloadJson, $active, $expireAt);
 if (!$stmt->fetch()) {
   $stmt->close();
   http_response_code(404);
@@ -18,6 +23,7 @@ if (!$stmt->fetch()) {
   exit;
 }
 $stmt->close();
+if ($slug === '') $slug = (string)$slugDb;
 if ((int)$active !== 1) {
   http_response_code(403);
   echo 'Link nonaktif';
