@@ -1015,14 +1015,7 @@ if (!isset($_SESSION['user_id'])) {
                 </div>
                 <div class="pr-44">
                   <p class="mb-4 pr-10 text-justify leading-relaxed text-lg">${safeText(q.question)}</p>
-                  ${q.asciiDiagram 
-                    ? `<pre class="font-mono text-xs leading-none whitespace-pre overflow-x-auto p-4 bg-gray-50 border rounded-lg mb-4 select-all w-fit shadow-sm">${safeText(q.asciiDiagram)}</pre>` 
-                    : q.svgSource 
-                      ? `<div class="mb-4 overflow-x-auto p-4 bg-white border rounded-lg w-fit shadow-sm">${q.svgSource}</div>` 
-                      : q.image 
-                        ? `<img src="${q.image}" class="w-64 h-64 object-contain rounded-lg mb-2 border shadow-sm">` 
-                        : ""
-                  }
+                  ${q.image ? `<img src="${q.image}" class="w-64 h-64 object-contain rounded-lg mb-2 border shadow-sm">` : ""}
                   ${q._showImagePrompt && !q.image && q.imagePrompt ? `
                     <div class="mb-3 italic text-xs text-text-sub-light flex items-center gap-2">
                       <span>Prompt Gambar: ${safeText(q.imagePrompt)}</span>
