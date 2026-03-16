@@ -853,80 +853,21 @@ if (!isset($_SESSION['user_id'])) {
         const t = String(topic || '').toLowerCase();
         const m = String(mapel || '').toLowerCase();
         const q = String(question || '').toLowerCase();
-        // Bahasa/aksara – buat lebih kontekstual daripada sekadar "mengenal huruf"
-        // Ekstrak kata dalam tanda kutip jika ada (contoh: kata 'apel')
-        const quotedMatch = (String(question || '').match(/[\"'‘’“”]([^\"'‘’“”]+)[\"'‘’“”]/) || [,''])[1].trim();
-        if (m.includes('bahasa') || m.includes('bahasa indonesia') || t.includes('huruf') || q.includes('huruf')) {
-          if (q.includes('huruf vokal') || t.includes('huruf vokal')) {
-            if (quotedMatch) return `simple vector illustration of ${quotedMatch} (object), minimal colors, white background, labels optional`;
-            return 'alphabet chart showing uppercase and lowercase vowels A E I O U, minimal colors, white background';
-          }
-          if (q.includes('huruf konsonan') || t.includes('huruf konsonan')) {
-            return 'alphabet chart highlighting consonant letters (excluding A E I O U), minimal colors, white background';
-          }
-          if (q.includes('kata') && quotedMatch) {
-            return `simple vector illustration of ${quotedMatch} (object), minimal colors, white background, labels optional`;
-          }
-          if (t.includes('mengenal huruf') || q.includes('mengenal huruf') || t.includes('alfabet') || q.includes('alfabet')) {
-            return 'alphabet chart with A–Z uppercase and lowercase in clean grid, minimal colors, white background';
-          }
-        }
-        const rules = [
-          { ok: () => m.includes('biologi') && (t.includes('fotosintesis') || q.includes('fotosintesis')), s: 'cross-section of a leaf showing chloroplasts with stacked thylakoids, arrows for light and glucose, labels optional' },
-          { ok: () => t.includes('sistem pencernaan') || q.includes('pencernaan'), s: 'simple vector of human digestive system front view showing stomach, small and large intestines, minimal colors, labels optional' },
-          { ok: () => t.includes('sistem peredaran darah') || q.includes('peredaran darah') || t.includes('jantung') || q.includes('jantung'), s: 'diagram of human heart with four chambers and major vessels, arrows for blood flow, minimal colors, labels optional' },
-          { ok: () => t.includes('sistem saraf') || q.includes('sistem saraf'), s: 'nervous system diagram highlighting brain, spinal cord and peripheral nerves, minimal colors, labels optional' },
-          { ok: () => t.includes('sistem ekskresi') || q.includes('ekskresi'), s: 'urinary system diagram showing kidneys, ureters, bladder and urethra, minimal colors, labels optional' },
-          { ok: () => t.includes('ekosistem') || q.includes('ekosistem'), s: 'ecosystem diagram with producers, consumers and decomposers, arrows for energy flow, minimal colors, labels optional' },
-          { ok: () => t.includes('rantai makanan') || q.includes('rantai makanan'), s: 'food chain diagram with producer, primary and secondary consumers, arrows indicating energy flow, minimal colors, labels optional' },
-          { ok: () => t.includes('daur nitrogen') || q.includes('daur nitrogen') || t.includes('siklus nitrogen') || q.includes('siklus nitrogen'), s: 'nitrogen cycle diagram with fixation, nitrification, assimilation and denitrification, arrows, minimal colors, labels optional' },
-          { ok: () => t.includes('sel') || q.includes('sel'), s: 'cell diagram labeling nucleus, mitochondria, membrane and cytoplasm, minimal colors, labels optional' },
-          { ok: () => t.includes('mitosis') || q.includes('mitosis'), s: 'sequence diagram of mitosis phases (prophase, metaphase, anaphase, telophase), minimal colors, labels optional' },
-          { ok: () => t.includes('meiosis') || q.includes('meiosis'), s: 'sequence diagram of meiosis with two divisions and gamete formation, minimal colors, labels optional' },
-          { ok: () => t.includes('adaptasi') || q.includes('adaptasi'), s: 'illustrations of animal adaptations such as camouflage and mimicry, minimal colors, labels optional' },
-          { ok: () => m.includes('fisika') && (t.includes('gaya') || q.includes('gaya') || t.includes('hukum newton') || q.includes('hukum newton')), s: 'free-body diagram of a block with weight, normal, friction and applied force arrows, minimal colors, labels optional' },
-          { ok: () => m.includes('fisika') && (t.includes('gerak lurus') || q.includes('gerak lurus')), s: 'position-time and velocity-time graphs for uniform motion, minimal colors, labels optional' },
-          { ok: () => m.includes('fisika') && (t.includes('momentum') || q.includes('momentum') || t.includes('tumbukan') || q.includes('tumbukan')), s: 'collision diagram showing two masses before and after impact with momentum arrows, minimal colors, labels optional' },
-          { ok: () => m.includes('fisika') && (t.includes('energi') || q.includes('energi')), s: 'energy transformation diagram (potential to kinetic) with simple track and object, arrows, labels optional' },
-          { ok: () => m.includes('fisika') && (t.includes('listrik statis') || q.includes('listrik statis')), s: 'diagram showing charged objects with electric field lines and attraction/repulsion, minimal colors, labels optional' },
-          { ok: () => m.includes('fisika') && (t.includes('rangkaian listrik') || q.includes('rangkaian listrik') || t.includes('seri paralel') || q.includes('seri paralel')), s: 'simple series and parallel circuit diagrams with battery and resistors, minimal colors, labels optional' },
-          { ok: () => m.includes('fisika') && (t.includes('optik') || q.includes('optik') || t.includes('lensa') || q.includes('lensa') || t.includes('cermin') || q.includes('cermin')), s: 'ray diagram of convex lens and mirror with principal axis and image formation, minimal colors, labels optional' },
-          { ok: () => m.includes('fisika') && (t.includes('gelombang') || q.includes('gelombang') || t.includes('bunyi') || q.includes('bunyi')), s: 'wave diagram showing wavelength and amplitude on a sine wave, minimal colors, labels optional' },
-          { ok: () => m.includes('fisika') && (t.includes('kalor') || q.includes('kalor') || t.includes('termal') || q.includes('termal')), s: 'heat transfer diagram (conduction, convection, radiation) with arrows, minimal colors, labels optional' },
-          { ok: () => m.includes('kimia') && (t.includes('atom') || q.includes('atom')), s: 'bohr-like atomic model with nucleus and electron orbits, minimal colors, labels optional' },
-          { ok: () => m.includes('kimia') && (t.includes('ikatan kimia') || q.includes('ikatan kimia')), s: 'ionic and covalent bonding examples with electron transfer/sharing, minimal colors, labels optional' },
-          { ok: () => m.includes('kimia') && (t.includes('reaksi kimia') || q.includes('reaksi kimia') || t.includes('stoikiometri') || q.includes('stoikiometri')), s: 'chemical reaction schematic with reactants and products, simple molecules, arrows, minimal colors, labels optional' },
-          { ok: () => m.includes('kimia') && (t.includes('tabel periodik') || q.includes('tabel periodik') || t.includes('periodik')), s: 'periodic table fragment highlighting groups and periods, minimal colors, labels optional' },
-          { ok: () => m.includes('kimia') && (t.includes('asam basa') || q.includes('asam basa')), s: 'pH scale bar from 0 to 14 with acidic, neutral and basic regions, minimal colors, labels optional' },
-          { ok: () => m.includes('kimia') && (t.includes('elektrolisis') || q.includes('elektrolisis')), s: 'electrolysis cell diagram with electrodes, electrolyte and ion movement arrows, minimal colors, labels optional' },
-          { ok: () => m.includes('matematika') && (t.includes('persamaan linear') || q.includes('persamaan linear') || t.includes('spl') || q.includes('spl')), s: '2D coordinate plane with two straight lines intersecting, axes and faint grid, minimal colors, labels optional' },
-          { ok: () => m.includes('matematika') && (t.includes('fungsi') || q.includes('fungsi') || t.includes('grafik') || q.includes('grafik')), s: 'clean graph of a linear function on coordinate plane, axes and faint grid, minimal colors, labels optional' },
-          { ok: () => m.includes('matematika') && (t.includes('trigonometri') || q.includes('trigonometri')), s: 'right triangle with angles and sides marked (opposite, adjacent, hypotenuse), minimal colors, labels optional' },
-          { ok: () => m.includes('matematika') && (t.includes('geometri') || q.includes('geometri') || t.includes('lingkaran') || q.includes('lingkaran')), s: 'circle with center, radius, diameter and chord marked, minimal colors, labels optional' },
-          { ok: () => m.includes('matematika') && (t.includes('statistika') || q.includes('statistika') || t.includes('diagram batang') || q.includes('diagram batang')), s: 'simple bar chart with axes and 4–5 bars, minimal colors, labels optional' },
-          { ok: () => m.includes('matematika') && (t.includes('peluang') || q.includes('peluang')), s: 'probability tree diagram with simple branches and outcomes, minimal colors, labels optional' },
-          { ok: () => m.includes('matematika') && (t.includes('vektor') || q.includes('vektor')), s: 'coordinate plane with two vectors and resultant using triangle method, minimal colors, labels optional' },
-          { ok: () => m.includes('geografi') && (t.includes('siklus air') || q.includes('siklus air')), s: 'water cycle diagram with evaporation, condensation, precipitation and collection, arrows, minimal colors, labels optional' },
-          { ok: () => m.includes('geografi') && (t.includes('siklus batuan') || q.includes('siklus batuan')), s: 'rock cycle diagram showing igneous, sedimentary and metamorphic transitions with arrows, minimal colors, labels optional' },
-          { ok: () => m.includes('geografi') && (t.includes('peta') || q.includes('peta')), s: 'map with legend box, scale bar and compass rose, minimal colors, labels optional' },
-          { ok: () => m.includes('geografi') && (t.includes('lempeng tektonik') || q.includes('lempeng tektonik')), s: 'tectonic plate boundaries diagram showing convergent, divergent and transform with arrows, minimal colors, labels optional' },
-          { ok: () => m.includes('sejarah') && (t.includes('revolusi industri') || q.includes('revolusi industri')), s: 'timeline of industrial revolution milestones with simple icons (steam engine, factory), minimal colors, labels optional' },
-          { ok: () => m.includes('sejarah') && (t.includes('proklamasi') || q.includes('proklamasi')), s: 'simple scene of proclamation document and microphone, minimal iconic style, labels optional' },
-          { ok: () => m.includes('ekonomi') && (t.includes('permintaan') || q.includes('permintaan') || t.includes('penawaran') || q.includes('penawaran')), s: 'supply and demand graph with intersection point, axes labeled P and Q, minimal colors, labels optional' },
-          { ok: () => m.includes('ekonomi') && (t.includes('inflasi') || q.includes('inflasi')), s: 'line chart showing price index rising over time, minimal colors, labels optional' },
-          { ok: () => m.includes('ppkn') && (t.includes('pancasila') || q.includes('pancasila')), s: 'simple shield icon with five symbols representing Pancasila principles, minimal colors, labels optional' },
-          { ok: () => m.includes('ppkn') && (t.includes('struktur pemerintahan') || q.includes('struktur pemerintahan')), s: 'organization chart of government branches (executive, legislative, judiciary), minimal colors, labels optional' },
-          { ok: () => m.includes('informatika') && (t.includes('flowchart') || q.includes('flowchart') || t.includes('algoritma') || q.includes('algoritma')), s: 'simple flowchart with start, process and decision symbols connected by arrows, minimal colors, labels optional' },
-          { ok: () => m.includes('informatika') && (t.includes('jaringan') || q.includes('jaringan')), s: 'network topology diagram (star and bus) with devices and lines, minimal colors, labels optional' },
-          { ok: () => m.includes('bahasa') && (t.includes('teks narasi') || q.includes('teks narasi')), s: 'story structure diagram with beginning, middle and end blocks, minimal colors, labels optional' },
-          { ok: () => m.includes('bahasa inggris') && (t.includes('tenses') || q.includes('tenses')), s: 'timeline showing past, present and future markers with example positions, minimal colors, labels optional' },
-          { ok: () => m.includes('seni') && (t.includes('roda warna') || q.includes('roda warna')), s: 'color wheel showing primary and secondary colors in a circle, minimal labels, minimal colors' },
-          { ok: () => m.includes('penjaskes') && (t.includes('anatomi otot') || q.includes('otot')), s: 'muscular system front view highlighting major muscle groups, minimal colors, labels optional' },
-          { ok: () => m.includes('penjaskes') && (t.includes('lintasan') || q.includes('lintasan')) , s: 'athletics track top view with lanes and start/finish lines, minimal colors, labels optional' }
-        ];
-        for (const r of rules) { if (r.ok()) return r.s; }
-        const base = String(topic || question || 'educational diagram').trim();
-        return `clear vector diagram of ${base}, minimal colors, arrows where applicable, labels optional`;
+        const src = [t, q].join(' ');
+        const stop = ['yang','dan','atau','dengan','pada','dari','di','ke','apa','bagaimana','mengapa','adalah','untuk','dalam','the','of','a','an','to','on','at','by','is','are','do','does','did'];
+        const tokens = src.split(/[^a-z0-9]+/i).filter(w => w && !stop.includes(w) && w.length > 2);
+        const uniq = [];
+        for (const w of tokens) if (!uniq.includes(w)) uniq.push(w);
+        const phrase = uniq.slice(0, 5).join(' ') || 'educational diagram';
+        const isProcess = /(proses|bagaimana|terjadi|menghasilkan|input|keluaran|siklus|daur|perubahan|langkah)/.test(src);
+        const isPart = /(bagian|struktur|penampang|organ|anatomi|komponen|unsur)/.test(src) || /(daun|akar|batang|jantung|lensa|rangkaian)/.test(src);
+        const isChart = /(diagram batang|diagram garis|grafik|chart|tabel)/.test(src);
+        const isMap = /(peta|map)/.test(src);
+        if (isChart) return 'simple chart with axes and few items, minimal colors, labels optional';
+        if (isMap) return 'map with simple legend, scale bar and compass rose, minimal colors, labels optional';
+        if (isProcess) return `clear vector diagram of ${phrase} with key inputs and outputs, arrows, minimal colors, labels optional`;
+        if (isPart) return `cross-section of ${phrase} showing main parts, minimal colors, labels optional`;
+        return `simple vector illustration of ${phrase}, minimal colors, white background, labels optional`;
       }
 
       function stripPrefixForSubject(p) {
@@ -934,6 +875,14 @@ if (!isset($_SESSION['user_id'])) {
         const key = 'High quality educational illustration, clear vector style, white background: ';
         if (s.startsWith(key)) return s.slice(key.length);
         return s;
+      }
+      function enrichSubject(subject, topic, mapel, question) {
+        const sub = String(subject || '').trim();
+        // Jika terlalu pendek/satu kata atau generik, perluas via builder
+        if (sub.length < 15 || /^\w+$/i.test(sub)) {
+          return buildImageSubject(topic, mapel, question);
+        }
+        return sub;
       }
       function extractQuotedWord(text) {
         const m = String(text || '').match(/[\"'‘’“”]([^\"'‘’“”]+)[\"'‘’“”]/);
@@ -1077,6 +1026,15 @@ if (!isset($_SESSION['user_id'])) {
                   ${q._showImagePrompt && !q.image && q.imagePrompt ? `
                     <div class="mb-3 italic text-xs text-text-sub-light flex items-center gap-2">
                       <span>Prompt Gambar: ${safeText(q.imagePrompt)}</span>
+                      <button class="inline-flex items-center justify-center size-6 rounded hover:bg-background-light border border-border-light" title="Salin prompt" onclick="copyImagePrompt('${q.id}', this)">
+                        <span class="material-symbols-outlined text-[16px]">content_copy</span>
+                      </button>
+                      <button class="inline-flex items-center justify-center size-6 rounded hover:bg-background-light border border-border-light" title="Buka ChatGPT (prompt disalin)" onclick="openChatGPTWithPrompt('${q.id}', this)">
+                        <span class="material-symbols-outlined text-[16px]">smart_toy</span>
+                      </button>
+                      <a href="https://gemini.google.com/share/03bfbeff5d94" target="_blank" rel="noopener" class="inline-flex items-center justify-center size-6 rounded hover:bg-background-light border border-border-light" title="Buka pembuat prompt">
+                        <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+                      </a>
                       <button class="inline-flex items-center justify-center size-6 rounded hover:bg-background-light border border-border-light" title="Upload gambar" onclick="document.getElementById('qImgFile-${q.id}').click()">
                         <span class="material-symbols-outlined text-[16px]">file_upload</span>
                       </button>
@@ -2529,6 +2487,24 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         const btn = document.getElementById('pubMsg');
         if (btn) btn.textContent = "Memproses...";
         try {
+          const uploadIfNeeded = async (img) => {
+            const s = String(img || '');
+            if (!s) return '';
+            if (/^data:image\//i.test(s)) {
+              try {
+                const r = await fetch('api/upload_image.php', {
+                  method: 'POST',
+                  headers: {'Content-Type':'application/json'},
+                  credentials: 'same-origin',
+                  body: JSON.stringify({ dataUrl: s })
+                });
+                const jsUp = await r.json().catch(()=>null);
+                if (r.ok && jsUp && jsUp.ok && jsUp.url) return String(jsUp.url);
+                return '';
+              } catch { return ''; }
+            }
+            return s;
+          };
           const params = new URLSearchParams();
           params.set('slug', slug);
           params.set('mapel', mapel);
@@ -2536,10 +2512,14 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           params.set('sekolah', String(state.identity.namaSekolah||''));
           params.set('guru', String(state.identity.namaGuru||''));
           // tambahkan pembahasan jika ada
-          const payloadWithExplain = pg.map(q => ({
-            question: String(q.question||''),
-            options: q.options.map(x=>String(x||'')),
-            explain: String(q.explanation || q.pembahasan || q.rationale || '')
+          const payloadWithExplain = await Promise.all(pg.map(async (q) => {
+            const imgUrl = await uploadIfNeeded(q.image);
+            return {
+              question: String(q.question||''),
+              options: q.options.map(x=>String(x||'')),
+              explain: String(q.explanation || q.pembahasan || q.rationale || ''),
+              image: imgUrl ? String(imgUrl) : ''
+            };
           }));
           params.set('payload_public', JSON.stringify(payloadWithExplain));
           params.set('answer_key', JSON.stringify(answer_key));
@@ -2847,6 +2827,36 @@ OUTPUT JSON:
         } catch {}
       };
 
+      const copyImagePrompt = async (id, el) => {
+        try {
+          const q = state.questions.find(x => x.id === id);
+          const p = String(q?.imagePrompt || '').trim();
+          if (!p) return;
+          await navigator.clipboard.writeText(p);
+          if (el) {
+            const prev = el.innerHTML;
+            el.innerHTML = '<span class="material-symbols-outlined text-[16px]">done</span>';
+            setTimeout(() => { el.innerHTML = '<span class="material-symbols-outlined text-[16px]">content_copy</span>'; }, 1200);
+          }
+        } catch {}
+      };
+
+      const openChatGPTWithPrompt = async (id, el) => {
+        try {
+          const q = state.questions.find(x => x.id === id);
+          const p = String(q?.imagePrompt || '').trim();
+          if (!p) return;
+          // Copy prompt terlebih dahulu karena ChatGPT tidak mendukung prefill lewat URL
+          await navigator.clipboard.writeText(p);
+          window.open('https://chat.openai.com/', '_blank', 'noopener');
+          if (el) {
+            const prev = el.innerHTML;
+            el.innerHTML = '<span class="material-symbols-outlined text-[16px]">done</span>';
+            setTimeout(() => { el.innerHTML = '<span class="material-symbols-outlined text-[16px]">smart_toy</span>'; }, 1200);
+          }
+        } catch {}
+      };
+
       const regenImage = async (id) => {
         const q = state.questions.find(x => x.id === id);
         if (!q) return;
@@ -2859,8 +2869,12 @@ OUTPUT JSON:
               if ((limits?.limitgambar ?? 0) <= 0) {
                 const ctx = state.identity || {};
                 const baseTopic = String(q.materi || ctx.topik || ctx.mataPelajaran || q.question || '').trim();
-                const existing = String(q.imagePrompt || '').trim();
-                const enhanced = `High quality educational illustration, clear vector style, white background: ${existing || baseTopic || 'educational diagram'}`;
+                const existing = stripPrefixForSubject(String(q.imagePrompt || '').trim());
+                const quoted = extractQuotedWord(q.question || '');
+                const optGuess = pickConcreteOption(q.options || []);
+                const rawSubj = existing || quoted || optGuess || baseTopic;
+                const subject = enrichSubject(rawSubj, baseTopic, ctx.mataPelajaran, q.question);
+                const enhanced = `High quality educational illustration, clear vector style, white background: ${subject}`;
                 updateQuestionData(id, { imagePrompt: enhanced, _showImagePrompt: true, _imageError: null });
                 return;
               }
@@ -2871,7 +2885,8 @@ OUTPUT JSON:
           const subjSource = stripPrefixForSubject(q.imagePrompt || '');
           const quoted = extractQuotedWord(q.question || '');
           const optGuess = pickConcreteOption(q.options || []);
-          const subj = subjSource || quoted || optGuess || buildImageSubject(q.materi || ctx.topik || ctx.mataPelajaran, ctx.mataPelajaran, q.question);
+          const rawSubj = subjSource || quoted || optGuess || (q.materi || ctx.topik || ctx.mataPelajaran || q.question);
+          const subj = enrichSubject(rawSubj, q.materi || ctx.topik || ctx.mataPelajaran, ctx.mataPelajaran, q.question);
           const img = await generateImage(subj || 'diagram', preferSize);
           if (!img) throw new Error('Gagal membuat gambar');
           updateQuestionData(id, { image: img });
@@ -2883,7 +2898,8 @@ OUTPUT JSON:
             const existing = stripPrefixForSubject(String(q.imagePrompt || '').trim());
             const quoted = extractQuotedWord(q.question || '');
             const optGuess = pickConcreteOption(q.options || []);
-            const subject = existing || quoted || optGuess || buildImageSubject(baseTopic, ctx.mataPelajaran, q.question);
+            const rawSubj = existing || quoted || optGuess || baseTopic;
+            const subject = enrichSubject(rawSubj, baseTopic, ctx.mataPelajaran, q.question);
             const enhanced = `High quality educational illustration, clear vector style, white background: ${subject}`;
             updateQuestionData(id, { imagePrompt: enhanced, _showImagePrompt: true, _imageError: null });
           } else {

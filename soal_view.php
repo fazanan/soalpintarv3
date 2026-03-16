@@ -68,38 +68,49 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
   </style>
 </head>
 <body class="bg-gray-50">
-  <div class="max-w-3xl mx-auto p-4 md:p-6">
-    <div class="bg-white rounded-2xl border shadow-sm p-6 mb-4">
-      <div class="flex items-center justify-between gap-3 mb-4">
-        <div class="brand-badge">
-          <span class="brand-dot"></span>
-          <span class="brand-text"><span style="color:#137fec">Guru</span>Pintar</span>
+  <div class="max-w-4xl mx-auto p-4 md:p-6">
+    <div id="paper" class="bg-white text-black p-6 md:p-10 shadow-paper border border-gray-200 rounded-2xl">
+      <div class="border-b-2 border-black pb-6 mb-8 relative">
+        <div class="text-center mb-6">
+          <h2 class="font-bold text-2xl uppercase tracking-wider mb-1">
+            <?php echo htmlspecialchars((strtoupper(trim((string)($decoded['settings']['meta']['sekolah'] ?? ''))) ?: 'NAMA SEKOLAH')); ?>
+          </h2>
+          <h3 class="font-bold text-lg uppercase tracking-wide">
+            NASKAH SOAL
+          </h3>
+          <div class="text-sm mt-1">Mata Pelajaran <?php echo htmlspecialchars($mapel ?: '-'); ?></div>
         </div>
-        <div class="text-right">
-          <div class="text-2xl font-extrabold tracking-tight"><?php echo htmlspecialchars($mapel ?: 'Soal'); ?></div>
-          <div class="text-xs text-gray-600">No Absen: <?php echo (int)$n; ?></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-2 text-sm">
+          <div class="space-y-1.5">
+            <div class="flex items-start">
+              <span class="w-36 font-semibold shrink-0">Mata Pelajaran</span><span class="mr-2">:</span><span><?php echo htmlspecialchars($mapel ?: '-'); ?></span>
+            </div>
+            <div class="flex items-start">
+              <span class="w-36 font-semibold shrink-0">Kelas</span><span class="mr-2">:</span><span><?php echo htmlspecialchars($kelas ?: '-'); ?></span>
+            </div>
+            <div class="flex items-center">
+              <span class="w-36 font-semibold shrink-0">Hari / Tanggal</span><span class="mr-2">:</span>
+              <div class="border-b border-black border-dotted flex-1 h-4"></div>
+            </div>
+          </div>
+          <div class="space-y-1.5">
+            <div class="flex items-center">
+              <span class="w-36 font-semibold shrink-0">Waktu</span><span class="mr-2">:</span>
+              <div class="border-b border-black border-dotted flex-1 h-4"></div>
+            </div>
+            <div class="flex items-center">
+              <span class="w-36 font-semibold shrink-0">Nama</span><span class="mr-2">:</span>
+              <div class="border-b border-black border-dotted flex-1 h-4"></div>
+            </div>
+            <div class="flex items-start">
+              <span class="w-36 font-semibold shrink-0">No. Absen</span><span class="mr-2">:</span>
+              <span><?php echo (int)$n; ?></span>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-        <div class="p-3 rounded-lg border bg-gray-50">
-          <div class="text-xs text-gray-600">Satuan Pendidikan</div>
-          <div class="font-semibold"><?php echo htmlspecialchars(($decoded['settings']['meta']['sekolah'] ?? '') ?: '-'); ?></div>
-        </div>
-        <div class="p-3 rounded-lg border bg-gray-50">
-          <div class="text-xs text-gray-600">Guru</div>
-          <div class="font-semibold"><?php echo htmlspecialchars(($decoded['settings']['meta']['guru'] ?? '') ?: '-'); ?></div>
-        </div>
-        <div class="p-3 rounded-lg border bg-gray-50">
-          <div class="text-xs text-gray-600">Mata Pelajaran</div>
-          <div class="font-semibold"><?php echo htmlspecialchars($mapel ?: '-'); ?></div>
-        </div>
-        <div class="p-3 rounded-lg border bg-gray-50">
-          <div class="text-xs text-gray-600">Kelas</div>
-          <div class="font-semibold"><?php echo htmlspecialchars($kelas ?: '-'); ?></div>
-        </div>
-      </div>
+      <div id="root"></div>
     </div>
-    <div id="root" class="bg-white rounded-2xl border shadow-sm p-5"></div>
   </div>
   <script>
     const payload = <?php echo json_encode($items, JSON_UNESCAPED_UNICODE); ?>;
@@ -144,23 +155,38 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         const q = questions[origIdx] || {};
         const opts = Array.isArray(q.options) ? q.options : [];
         const optsHtml = opts.map((t, oi) => `
-          <label class="flex items-center gap-3 p-3 rounded-lg border hover:bg-gray-50 transition">
-            <input type="radio" name="q_${i}" value="${oi}" class="rounded border-gray-300">
-            <span class="text-sm">${String(t || '')}</span>
-          </label>
+          <div class="flex gap-3 items-start">
+            <label class="font-semibold pt-0.5">${String.fromCharCode(65 + oi)}.</label>
+            <label class="flex-1 flex gap-3 p-2 rounded-lg hover:bg-gray-50 transition">
+              <input type="radio" name="q_${i}" value="${oi}" class="mt-1 rounded border-gray-300">
+              <span class="text-sm leading-relaxed">${String(t || '')}</span>
+            </label>
+          </div>
         `).join('');
         return `
-          <div class="mb-5 rounded-xl border p-4">
-            <div class="font-semibold mb-3">${i+1}. ${String(q.question || '')}</div>
-            <div class="space-y-2">${optsHtml}</div>
+          <div class="mb-6">
+            <div class="flex gap-4">
+              <span class="font-bold text-lg min-w-[1.5rem]">${i + 1}.</span>
+              <div class="flex-1">
+                <p class="mb-3 text-justify leading-relaxed">${String(q.question || '')}</p>
+                ${q.image ? `<img src="${String(q.image)}" class="w-64 h-64 object-contain rounded-lg mb-3 border shadow-sm">` : ``}
+                <div class="grid grid-cols-1 gap-2 pl-1">
+                  ${optsHtml}
+                </div>
+              </div>
+            </div>
           </div>
         `;
       }).join('');
       return `
-        ${cards}
-        <div class="pt-2">
-          <button id="btnSubmit" class="h-11 px-5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">Submit</button>
-          <div id="info" class="text-sm text-gray-600 mt-2"></div>
+        <div class="space-y-6">
+          <div class="font-bold mb-1">PILIHAN GANDA</div>
+          <div class="italic text-sm mb-4">Pilihlah salah satu jawaban yang paling tepat!</div>
+          ${cards}
+          <div class="pt-2">
+            <button id="btnSubmit" class="h-11 px-5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">Submit</button>
+            <div id="info" class="text-sm text-gray-600 mt-2"></div>
+          </div>
         </div>
       `;
     }
