@@ -849,6 +849,28 @@ if (!isset($_SESSION['user_id'])) {
         }
       }
 
+      function buildImageSubject(topic, mapel, question) {
+        const t = String(topic || '').toLowerCase();
+        const m = String(mapel || '').toLowerCase();
+        if (m.includes('biologi') || t.includes('fotosintesis') || String(question||'').toLowerCase().includes('fotosintesis')) return 'cross-section of a leaf showing chloroplasts with stacked thylakoids, arrows for light and glucose, labels optional';
+        if (t.includes('sistem pencernaan') || String(question||'').toLowerCase().includes('pencernaan')) return 'simple vector of human digestive system front view showing stomach, small and large intestines, minimal colors, labels optional';
+        if (t.includes('jantung') || String(question||'').toLowerCase().includes('jantung')) return 'diagram of human heart with four chambers and major vessels, arrows for blood flow, minimal colors, labels optional';
+        if (t.includes('siklus air') || String(question||'').toLowerCase().includes('siklus air')) return 'water cycle diagram with evaporation, condensation, precipitation and collection, arrows, minimal colors, labels optional';
+        if (t.includes('rantai makanan') || String(question||'').toLowerCase().includes('rantai makanan')) return 'food chain diagram with producer, primary and secondary consumers, arrows indicating energy flow, minimal colors, labels optional';
+        if (m.includes('fisika') && (t.includes('gaya') || String(question||'').toLowerCase().includes('gaya'))) return 'free-body diagram of a block on a horizontal surface with arrows for forces, minimal colors, labels optional';
+        if (m.includes('kimia') && (t.includes('atom') || String(question||'').toLowerCase().includes('atom'))) return 'bohr-like atomic model with nucleus and electron orbits, minimal colors, labels optional';
+        if (m.includes('matematika') && (t.includes('persamaan linear') || String(question||'').toLowerCase().includes('persamaan linear'))) return 'clean 2D coordinate plane with two straight lines intersecting, axes and grid faint, minimal colors, labels optional';
+        const base = String(topic || question || 'educational diagram').trim();
+        return `clear vector diagram of ${base}, minimal colors, arrows where applicable, labels optional`;
+      }
+
+      function stripPrefixForSubject(p) {
+        const s = String(p || '');
+        const key = 'High quality educational illustration, clear vector style, white background: ';
+        if (s.startsWith(key)) return s.slice(key.length);
+        return s;
+      }
+
       async function generateImage(prompt, firstSize = "512x512") {
         const callApi = async (model, p, size) => {
           const response = await fetch("api/openai_proxy.php", {
@@ -2763,9 +2785,11 @@ OUTPUT JSON:
               }
             }
           } catch {}
-          // Gunakan 256x256 saat pertama kali (belum ada gambar), 512x512 untuk buat ulang
           const preferSize = q.image ? "512x512" : "256x256";
-          const img = await generateImage(q.imagePrompt || q.question || 'diagram', preferSize);
+          const ctx = state.identity || {};
+          const subjSource = stripPrefixForSubject(q.imagePrompt || '');
+          const subj = subjSource || buildImageSubject(q.materi || ctx.topik || ctx.mataPelajaran, ctx.mataPelajaran, q.question);
+          const img = await generateImage(subj || 'diagram', preferSize);
           if (!img) throw new Error('Gagal membuat gambar');
           updateQuestionData(id, { image: img });
         } catch (e) {
@@ -2773,8 +2797,9 @@ OUTPUT JSON:
           if (msg.includes('403') || msg.toLowerCase().includes('habis')) {
             const ctx = state.identity || {};
             const baseTopic = String(q.materi || ctx.topik || ctx.mataPelajaran || q.question || '').trim();
-            const existing = String(q.imagePrompt || '').trim();
-            const enhanced = `High quality educational illustration, clear vector style, white background: ${existing || baseTopic || 'educational diagram'}`;
+            const existing = stripPrefixForSubject(String(q.imagePrompt || '').trim());
+            const subject = existing || buildImageSubject(baseTopic, ctx.mataPelajaran, q.question);
+            const enhanced = `High quality educational illustration, clear vector style, white background: ${subject}`;
             updateQuestionData(id, { imagePrompt: enhanced, _showImagePrompt: true, _imageError: null });
           } else {
             updateQuestionData(id, { _imageError: msg });
