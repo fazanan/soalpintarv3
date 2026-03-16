@@ -849,7 +849,7 @@ if (!isset($_SESSION['user_id'])) {
         }
       }
 
-      async function generateImage(prompt) {
+      async function generateImage(prompt, firstSize = "512x512") {
         const callApi = async (model, p, size) => {
           const response = await fetch("api/openai_proxy.php", {
             method: "POST",
@@ -869,16 +869,18 @@ if (!isset($_SESSION['user_id'])) {
         };
 
         try {
-          const promptSimple = `simple black and white educational diagram, minimalist line drawing, no shading, white background. Subject: ${prompt}`;
-          return await callApi("gpt-image-1", promptSimple, "512x512");
+          const enhancedPrompt = `High quality educational illustration, clear vector style, white background: ${prompt}`;
+          return await callApi("gpt-image-1", enhancedPrompt, firstSize);
         } catch (e) {
-          console.warn("Image gen simple failed, trying normal...", e);
+          console.warn("Image gen first attempt failed, trying fallback...", e);
         }
 
         try {
-          const promptNormal = `clear educational diagram for school question, black and white, high contrast. Subject: ${prompt}`;
+          const promptNormal = `High quality educational illustration, clear vector style, white background: ${prompt}`;
           try {
-            return await callApi("gpt-image-1", promptNormal, "512x512");
+            // fallback ke 512 jika percobaan awal bukan 512, jika sudah 512 tetap ulangi
+            const fallbackSize = firstSize === "512x512" ? "512x512" : "512x512";
+            return await callApi("gpt-image-1", promptNormal, fallbackSize);
           } catch (e2) {
             console.warn("gpt-image-1 failed, trying dall-e-3...", e2);
             return await callApi("dall-e-3", promptNormal, "1024x1024");
@@ -2752,34 +2754,28 @@ OUTPUT JSON:
             if (res.ok) {
               const limits = await res.json();
               if ((limits?.limitgambar ?? 0) <= 0) {
-                const promptExisting = String(q.imagePrompt || '').trim();
-                if (promptExisting) {
-                  updateQuestionData(id, { _showImagePrompt: true });
-                } else {
-                  const ctx = state.identity || {};
-                  const base = String(q.materi || ctx.topik || ctx.mataPelajaran || '').trim();
-                  const inferred = base ? `Ilustrasi edukatif garis sederhana hitam-putih, tanpa teks, latar putih. Topik: ${base}.` : `Ilustrasi edukatif garis sederhana hitam-putih, tanpa teks, latar putih. Topik: ${q.question || ''}.`;
-                  updateQuestionData(id, { imagePrompt: inferred, _showImagePrompt: true, _imageError: null });
-                }
+                const ctx = state.identity || {};
+                const baseTopic = String(q.materi || ctx.topik || ctx.mataPelajaran || q.question || '').trim();
+                const existing = String(q.imagePrompt || '').trim();
+                const enhanced = `High quality educational illustration, clear vector style, white background: ${existing || baseTopic || 'educational diagram'}`;
+                updateQuestionData(id, { imagePrompt: enhanced, _showImagePrompt: true, _imageError: null });
                 return;
               }
             }
           } catch {}
-          const img = await generateImage(q.imagePrompt || q.question || 'diagram');
+          // Gunakan 256x256 saat pertama kali (belum ada gambar), 512x512 untuk buat ulang
+          const preferSize = q.image ? "512x512" : "256x256";
+          const img = await generateImage(q.imagePrompt || q.question || 'diagram', preferSize);
           if (!img) throw new Error('Gagal membuat gambar');
           updateQuestionData(id, { image: img });
         } catch (e) {
           const msg = String(e.message || e);
           if (msg.includes('403') || msg.toLowerCase().includes('habis')) {
-            const promptExisting = String(q.imagePrompt || '').trim();
-            if (promptExisting) {
-              updateQuestionData(id, { _showImagePrompt: true, _imageError: null });
-            } else {
-              const ctx = state.identity || {};
-              const base = String(q.materi || ctx.topik || ctx.mataPelajaran || '').trim();
-              const inferred = base ? `Ilustrasi edukatif garis sederhana hitam-putih, tanpa teks, latar putih. Topik: ${base}.` : `Ilustrasi edukatif garis sederhana hitam-putih, tanpa teks, latar putih. Topik: ${q.question || ''}.`;
-              updateQuestionData(id, { imagePrompt: inferred, _showImagePrompt: true, _imageError: null });
-            }
+            const ctx = state.identity || {};
+            const baseTopic = String(q.materi || ctx.topik || ctx.mataPelajaran || q.question || '').trim();
+            const existing = String(q.imagePrompt || '').trim();
+            const enhanced = `High quality educational illustration, clear vector style, white background: ${existing || baseTopic || 'educational diagram'}`;
+            updateQuestionData(id, { imagePrompt: enhanced, _showImagePrompt: true, _imageError: null });
           } else {
             updateQuestionData(id, { _imageError: msg });
           }
