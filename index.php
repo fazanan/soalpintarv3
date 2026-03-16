@@ -853,6 +853,24 @@ if (!isset($_SESSION['user_id'])) {
         const t = String(topic || '').toLowerCase();
         const m = String(mapel || '').toLowerCase();
         const q = String(question || '').toLowerCase();
+        // Bahasa/aksara – buat lebih kontekstual daripada sekadar "mengenal huruf"
+        // Ekstrak kata dalam tanda kutip jika ada (contoh: kata 'apel')
+        const quotedMatch = (String(question || '').match(/[\"'‘’“”]([^\"'‘’“”]+)[\"'‘’“”]/) || [,''])[1].trim();
+        if (m.includes('bahasa') || m.includes('bahasa indonesia') || t.includes('huruf') || q.includes('huruf')) {
+          if (q.includes('huruf vokal') || t.includes('huruf vokal')) {
+            if (quotedMatch) return `simple vector illustration of ${quotedMatch} (object), minimal colors, white background, labels optional`;
+            return 'alphabet chart showing uppercase and lowercase vowels A E I O U, minimal colors, white background';
+          }
+          if (q.includes('huruf konsonan') || t.includes('huruf konsonan')) {
+            return 'alphabet chart highlighting consonant letters (excluding A E I O U), minimal colors, white background';
+          }
+          if (q.includes('kata') && quotedMatch) {
+            return `simple vector illustration of ${quotedMatch} (object), minimal colors, white background, labels optional`;
+          }
+          if (t.includes('mengenal huruf') || q.includes('mengenal huruf') || t.includes('alfabet') || q.includes('alfabet')) {
+            return 'alphabet chart with A–Z uppercase and lowercase in clean grid, minimal colors, white background';
+          }
+        }
         const rules = [
           { ok: () => m.includes('biologi') && (t.includes('fotosintesis') || q.includes('fotosintesis')), s: 'cross-section of a leaf showing chloroplasts with stacked thylakoids, arrows for light and glucose, labels optional' },
           { ok: () => t.includes('sistem pencernaan') || q.includes('pencernaan'), s: 'simple vector of human digestive system front view showing stomach, small and large intestines, minimal colors, labels optional' },
@@ -916,6 +934,22 @@ if (!isset($_SESSION['user_id'])) {
         const key = 'High quality educational illustration, clear vector style, white background: ';
         if (s.startsWith(key)) return s.slice(key.length);
         return s;
+      }
+      function extractQuotedWord(text) {
+        const m = String(text || '').match(/[\"'‘’“”]([^\"'‘’“”]+)[\"'‘’“”]/);
+        return (m && m[1]) ? m[1].trim() : '';
+      }
+      function pickConcreteOption(options) {
+        if (!Array.isArray(options) || options.length === 0) return '';
+        const bad = [/^semua jawaban/i, /^tidak ada/i, /^semua di atas/i, /^pilihan/i, /^opsi/i];
+        const cleaned = options
+          .map(x => String(x || '').trim())
+          .filter(x => x.length > 0 && !bad.some(r => r.test(x)));
+        if (cleaned.length === 0) return '';
+        // Pilih opsi terpendek yang terlihat "bendawi" (satu atau dua kata)
+        cleaned.sort((a,b) => a.length - b.length);
+        const candidate = cleaned.find(x => x.split(/\s+/).length <= 3) || cleaned[0];
+        return candidate;
       }
 
       async function generateImage(prompt, firstSize = "512x512") {
@@ -2835,7 +2869,9 @@ OUTPUT JSON:
           const preferSize = q.image ? "512x512" : "256x256";
           const ctx = state.identity || {};
           const subjSource = stripPrefixForSubject(q.imagePrompt || '');
-          const subj = subjSource || buildImageSubject(q.materi || ctx.topik || ctx.mataPelajaran, ctx.mataPelajaran, q.question);
+          const quoted = extractQuotedWord(q.question || '');
+          const optGuess = pickConcreteOption(q.options || []);
+          const subj = subjSource || quoted || optGuess || buildImageSubject(q.materi || ctx.topik || ctx.mataPelajaran, ctx.mataPelajaran, q.question);
           const img = await generateImage(subj || 'diagram', preferSize);
           if (!img) throw new Error('Gagal membuat gambar');
           updateQuestionData(id, { image: img });
@@ -2845,7 +2881,9 @@ OUTPUT JSON:
             const ctx = state.identity || {};
             const baseTopic = String(q.materi || ctx.topik || ctx.mataPelajaran || q.question || '').trim();
             const existing = stripPrefixForSubject(String(q.imagePrompt || '').trim());
-            const subject = existing || buildImageSubject(baseTopic, ctx.mataPelajaran, q.question);
+            const quoted = extractQuotedWord(q.question || '');
+            const optGuess = pickConcreteOption(q.options || []);
+            const subject = existing || quoted || optGuess || buildImageSubject(baseTopic, ctx.mataPelajaran, q.question);
             const enhanced = `High quality educational illustration, clear vector style, white background: ${subject}`;
             updateQuestionData(id, { imagePrompt: enhanced, _showImagePrompt: true, _imageError: null });
           } else {
