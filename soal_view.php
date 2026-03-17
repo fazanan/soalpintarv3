@@ -39,6 +39,7 @@ $items = [];
 $maxAbsen = 0;
 $showSolution = 0;
 $answerKeySettings = [];
+$studentName = isset($_GET['name']) ? trim((string)$_GET['name']) : (isset($_GET['nama']) ? trim((string)$_GET['nama']) : '');
 if (is_array($decoded)) {
   if (isset($decoded['items']) && is_array($decoded['items'])) {
     $items = $decoded['items'];
@@ -88,19 +89,14 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
             <div class="flex items-start">
               <span class="w-36 font-semibold shrink-0">Kelas</span><span class="mr-2">:</span><span><?php echo htmlspecialchars($kelas ?: '-'); ?></span>
             </div>
-            <div class="flex items-center">
-              <span class="w-36 font-semibold shrink-0">Hari / Tanggal</span><span class="mr-2">:</span>
-              <div class="border-b border-black border-dotted flex-1 h-4"></div>
+            <div class="flex items-start">
+              <span class="w-36 font-semibold shrink-0">Hari / Tanggal</span><span class="mr-2">:</span><span id="dtNow"></span>
             </div>
           </div>
           <div class="space-y-1.5">
             <div class="flex items-center">
-              <span class="w-36 font-semibold shrink-0">Waktu</span><span class="mr-2">:</span>
-              <div class="border-b border-black border-dotted flex-1 h-4"></div>
-            </div>
-            <div class="flex items-center">
               <span class="w-36 font-semibold shrink-0">Nama</span><span class="mr-2">:</span>
-              <div class="border-b border-black border-dotted flex-1 h-4"></div>
+              <span><?php echo htmlspecialchars($studentName !== '' ? $studentName : '-'); ?></span>
             </div>
             <div class="flex items-start">
               <span class="w-36 font-semibold shrink-0">No. Absen</span><span class="mr-2">:</span>
@@ -117,6 +113,19 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
     const absen = <?php echo (int)$n; ?>;
     const showSolution = <?php echo (int)$showSolution; ?> === 1;
     const answerKey = <?php echo json_encode($answerKeySettings, JSON_UNESCAPED_UNICODE); ?>;
+    (function(){
+      const el = document.getElementById('dtNow');
+      if (el) {
+        const dt = new Date();
+        const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+        const d = String(dt.getDate()).padStart(2,'0');
+        const m = months[dt.getMonth()];
+        const y = String(dt.getFullYear()).slice(-2);
+        const hh = String(dt.getHours()).padStart(2,'0');
+        const mm = String(dt.getMinutes()).padStart(2,'0');
+        el.textContent = `${d}/${m}/${y} - ${hh}:${mm}`;
+      }
+    })();
     let submitted = false;
     let activeTab = 'soal';
     function shuffleWithSeed(arr, seed) {

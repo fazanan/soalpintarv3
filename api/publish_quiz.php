@@ -38,6 +38,18 @@ $guru = isset($data['guru']) ? trim((string)$data['guru']) : '';
 $payload = $data['payload_public'] ?? null;
 $answerKey = $data['answer_key'] ?? null;
 $expire = isset($data['expire_at']) ? trim((string)$data['expire_at']) : '';
+// Normalisasi format expire ke 'YYYY-MM-DD HH:MM:SS'
+if ($expire !== '') {
+  if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $expire)) {
+    $expire .= ' 23:59:59';
+  } else if (preg_match('/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}$/', $expire)) {
+    $expire .= ':00';
+  } else {
+    $ts = strtotime($expire);
+    if ($ts !== false) $expire = date('Y-m-d H:i:s', $ts);
+    else $expire = '';
+  }
+}
 $maxAbsen = isset($data['max_absen']) ? (int)$data['max_absen'] : 0;
 $showSolution = isset($data['show_solution']) ? (int)$data['show_solution'] : 0;
 if (is_string($payload)) {
@@ -79,25 +91,17 @@ $payloadJson = json_encode($payloadObject, JSON_UNESCAPED_UNICODE);
 $answerJson = is_string($answerKey) ? $answerKey : json_encode($answerKey, JSON_UNESCAPED_UNICODE);
 $arr = json_decode($payloadJson, true);
 $total = is_array($arr['items'] ?? null) ? count($arr['items']) : 0;
-$sql = "INSERT INTO published_quizzes (user_id, slug, mapel, kelas, total_soal, payload_public, answer_key, is_active, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ".($expire ? '?' : 'NULL').")";
+if ($expire === '') {
+  $expire = date('Y-m-d H:i:s', time() + 86400);
+}
+$sql = "INSERT INTO published_quizzes (user_id, slug, mapel, kelas, total_soal, payload_public, answer_key, is_active, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)";
 $stmt = $mysqli->prepare($sql);
 if (!$stmt) {
   http_response_code(500);
   echo json_encode(['ok'=>false,'error'=>'stmt_fail','errno'=>(int)$mysqli->errno]);
   exit;
 }
-if ($expire !== '') {
-  $stmt->bind_param('isssisss', $_SESSION['user_id'], $slug, $mapel, $kelas, $total, $payloadJson, $answerJson, $expire);
-} else {
-  $stmt->close();
-  $stmt = $mysqli->prepare("INSERT INTO published_quizzes (user_id, slug, mapel, kelas, total_soal, payload_public, answer_key, is_active, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, NULL)");
-  if (!$stmt) {
-    http_response_code(500);
-    echo json_encode(['ok'=>false,'error'=>'stmt_fail','errno'=>(int)$mysqli->errno]);
-    exit;
-  }
-  $stmt->bind_param('isssiss', $_SESSION['user_id'], $slug, $mapel, $kelas, $total, $payloadJson, $answerJson);
-}
+$stmt->bind_param('isssisss', $_SESSION['user_id'], $slug, $mapel, $kelas, $total, $payloadJson, $answerJson, $expire);
 $ok = $stmt->execute();
 if (!$ok) {
   $code = (int)($stmt->errno ?: $mysqli->errno);

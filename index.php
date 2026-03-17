@@ -283,6 +283,7 @@ if (!isset($_SESSION['user_id'])) {
     <input id="projectPicker" type="file" accept=".json" class="hidden" />
     <input id="lkpdImgUpload" type="file" accept="image/*" class="hidden" />
     <input id="lkpdTxtUpload" type="file" accept=".txt,.md,.markdown,.csv,.json,.html,.htm" class="hidden" />
+    <input id="rosterPicker" type="file" accept=".csv,.txt" class="hidden" />
 
     <script>
       const OPENAI_API_KEY = "";
@@ -485,8 +486,11 @@ if (!isset($_SESSION['user_id'])) {
         questions: [],
         quiz: { idx: 0, answered: {}, input: "", reveal: false },
         quizSubtab: "live",
-        quizPublishForm: { slug: "", jumlah: 32, expire: "" },
+        quizPublishForm: { slug: "", jumlah: 32, expire: "", roster: [] },
         quizLastLink: "",
+        quizLastPubId: 0,
+        quizLastRoster: [],
+        quizLastSlug: "",
         quizPublications: [],
         quizResults: [],
         quizSelectedSlug: "",
@@ -2310,7 +2314,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           return `
             <div class="p-6 space-y-5">
               <div>
-                <div class="text-xl font-bold">Buat Link Publik</div>
+                <div class="text-xl font-bold">Buat Link Soal Untuk Siswa</div>
                 <div class="text-sm text-text-sub-light mt-1">Buat tautan yang bisa diakses siswa tanpa login</div>
               </div>
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -2327,6 +2331,14 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                   <input placeholder="2026-12-31 23:59" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(f.expire || '')}" oninput="window.__sp.setQuizPublish('expire', this.value)">
                 </div>
               </div>
+              <div class="space-y-2">
+                <div class="text-sm font-semibold">Daftar Siswa (opsional)</div>
+                <div class="text-xs text-text-sub-light">Unggah file .csv / .txt dengan format baris: <code>NoAbsen,Nama Siswa</code> atau dipisah tab/semicolon</div>
+                <div class="flex items-center gap-3">
+                  <button type="button" onclick="document.getElementById('rosterPicker').click()" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark">Upload CSV/TXT</button>
+                  <div class="text-xs text-text-sub-light">${Array.isArray(f.roster) && f.roster.length ? `Terbaca ${f.roster.length} siswa` : 'Belum ada file diunggah'}</div>
+                </div>
+              </div>
               <div class="flex items-center gap-3">
                 <label class="inline-flex items-center gap-2 text-sm">
                   <input type="checkbox" ${f.showSolution ? 'checked' : ''} onchange="window.__sp.setQuizPublish('showSolution', this.checked)">
@@ -2337,7 +2349,10 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 <button onclick="window.__sp.publishQuiz()" class="px-4 h-11 rounded-lg bg-primary hover:bg-blue-600 text-white font-semibold">Publish</button>
                 <div id="pubMsg" class="text-sm text-text-sub-light"></div>
               </div>
-              ${last ? `
+              ${(() => {
+                const hasRoster = Array.isArray(f.roster) && f.roster.length > 0;
+                const showLast = last && (!hasRoster || !state.quizLastPubId);
+                return showLast ? `
                 <div class="space-y-2">
                   <div class="text-xs text-text-sub-light">Link publik:</div>
                   <code class="block px-2.5 py-1 rounded-md border bg-white dark:bg-surface-dark font-mono text-xs">${last}</code>
@@ -2345,7 +2360,27 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                     <button type="button" data-link="${last}" onclick="navigator.clipboard.writeText(this.getAttribute('data-link')); this.textContent='Disalin'; setTimeout(()=>this.textContent='Salin',1500)" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm">Salin</button>
                   </div>
                 </div>
-              ` : ``}
+                ` : ``;
+              })()}
+              ${Array.isArray(f.roster) && f.roster.length && state.quizLastPubId ? (() => {
+                const rows = f.roster.map(r => {
+                  const link = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(state.quizLastPubId))}&n=${encodeURIComponent(String(r.absen))}&name=${encodeURIComponent(String(r.nama||''))}`;
+                  return `<tr><td class="border px-2 py-1 text-center">${r.absen}</td><td class="border px-2 py-1">${safeText(r.nama||'')}</td><td class="border px-2 py-1"><a href="${link}" target="_blank" class="text-blue-600 underline">${link}</a></td></tr>`;
+                }).join('');
+                return `
+                  <div class="mt-3">
+                    <div class="flex items-center justify-between">
+                      <div class="text-sm font-semibold">Daftar Link Siswa (${f.roster.length})</div>
+                      <button class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.exportRosterLinksCSV(${Number(state.quizLastPubId)}, '${safeText(state.quizLastSlug||'')}')">Download CSV</button>
+                    </div>
+                    <div class="overflow-auto mt-2">
+                      <table class="min-w-full text-xs border">
+                        <thead><tr><th class="border px-2 py-1">No Absen</th><th class="border px-2 py-1">Nama Siswa</th><th class="border px-2 py-1">Link</th></tr></thead>
+                        <tbody>${rows}</tbody>
+                      </table>
+                    </div>
+                  </div>`;
+              })() : `<div class="mt-3 text-xs text-text-sub-light">Unggah daftar siswa untuk menghasilkan link unik per siswa.</div>`}
             </div>
           `;
         })();
@@ -2362,23 +2397,76 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           });
           const pubObj = items.find(it => it.slug === sel);
           const exampleLink = pubObj ? `${location.origin}/soal_view.php?id=${encodeURIComponent(String(pubObj.id))}&n=1` : '';
+          const roster = Array.isArray(state.quizPublishForm?.roster) ? state.quizPublishForm.roster : [];
+          const nameMap = new Map(roster.map(r => [Number(r.absen), String(r.nama||'')]));
+          const scores = dataRows.map(r => r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0);
+          const avg = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+          const max = scores.length ? Math.max(...scores) : 0;
+          const top3 = dataRows.slice(0,3).map((r,i) => ({ rank: i+1, absen: Number(r.absen), name: nameMap.get(Number(r.absen)) || '', nilai: r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0 }));
           const rows = dataRows.map((r, idx) => {
             const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
-            return `<tr><td class="border px-3 py-2 text-center">${idx+1}</td><td class="border px-3 py-2">${safeText(state.quizResultsMapel || '')}</td><td class="border px-3 py-2 text-center">${Number(r.absen)}</td><td class="border px-3 py-2 text-center">${pct}</td></tr>`;
+            const nm = nameMap.get(Number(r.absen)) || '';
+            const trophy = idx < 3 ? `<span class="material-symbols-outlined text-amber-500 text-[18px] align-middle">trophy</span>` : '';
+            return `<tr>
+              <td class="border px-3 py-2 text-center">${idx+1} ${trophy}</td>
+              <td class="border px-3 py-2 text-center">${Number(r.absen)}</td>
+              <td class="border px-3 py-2">${safeText(nm || '-')}</td>
+              <td class="border px-3 py-2 text-center">${pct}</td>
+            </tr>`;
           }).join('');
           return `
             <div class="p-6 space-y-4">
               <div class="text-xl font-bold">Hasil</div>
-              <div class="flex items-center gap-2">
-                <select id="selPub" class="h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark">${options}</select>
+              <div class="flex items-center flex-wrap gap-2">
+                <select id="selPub" class="flex-1 min-w-0 h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark">${options}</select>
                 <button onclick="window.__sp.loadResults()" class="px-4 h-11 rounded-lg border bg-white dark:bg-surface-dark">Muat</button>
                 <button onclick="window.__sp.loadPublications()" class="px-3 h-11 rounded-lg border bg-white dark:bg-surface-dark">Segarkan</button>
+                ${pubObj ? `
+                  <button onclick="window.__sp.exportJSON('${safeText(pubObj.slug)}')" title="Download JSON"
+                    class="flex items-center justify-center h-11 w-11 rounded-lg bg-primary text-white">
+                    <span class="material-symbols-outlined">download</span>
+                  </button>
+                ` : ``}
+                ${pubObj ? `
+                  <button onclick="window.__sp.exportZIP('${safeText(pubObj.slug)}')" title="Download ZIP (JSON+Gambar)"
+                    class="flex items-center justify-center h-11 w-11 rounded-lg border bg-white dark:bg-surface-dark">
+                    <span class="material-symbols-outlined">folder_zip</span>
+                  </button>
+                ` : ``}
+                ${pubObj ? `
+                  <button onclick="window.__sp.exportResultsCSV('${safeText(pubObj.slug)}')" title="Download Laporan (CSV)"
+                    class="flex items-center justify-center h-11 w-11 rounded-lg border bg-white dark:bg-surface-dark">
+                    <span class="material-symbols-outlined">table</span>
+                  </button>
+                ` : ``}
               </div>
-              ${exampleLink ? `<div class="text-xs text-text-sub-light">Contoh link: <a href="${exampleLink}" class="text-blue-600 underline" target="_blank" rel="noopener">${exampleLink}</a></div>` : ``}
+              <div class="text-xs rounded-md border border-amber-200 bg-amber-50 text-amber-800 p-3">
+                Data hasil dan gambar di server akan dihapus otomatis 24 jam setelah publish. Segera unduh JSON atau ZIP agar arsip aman.
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
+                  <div class="text-xs text-text-sub-light">Mata Pelajaran</div>
+                  <div class="font-bold">${safeText(state.quizResultsMapel || '-')}</div>
+                </div>
+                <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
+                  <div class="text-xs text-text-sub-light">Nilai Rata-rata</div>
+                  <div class="font-bold">${avg}</div>
+                </div>
+                <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
+                  <div class="text-xs text-text-sub-light">Nilai Tertinggi</div>
+                  <div class="font-bold">${max}</div>
+                </div>
+              </div>
+              <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
+                <div class="font-bold mb-2">3 Besar</div>
+                <div class="space-y-1">
+                  ${top3.map(t => `<div class="flex items-center gap-2"><span class="material-symbols-outlined text-amber-500">trophy</span><span>#${t.rank}</span><span>• No ${t.absen}</span><span>• ${safeText(t.name||'-')}</span><span class="ml-auto font-bold">${t.nilai}</span></div>`).join('')}
+                </div>
+              </div>
               <div class="overflow-auto">
                 <table class="min-w-full text-sm border">
                   <thead class="bg-background-light dark:bg-background-dark">
-                    <tr><th class="border px-3 py-2 text-center">Peringkat</th><th class="border px-3 py-2 text-left">Mata Pelajaran</th><th class="border px-3 py-2">No Absen</th><th class="border px-3 py-2">Nilai</th></tr>
+                    <tr><th class="border px-3 py-2 text-center">Peringkat</th><th class="border px-3 py-2 text-center">No Absen</th><th class="border px-3 py-2 text-left">Nama Siswa</th><th class="border px-3 py-2 text-center">Nilai</th></tr>
                   </thead>
                   <tbody>${rows || `<tr><td colspan="4" class="border px-3 py-6 text-center text-text-sub-light">Belum ada hasil.</td></tr>`}</tbody>
                 </table>
@@ -2462,6 +2550,51 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         state.quizPublishForm[k] = v;
         saveDebounced(false);
       };
+      const parseRosterText = (text) => {
+        const lines = String(text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+        const rows = [];
+        for (const l of lines) {
+          const parts = l.split(/[,\t;]+/).map(s=>s.trim()).filter(Boolean);
+          if (parts.length >= 2) {
+            const ab = Number(parts[0]);
+            const nm = parts.slice(1).join(' ');
+            if (Number.isFinite(ab) && ab > 0 && nm) rows.push({ absen: ab, nama: nm });
+          }
+        }
+        return rows;
+      };
+      const handleRosterSelected = (evt) => {
+        const f = evt.target?.files?.[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const txt = String(e.target?.result || '');
+          const rows = parseRosterText(txt);
+          state.quizPublishForm = state.quizPublishForm || {};
+          state.quizPublishForm.roster = rows;
+          if (rows.length > 0) state.quizPublishForm.jumlah = rows.length;
+          saveDebounced(false);
+          render();
+          alert(rows.length ? `Daftar siswa terbaca: ${rows.length}` : 'Tidak ada data valid pada file.');
+        };
+        reader.readAsText(f);
+      };
+      const exportRosterLinksCSV = (pubId, slug) => {
+        const roster = Array.isArray(state.quizPublishForm?.roster) ? state.quizPublishForm.roster : [];
+        if (!pubId || roster.length === 0) return;
+        const base = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(pubId))}`;
+        const lines = ['No Absen,Nama Siswa,Link'];
+        for (const r of roster) {
+          const link = `${base}&n=${encodeURIComponent(String(r.absen))}&name=${encodeURIComponent(String(r.nama||''))}`;
+          lines.push(`${r.absen},"${(r.nama||'').replace(/"/g,'""')}",${link}`);
+        }
+        const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `DaftarLink_${slug||'publikasi'}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      };
       const publishQuiz = async () => {
         const mapel = String(state.identity.mataPelajaran || "").trim();
         if (!mapel) { alert("Lengkapi mata pelajaran di Identitas."); return; }
@@ -2480,6 +2613,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         const btn = document.getElementById('pubMsg');
         if (btn) btn.textContent = "Memproses...";
         try {
+          const roster = Array.isArray(state.quizPublishForm?.roster) ? state.quizPublishForm.roster : [];
           const uploadIfNeeded = async (img) => {
             const s = String(img || '');
             if (!s) return '';
@@ -2516,7 +2650,8 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           }));
           params.set('payload_public', JSON.stringify(payloadWithExplain));
           params.set('answer_key', JSON.stringify(answer_key));
-          params.set('max_absen', String(Number(state.quizPublishForm?.jumlah || 0) || 0));
+          const maxAbsen = roster.length > 0 ? roster.length : (Number(state.quizPublishForm?.jumlah || 0) || 0);
+          params.set('max_absen', String(maxAbsen));
           params.set('show_solution', String(state.quizPublishForm?.showSolution ? 1 : 0));
           if (expire) params.set('expire_at', expire);
           const res = await fetch('api/publish_quiz.php', { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'}, body: params.toString(), credentials: 'same-origin' });
@@ -2524,12 +2659,14 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           let js = null;
           try { js = JSON.parse(raw); } catch {}
           if (res.ok && js && js.ok) {
-            const expText = (expire && expire.trim()) ? expire.trim() : 'tanpa batas';
+            const expText = (expire && expire.trim()) ? expire.trim() : '24 jam (otomatis)';
             const msgLink = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(js.id))}&n=1`;
             if (btn) btn.innerHTML = `Berhasil publish.<br>Contoh akses: <a class="text-blue-600 underline" href="${msgLink}" target="_blank" rel="noopener">${msgLink}</a><br>Maks absen: ${Number(state.quizPublishForm?.jumlah||0) || '-'} • Expire: ${expText}`;
             state.quizLastLink = msgLink;
             await loadPublications();
             state.quizSelectedSlug = String(js.slug);
+            state.quizLastPubId = Number(js.id);
+            state.quizLastSlug = String(js.slug || '');
             saveDebounced(true);
             render();
           } else {
@@ -2569,6 +2706,35 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             render();
           }
         } catch {}
+      };
+      const exportResultsCSV = (slug) => {
+        const rows = Array.isArray(state.quizResults) ? state.quizResults.slice() : [];
+        const roster = Array.isArray(state.quizPublishForm?.roster) ? state.quizPublishForm.roster : [];
+        const nameMap = new Map(roster.map(r => [Number(r.absen), String(r.nama||'')]));
+        const head = ['No Absen','Nama Siswa','Nilai','Tanggal Submit'];
+        const body = rows.map(r => {
+          const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
+          const nm = nameMap.get(Number(r.absen)) || '';
+          const dt = String(r.created_at || '');
+          return [String(r.absen), nm, String(pct), dt];
+        });
+        const lines = [head.join(','), ...body.map(cols => cols.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))];
+        const blob = new Blob([lines.join('\n')], { type:'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `Laporan_${slug||'hasil'}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      };
+      const exportJSON = (slug) => {
+        if (!slug) return;
+        const url = 'api/export_publication_json.php?'+new URLSearchParams({ slug });
+        window.open(url, '_blank');
+      };
+      const exportZIP = (slug) => {
+        if (!slug) return;
+        const url = 'api/export_publication_zip.php?'+new URLSearchParams({ slug });
+        window.open(url, '_blank');
       };
 
       const buildPackage = async () => {
@@ -4423,6 +4589,10 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         publishQuiz,
         loadPublications,
         loadResults,
+        exportJSON,
+        exportZIP,
+        exportRosterLinksCSV,
+        exportResultsCSV,
         setLkpdSource,
         buildLKPD,
         pickLkpdImage,
@@ -4498,6 +4668,8 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       if (lkpdImg) lkpdImg.addEventListener("change", handleLkpdImageSelected);
       const lkpdTxt = el("lkpdTxtUpload");
       if (lkpdTxt) lkpdTxt.addEventListener("change", handleLkpdTextSelected);
+      const rosterPicker = el("rosterPicker");
+      if (rosterPicker) rosterPicker.addEventListener("change", handleRosterSelected);
       let historyItems = [];
       let historyPage = 1;
       const historyPageSize = 10;
