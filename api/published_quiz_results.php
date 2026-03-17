@@ -1,7 +1,7 @@
 <?php
 session_start();
 header('Content-Type: application/json; charset=utf-8');
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? 'user') !== 'admin') {
+if (!isset($_SESSION['user_id'])) {
   http_response_code(403);
   echo json_encode(['ok'=>false,'error'=>'forbidden']);
   exit;

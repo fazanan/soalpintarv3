@@ -3,7 +3,7 @@ session_start();
 header('Content-Type: application/json; charset=utf-8');
 @ini_set('display_errors', '0');
 @error_reporting(E_ERROR | E_PARSE);
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? 'user') !== 'admin') {
+if (!isset($_SESSION['user_id'])) {
   http_response_code(403);
   echo json_encode(['ok'=>false,'error'=>'forbidden']);
   exit;

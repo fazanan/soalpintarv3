@@ -2,7 +2,7 @@
 session_start();
 @ini_set('display_errors', '0');
 @error_reporting(E_ERROR | E_PARSE);
-if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? 'user') !== 'admin') {
+if (!isset($_SESSION['user_id'])) {
   http_response_code(403);
   header('Content-Type: application/json; charset=utf-8');
   echo json_encode(['ok'=>false,'error'=>'forbidden']);
@@ -57,4 +57,3 @@ header('Content-Type: application/json; charset=utf-8');
 header('Content-Disposition: attachment; filename="'.$fn.'"');
 echo json_encode($obj, JSON_UNESCAPED_UNICODE);
 exit;
-

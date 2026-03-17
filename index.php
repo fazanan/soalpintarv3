@@ -2296,7 +2296,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         const tabs = `
           <div class="flex items-center gap-2 border-b border-border-light dark:border-border-dark px-4 pt-4">
             <button onclick="window.__sp.setQuizTab('live')" class="px-3 py-2 text-sm font-semibold ${sub==='live'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Live</button>
-            ${IS_ADMIN ? `<button onclick="window.__sp.setQuizTab('publish')" class="px-3 py-2 text-sm font-semibold ${sub==='publish'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Buat Link</button>` : ``}
+            <button onclick="window.__sp.setQuizTab('publish')" class="px-3 py-2 text-sm font-semibold ${sub==='publish'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Buat Link</button>
             ${IS_ADMIN ? `<button onclick="window.__sp.setQuizTab('results')" class="px-3 py-2 text-sm font-semibold ${sub==='results'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Hasil</button>` : ``}
           </div>
         `;
@@ -2308,7 +2308,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             <button ${haveQuestions ? '' : 'disabled'} onclick="openQuiz()" class="px-4 py-2 rounded-lg ${haveQuestions ? 'bg-primary hover:bg-blue-600 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'} font-bold">Mulai</button>
           </div>
         `;
-        const pub = !IS_ADMIN ? `` : (() => {
+        const pub = (() => {
           const f = state.quizPublishForm || {};
           const last = state.quizLastLink || '';
           return `
@@ -2384,7 +2384,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             </div>
           `;
         })();
-        const res = !IS_ADMIN ? `` : (() => {
+        const res = (() => {
           const items = Array.isArray(state.quizPublications) ? state.quizPublications : [];
           const sel = state.quizSelectedSlug || (items[0]?.slug || '');
           const options = items.map(it => `<option value="${safeText(it.slug)}" ${it.slug===sel?'selected':''}>${safeText(it.slug)} • ${safeText(it.mapel)} • ${safeText(it.created_at || '')}</option>`).join('');
