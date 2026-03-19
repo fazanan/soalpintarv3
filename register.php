@@ -1,6 +1,10 @@
 <?php
 session_start();
 require __DIR__ . '/db.php';
+if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? 'user') !== 'admin') {
+  header('Location: login.php');
+  exit;
+}
 $msg = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $u = isset($_POST['username']) ? trim($_POST['username']) : '';
@@ -24,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Daftar | GuruPintar</title>
+  <title>Daftar Pengguna | GuruPintar</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;600&display=swap" rel="stylesheet" />
@@ -34,7 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <div class="w-full max-w-sm bg-white rounded-2xl shadow p-6">
     <div class="text-center mb-6">
       <div class="text-2xl font-extrabold"><span class="text-sky-600">Guru</span>Pintar</div>
-      <div class="text-xs text-slate-500">Buat akun</div>
+      <div class="text-xs text-slate-500">Buat akun (Admin)</div>
     </div>
     <?php if ($msg): ?>
       <div class="mb-4 text-sm text-slate-700 bg-slate-100 border border-slate-200 rounded p-3"><?=$msg?></div>
@@ -50,9 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
       <button class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg py-2">Daftar</button>
     </form>
-    <div class="text-xs text-center mt-4">
-      Sudah punya akun? <a href="login.php" class="text-sky-600">Login</a>
-    </div>
+    <div class="text-xs text-center mt-4"><a href="index.php" class="text-sky-600">Kembali</a></div>
   </div>
 </body>
 </html>

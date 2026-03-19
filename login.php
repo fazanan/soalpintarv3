@@ -21,7 +21,7 @@ $err = isset($_GET['e']) ? 'Login gagal' : '';
   <div class="w-full max-w-sm bg-white rounded-2xl shadow p-6">
     <div class="text-center mb-6">
       <div class="text-2xl font-extrabold"><span class="text-sky-600">Guru</span>Pintar</div>
-      <div class="text-xs text-slate-500">Masuk untuk melanjutkan</div>
+      <div class="text-xs text-slate-500">Sahabat Pendidik Indonesia</div>
     </div>
     <?php if ($err): ?>
       <div class="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3"><?=$err?></div>
@@ -37,9 +37,6 @@ $err = isset($_GET['e']) ? 'Login gagal' : '';
       </div>
       <button class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg py-2">Masuk</button>
     </form>
-    <div class="text-xs text-center mt-4">
-      Belum punya akun? <a href="register.php" class="text-sky-600">Daftar</a>
-    </div>
   </div>
 </body>
 </html>
