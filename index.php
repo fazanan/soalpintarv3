@@ -3911,6 +3911,12 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 </label>
               </div>
               <div class="flex items-center gap-3">
+                <label class="inline-flex items-center gap-2 text-sm">
+                  <input type="checkbox" ${(f.includeImages ?? true) ? 'checked' : ''} onchange="window.__sp.setQuizPublish('includeImages', this.checked)">
+                  <span>Sertakan gambar (maks 5)</span>
+                </label>
+              </div>
+              <div class="flex items-center gap-3">
                 <button onclick="window.__sp.publishQuiz()" class="px-4 h-11 rounded-lg bg-primary hover:bg-blue-600 text-white font-semibold">Publish</button>
                 <div id="pubMsg" class="text-sm text-text-sub-light"></div>
               </div>
@@ -4278,6 +4284,12 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         const items = Array.isArray(state.questions) ? state.questions : [];
         const pg = items.filter(q => q && q.type === 'pg' && Array.isArray(q.options) && q.options.length >= 3);
         if (pg.length === 0) { alert("Hanya mendukung PG. Tidak ada PG pada paket ini."); return; }
+        const includeImages = state.quizPublishForm?.includeImages ?? true;
+        const imageCount = includeImages ? pg.reduce((acc, q) => acc + (String(q.image || '').trim() ? 1 : 0), 0) : 0;
+        if (includeImages && imageCount > 5) {
+          alert(`Maksimal 5 gambar per paket publish. Saat ini terdeteksi ${imageCount} gambar.`);
+          return;
+        }
         const payload = pg.map(q => ({ question: String(q.question||''), options: q.options.map(x=>String(x||'')) }));
         const answer_key = pg.map(q => Number(Array.isArray(q.answer)? q.answer[0] : q.answer || 0));
         const slug = String(state.quizPublishForm?.slug || "").trim().toLowerCase().replace(/[^a-z0-9\-]+/g,'-').replace(/^-+|-+$/g,'');
@@ -4287,16 +4299,53 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         if (btn) btn.textContent = "Memproses...";
         try {
           const roster = Array.isArray(state.quizPublishForm?.roster) ? state.quizPublishForm.roster : [];
+          const compressImageDataUrl = async (dataUrl, opts = {}) => {
+            const maxSide = Number(opts.maxSide || 1280);
+            const maxBytes = Number(opts.maxBytes || (350 * 1024));
+            const minQuality = Number(opts.minQuality || 0.55);
+            let quality = Number(opts.quality || 0.82);
+            const img = await new Promise((resolve, reject) => {
+              const im = new Image();
+              im.onload = () => resolve(im);
+              im.onerror = () => reject(new Error('image_load_failed'));
+              im.src = dataUrl;
+            });
+            const w0 = Number(img.naturalWidth || img.width || 0);
+            const h0 = Number(img.naturalHeight || img.height || 0);
+            if (!w0 || !h0) return dataUrl;
+            const scale = Math.min(1, maxSide / Math.max(w0, h0));
+            const w = Math.max(1, Math.round(w0 * scale));
+            const h = Math.max(1, Math.round(h0 * scale));
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d', { alpha: false });
+            if (!ctx) return dataUrl;
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            let out = canvas.toDataURL('image/jpeg', quality);
+            while (out.length > (maxBytes * 1.37) && quality > minQuality) {
+              quality = Math.max(minQuality, quality - 0.07);
+              out = canvas.toDataURL('image/jpeg', quality);
+            }
+            return out;
+          };
           const uploadIfNeeded = async (img) => {
             const s = String(img || '');
             if (!s) return '';
+            if (!includeImages) return '';
             if (/^data:image\//i.test(s)) {
               try {
+                const compressed = await compressImageDataUrl(s, { maxSide: 1280, maxBytes: 350 * 1024, quality: 0.82, minQuality: 0.55 });
+                if (compressed.length > (600 * 1024 * 1.37)) {
+                  return '';
+                }
                 const r = await fetch('api/upload_image.php', {
                   method: 'POST',
                   headers: {'Content-Type':'application/json'},
                   credentials: 'same-origin',
-                  body: JSON.stringify({ dataUrl: s })
+                  body: JSON.stringify({ dataUrl: compressed })
                 });
                 const jsUp = await r.json().catch(()=>null);
                 if (r.ok && jsUp && jsUp.ok && jsUp.url) return String(jsUp.url);
