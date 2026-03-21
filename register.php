@@ -10,9 +10,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $u = isset($_POST['username']) ? trim($_POST['username']) : '';
   $p = isset($_POST['password']) ? $_POST['password'] : '';
   if ($u !== '' && $p !== '') {
+    // initial limit from settings table
+    $init = 300;
+    $mysqli->query("CREATE TABLE IF NOT EXISTS app_settings (`k` VARCHAR(64) PRIMARY KEY, `v` VARCHAR(255) NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $res = $mysqli->query("SELECT v FROM app_settings WHERE k='initial_limit' LIMIT 1");
+    if ($row=$res->fetch_assoc()) $init = (int)$row['v'];
+    $res && $res->close();
     $hash = password_hash($p, PASSWORD_BCRYPT);
-    $stmt = $mysqli->prepare('INSERT INTO users (username, password, limitpaket) VALUES (?, ?, 300)');
-    $stmt->bind_param('ss', $u, $hash);
+    $stmt = $mysqli->prepare('INSERT INTO users (username, password, limitpaket) VALUES (?, ?, ?)');
+    $stmt->bind_param('ssi', $u, $hash, $init);
     if ($stmt->execute()) {
       $msg = 'Pendaftaran berhasil, silakan login';
     } else {

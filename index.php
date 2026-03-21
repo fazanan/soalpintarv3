@@ -184,18 +184,18 @@ if (!isset($_SESSION['user_id'])) {
           </div>
           <div class="flex items-center justify-between gap-2 pb-3">
             <div id="tabs" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
-            <div class="hidden md:flex items-center gap-1.5">
-              <button id="btnSave" class="inline-flex items-center justify-center h-10 w-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors">
-                <span class="material-symbols-outlined text-[18px]">save</span>
-                <span class="hidden 2xl:inline ml-2 text-sm font-medium">Simpan</span>
+            <div class="hidden md:flex items-center gap-2">
+              <button id="btnSave" class="inline-flex items-center gap-2 h-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors px-3">
+                <span class="material-symbols-outlined text-[18px] shrink-0">save</span>
+                <span class="hidden lg:inline text-sm font-medium whitespace-nowrap">Simpan</span>
               </button>
-              <button id="btnLoad" class="inline-flex items-center justify-center h-10 w-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors">
-                <span class="material-symbols-outlined text-[18px]">folder_open</span>
-                <span class="hidden 2xl:inline ml-2 text-sm font-medium">Muat</span>
+              <button id="btnLoad" class="inline-flex items-center gap-2 h-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors px-3">
+                <span class="material-symbols-outlined text-[18px] shrink-0">folder_open</span>
+                <span class="hidden lg:inline text-sm font-medium whitespace-nowrap">Muat</span>
               </button>
-              <button id="btnPrint" class="inline-flex items-center justify-center h-10 w-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors">
-                <span class="material-symbols-outlined text-[18px]">print</span>
-                <span class="hidden 2xl:inline ml-2 text-sm font-medium">Cetak</span>
+              <button id="btnPrint" class="inline-flex items-center gap-2 h-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors px-3">
+                <span class="material-symbols-outlined text-[18px] shrink-0">print</span>
+                <span class="hidden lg:inline text-sm font-medium whitespace-nowrap">Cetak</span>
               </button>
             </div>
           </div>
@@ -284,6 +284,8 @@ if (!isset($_SESSION['user_id'])) {
     <input id="lkpdImgUpload" type="file" accept="image/*" class="hidden" />
     <input id="lkpdTxtUpload" type="file" accept=".txt,.md,.markdown,.csv,.json,.html,.htm" class="hidden" />
     <input id="rosterPicker" type="file" accept=".csv,.txt" class="hidden" />
+    <input id="rekapExcelPicker" type="file" accept=".xlsx,.xls" class="hidden" />
+    <input id="rekapPrintLogoPicker" type="file" accept="image/*" class="hidden" />
 
     <script>
       const OPENAI_API_KEY = "";
@@ -301,6 +303,8 @@ if (!isset($_SESSION['user_id'])) {
         { id: "quiz", label: "Quiz", icon: "quiz" },
         { id: "lkpd", label: "LKPD", icon: "assignment" },
         { id: "modul_ajar", label: "Modul Ajar", icon: "menu_book" },
+        { id: "rekap", label: "Rekap Nilai", icon: "summarize" },
+        { id: "limit", label: "Kredit Limit", icon: "account_balance_wallet" },
         { id: "riwayat", label: "Riwayat", icon: "history" },
       ];
 
@@ -494,6 +498,22 @@ if (!isset($_SESSION['user_id'])) {
         quizPublications: [],
         quizResults: [],
         quizSelectedSlug: "",
+        rekap: { 
+          raw: [], 
+          data: [], 
+          columns: [], 
+          bobot: {}, 
+          custom: false,
+          predikatRules: [
+            { grade: 'A', min: 85, max: 100 },
+            { grade: 'B', min: 70, max: 84.9 },
+            { grade: 'C', min: 55, max: 69.9 },
+            { grade: 'D', min: 40, max: 54.9 },
+            { grade: 'E', min: 0,  max: 39.9 },
+          ],
+        },
+        creditHistory: [],
+        limitInfo: {},
       });
 
       let state = DEFAULT_STATE();
@@ -572,6 +592,761 @@ if (!isset($_SESSION['user_id'])) {
         saveDebounced(true);
         render();
       };
+      function logCreditUsage(kind, cost, detail) {
+        const rec = { ts: new Date().toISOString(), kind, cost: Number(cost)||0, detail: String(detail||'') };
+        state.creditHistory = Array.isArray(state.creditHistory) ? [rec, ...state.creditHistory].slice(0, 200) : [rec];
+        saveDebounced(true);
+      }
+      async function refreshCreditLimit(doRender = false) {
+        try {
+          const r = await fetch("api/openai_proxy.php", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ type:"get_limits" }) });
+          if (r.ok) {
+            const j = await r.json();
+            state.limitInfo = j || {};
+            saveDebounced(false);
+            if (doRender) render();
+          }
+        } catch {}
+      }
+      async function loadLimitConfig() {
+        if (!IS_ADMIN) return;
+        try {
+          const r = await fetch('api/limit_config_get.php', { credentials:'same-origin' });
+          if (r.ok) {
+            const j = await r.json();
+            if (j && j.ok) {
+              state.limitConfig = { costs: j.costs || {}, initial_limit: j.initial_limit || 0 };
+              saveDebounced(false);
+            }
+          }
+        } catch {}
+      }
+      async function saveLimitConfig() {
+        if (!IS_ADMIN) return;
+        try {
+          const payload = { 
+            costs: state.limitConfig?.costs || {}, 
+            initial_limit: Number(state.limitConfig?.initial_limit||0) 
+          };
+          const r = await fetch('api/limit_config_set.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload), credentials:'same-origin' });
+          if (r.ok) {
+            await loadLimitConfig();
+            alert('Pengaturan limit tersimpan.');
+          } else {
+            alert('Gagal menyimpan pengaturan.');
+          }
+        } catch { alert('Gagal menyimpan pengaturan.'); }
+      }
+
+      const ensureXLSX = () => {
+        return new Promise((resolve) => {
+          if (window.XLSX) return resolve();
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+          s.onload = () => resolve();
+          document.head.appendChild(s);
+        });
+      };
+      const ensureJsPDF = () => {
+        return new Promise((resolve) => {
+          if (window.jspdf && window.jspdf.jsPDF && window.jspdf_autotable) return resolve();
+          const s1 = document.createElement('script');
+          s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+          s1.onload = () => {
+            const s2 = document.createElement('script');
+            s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js';
+            s2.onload = () => resolve();
+            document.head.appendChild(s2);
+          };
+          document.head.appendChild(s1);
+        });
+      };
+      const ensureHtml2Pdf = () => {
+        return new Promise((resolve) => {
+          if (window.html2pdf) return resolve();
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+          s.onload = () => resolve();
+          document.head.appendChild(s);
+        });
+      };
+      function rekapPredikat(n) {
+        let rules = (state.rekap && Array.isArray(state.rekap.predikatRules)) ? state.rekap.predikatRules : [];
+        // Abaikan predikat nonaktif (0-0) jika tersimpan
+        rules = rules.filter(r => !(Number(r.min)===0 && Number(r.max)===0));
+        for (const r of rules) {
+          const min = Number(r.min); const max = Number(r.max);
+          if (n >= min && n <= max) return String(r.grade || '').toUpperCase();
+        }
+        if (rules.length) {
+          const lowest = rules.reduce((acc, r) => (r.min < acc.min ? r : acc), rules[0]);
+          return String(lowest.grade || 'E').toUpperCase();
+        }
+        return 'E';
+      }
+      function rekapRenderTable() {
+        const head = el('rekapHeadRow');
+        const tbody = el('rekapTBody');
+        if (!head || !tbody) return;
+        if (!state.rekap || state.rekap.data.length === 0) {
+          head.innerHTML = `
+            <th class="border px-3 py-2">No</th>
+            <th class="border px-3 py-2 text-left">Nama Siswa</th>
+            <th class="border px-3 py-2">Kelas</th>
+            <th class="border px-3 py-2">Nilai Akhir</th>
+            <th class="border px-3 py-2">Predikat</th>
+            <th class="border px-3 py-2">Ranking</th>
+          `;
+          tbody.innerHTML = `<tr><td colspan="6" class="border px-3 py-6 text-center text-text-sub-light">Belum ada data.</td></tr>`;
+          const info1 = el('rekapTotalRows'); const info2 = el('rekapTotalData');
+          if (info1) info1.textContent = '0';
+          if (info2) info2.textContent = '0';
+          return;
+        }
+        let header = `
+          <th class="border px-3 py-2">No</th>
+          <th class="border px-3 py-2 text-left">Nama Siswa</th>
+          <th class="border px-3 py-2">Kelas</th>
+        `;
+        state.rekap.columns.forEach(c => { header += `<th class="border px-3 py-2">${safeText(c)}</th>`; });
+        header += `
+          <th class="border px-3 py-2">Nilai Akhir</th>
+          <th class="border px-3 py-2">Predikat</th>
+          <th class="border px-3 py-2">Ranking</th>
+        `;
+        head.innerHTML = header;
+        const rows = state.rekap.data.map((r, idx) => {
+          const cls = r.nilaiAkhir >= 85 ? 'bg-green-100 text-green-700' : (r.nilaiAkhir < 60 ? 'bg-red-100 text-red-700' : '');
+          let cells = '';
+          state.rekap.columns.forEach(c => { cells += `<td class="border px-3 py-2 text-center">${Number(r[c] || 0)}</td>`; });
+          const trophy = r.ranking <= 3 ? `<span class="material-symbols-outlined text-amber-500 align-middle">trophy</span> ${r.ranking}` : r.ranking;
+          return `
+            <tr>
+              <td class="border px-3 py-2 text-center">${idx + 1}</td>
+              <td class="border px-3 py-2"><strong>${safeText(r.nama)}</strong></td>
+              <td class="border px-3 py-2 text-center">${safeText(r.kelas)}</td>
+              ${cells}
+              <td class="border px-3 py-2 text-center"><span class="px-2 py-1 rounded ${cls}">${r.nilaiAkhir}</span></td>
+              <td class="border px-3 py-2 text-center">${r.predikat}</td>
+              <td class="border px-3 py-2 text-center">${trophy}</td>
+            </tr>
+          `;
+        }).join('');
+        tbody.innerHTML = rows;
+        const info1 = el('rekapTotalRows'); const info2 = el('rekapTotalData');
+        if (info1) info1.textContent = String(state.rekap.data.length);
+        if (info2) info2.textContent = String(state.rekap.data.length);
+        rekapUpdateStats();
+      }
+      function rekapUpdateStats() {
+        const arr = state.rekap?.data?.map(x=>Number(x.nilaiAkhir)||0) || [];
+        const max = arr.length ? Math.max(...arr) : 0;
+        const min = arr.length ? Math.min(...arr) : 0;
+        const avg = arr.length ? Math.round((arr.reduce((a,b)=>a+b,0)/arr.length)*10)/10 : 0;
+        const m = el('rekapMax'); const n = el('rekapMin'); const a = el('rekapAvg');
+        if (m) m.textContent = String(max);
+        if (n) n.textContent = String(min);
+        if (a) a.textContent = String(avg);
+      }
+      function rekapProcessData(data) {
+        const ex = ['no','nama siswa','nama','kelas'];
+        const first = data[0] || {};
+        const cols = Object.keys(first).filter(k=>!ex.includes(String(k).toLowerCase().trim()));
+        if (!state.rekap) state.rekap = { raw: [], data: [], columns: [], bobot: {}, custom: false };
+        state.rekap.raw = data;
+        state.rekap.columns = cols;
+        if (!state.rekap.custom || Object.keys(state.rekap.bobot||{}).length===0) {
+          const per = cols.length ? 100/cols.length : 0;
+          state.rekap.bobot = {};
+          cols.forEach(c=> state.rekap.bobot[c]=per);
+          state.rekap.custom = false;
+        }
+        const rows = data.map((row, idx) => {
+          let total = 0;
+          const out = {};
+          cols.forEach(c => {
+            const v = parseFloat(row[c] || 0) || 0;
+            out[c] = v;
+            const b = Number(state.rekap.bobot[c] || 0);
+            total += v * (b/100);
+          });
+          const akhir = Math.round(total*10)/10;
+          return {
+            no: idx+1,
+            nama: row['Nama Siswa'] || row['Nama'] || row['nama'] || row['nama siswa'] || '-',
+            kelas: row['Kelas'] || row['kelas'] || '-',
+            ...out,
+            nilaiAkhir: akhir,
+            predikat: rekapPredikat(akhir),
+          };
+        });
+        rows.sort((a,b)=>b.nilaiAkhir - a.nilaiAkhir);
+        rows.forEach((r,i)=> r.ranking = i+1);
+        state.rekap.data = rows;
+        saveDebounced(false);
+        rekapRenderTable();
+      }
+      async function rekapHandlePicker(evt) {
+        const f = evt.target?.files?.[0];
+        if (!f) return;
+        await ensureXLSX();
+        const reader = new FileReader();
+        reader.onload = (e)=>{
+          try{
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, { type:'array' });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            let json = [];
+            try {
+              const rows = XLSX.utils.sheet_to_json(ws, { header: 1, blankrows: false });
+              let headerIdx = -1;
+              for (let i = 0; i < rows.length; i++) {
+                const r = rows[i].map(x => String(x||'').toLowerCase().trim());
+                const hasNama = r.includes('nama siswa') || r.includes('nama');
+                const hasKelas = r.includes('kelas');
+                const nonEmpty = r.filter(x=>x).length;
+                if ((hasNama && hasKelas) || nonEmpty >= 3) { headerIdx = i; break; }
+              }
+              if (headerIdx >= 0) {
+                const header = rows[headerIdx].map(x=>String(x||'').trim());
+                for (let i = headerIdx + 1; i < rows.length; i++) {
+                  const row = rows[i];
+                  if (!row || row.every(v=>v===null||v===undefined||String(v).trim()==='')) continue;
+                  const obj = {};
+                  for (let j=0;j<header.length;j++){
+                    const key = header[j] || `Kol${j+1}`;
+                    obj[key] = row[j];
+                  }
+                  json.push(obj);
+                }
+              }
+            } catch {}
+            if (!json.length) {
+              json = XLSX.utils.sheet_to_json(ws);
+            }
+            if (json && json.length) {
+              rekapProcessData(json);
+              state.activeView = 'rekap';
+              render();
+            }
+          }catch(_){}
+        };
+        reader.readAsArrayBuffer(f);
+      }
+      async function rekapDownloadTemplate() {
+        await ensureXLSX();
+        const t1 = [
+          ['TEMPLATE 1'],
+          [],
+          ['No','Nama Siswa','Kelas','Tugas','UH','UTS','UAS'],
+          [1,'Andi Pratama','7A',85,90,88,92],
+        ];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(t1), 'Template 1');
+        XLSX.writeFile(wb, 'template_rekap_nilai.xlsx');
+      }
+      function openBobotModal() {
+        if (!state.rekap || state.rekap.columns.length===0) return;
+        const m = el('modalBobot');
+        const c = el('bobotInputs');
+        if (!m || !c) return;
+        const per = state.rekap.columns.map(col => {
+          const val = Number(state.rekap.bobot[col] ?? (100/state.rekap.columns.length));
+          return `
+            <div class="flex items-center gap-3 bg-background-light dark:bg-background-dark rounded-lg p-3">
+              <label class="flex-1 font-semibold">${safeText(col)}</label>
+              <input type="number" data-col="${safeText(col)}" class="rekap-bobot-input w-24 h-10 rounded-lg border bg-white dark:bg-surface-dark text-center" value="${val.toFixed(1)}" min="0" max="100" step="0.1"><span class="text-sm">%</span>
+            </div>
+          `;
+        }).join('');
+        c.innerHTML = per;
+        m.style.display = 'flex';
+        updateTotalBobotDisplay();
+        c.querySelectorAll('.rekap-bobot-input').forEach(inp => {
+          inp.oninput = updateTotalBobotDisplay;
+          inp.onkeyup = updateTotalBobotDisplay;
+        });
+      }
+      function closeBobotModal() {
+        const m = el('modalBobot');
+        if (m) m.style.display = 'none';
+      }
+      function resetBobot() {
+        if (!state.rekap || state.rekap.columns.length===0) return;
+        const n = state.rekap.columns.length;
+        let eq = Math.round((100/n)*10)/10; // satu desimal
+        state.rekap.bobot = {};
+        // Set untuk n-1 kolom, kolom terakhir disesuaikan agar total tepat 100.0
+        let totalAssigned = 0;
+        for (let i=0; i<n; i++) {
+          if (i < n-1) {
+            state.rekap.bobot[state.rekap.columns[i]] = eq;
+            totalAssigned += eq;
+          } else {
+            const last = Math.round((100 - totalAssigned)*10)/10;
+            state.rekap.bobot[state.rekap.columns[i]] = last;
+          }
+        }
+        state.rekap.custom = false;
+        const inputs = document.querySelectorAll('.rekap-bobot-input');
+        inputs.forEach((inp, idx) => {
+          const col = inp.getAttribute('data-col');
+          inp.value = String((state.rekap.bobot[col] ?? eq).toFixed(1));
+        });
+        updateTotalBobotDisplay();
+      }
+      function saveBobotSettings() {
+        if (!state.rekap) return;
+        const inputs = document.querySelectorAll('.rekap-bobot-input');
+        const bobot = {};
+        inputs.forEach(inp => {
+          const col = inp.getAttribute('data-col');
+          bobot[col] = parseFloat(inp.value)||0;
+        });
+        let total = 0;
+        Object.values(bobot).forEach(v=> total += (parseFloat(v)||0));
+        // Wajib tepat 100%, jika tidak tampilkan peringatan dan jangan tutup modal
+        if (Math.abs(total - 100) > 0.05) {
+          updateTotalBobotDisplay();
+          alert('Total bobot harus tepat 100%. Mohon sesuaikan kembali.');
+          return;
+        }
+        // Simpan apa adanya (dibulatkan satu desimal)
+        const norm = {};
+        Object.keys(bobot).forEach(k => norm[k] = Math.round((bobot[k])*10)/10);
+        // Koreksi kemungkinan selisih rounding pada kolom terakhir
+        const keys = Object.keys(norm);
+        let sum = keys.reduce((a,k)=>a+(norm[k]||0),0);
+        const diff = Math.round((100 - sum)*10)/10;
+        if (Math.abs(diff) >= 0.1 && keys.length) {
+          norm[keys[keys.length-1]] = Math.round((norm[keys[keys.length-1]] + diff)*10)/10;
+        }
+        state.rekap.bobot = norm;
+        state.rekap.custom = true;
+        closeBobotModal();
+        if (state.rekap.raw && state.rekap.raw.length) {
+          rekapProcessData(state.rekap.raw);
+        }
+      }
+      function updateTotalBobotDisplay() {
+        const inputs = document.querySelectorAll('.rekap-bobot-input');
+        let total = 0;
+        inputs.forEach(inp => { total += parseFloat(inp.value)||0; });
+        const d = el('totalBobotDisplay');
+        if (d) {
+          d.textContent = total.toFixed(1)+'%';
+          d.style.color = (Math.abs(total - 100) < 0.05) ? '#059669' : '#dc2626';
+        }
+      }
+      function rekapFilter() {
+        const q = (el('rekapSearch')?.value || '').toLowerCase();
+        const rows = Array.from(el('rekapTBody')?.querySelectorAll('tr') || []);
+        let vis = 0;
+        rows.forEach(r=>{
+          const t = r.textContent.toLowerCase();
+          const show = t.includes(q);
+          r.style.display = show ? '' : 'none';
+          if (show) vis++;
+        });
+        const info = el('rekapTotalRows');
+        if (info) info.textContent = String(vis);
+      }
+      function openRekapHelp() {
+        const m = el('modalRekapHelp');
+        if (m) m.style.display = 'flex';
+      }
+      function closeRekapHelp() {
+        const m = el('modalRekapHelp');
+        if (m) m.style.display = 'none';
+      }
+      function openRekapPrint() {
+        const m = el('modalRekapPrint');
+        if (m) m.style.display = 'flex';
+      }
+      function closeRekapPrint() {
+        const m = el('modalRekapPrint');
+        if (m) m.style.display = 'none';
+      }
+      function openIdentitasHelp() {
+        const m = el('modalIdentitasHelp');
+        if (m) m.style.display = 'flex';
+      }
+      function closeIdentitasHelp() {
+        const m = el('modalIdentitasHelp');
+        if (m) m.style.display = 'none';
+      }
+      function openKonfigurasiHelp() {
+        const m = el('modalKonfigurasiHelp');
+        if (m) m.style.display = 'flex';
+      }
+      function closeKonfigurasiHelp() {
+        const m = el('modalKonfigurasiHelp');
+        if (m) m.style.display = 'none';
+      }
+      function openPreviewHelp() {
+        const m = el('modalPreviewHelp');
+        if (m) m.style.display = 'flex';
+      }
+      function closePreviewHelp() {
+        const m = el('modalPreviewHelp');
+        if (m) m.style.display = 'none';
+      }
+      function openMAHelp1(){ const m = el('modalMAHelp1'); if (m){ m.classList.remove('hidden'); m.style.display='flex'; } }
+      function closeMAHelp1(){ const m = el('modalMAHelp1'); if (m){ m.style.display='none'; m.classList.add('hidden'); } }
+      function openMAHelp2(){ const m = el('modalMAHelp2'); if (m){ m.classList.remove('hidden'); m.style.display='flex'; } }
+      function closeMAHelp2(){ const m = el('modalMAHelp2'); if (m){ m.style.display='none'; m.classList.add('hidden'); } }
+      async function exportModulAjarPDF() {
+        try {
+          await ensureJsPDF();
+          const M = state.modulAjar || {};
+          const md = String(M.hasil || '').trim();
+          if (!md) { alert('Modul Ajar belum tersedia. Generate dulu.'); return; }
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF('p', 'pt', 'letter');
+          const pageW = doc.internal.pageSize.getWidth();
+          const pageH = doc.internal.pageSize.getHeight();
+
+          const FONT = 'times';
+          const margin = 72; // 1 inch (gaya Word default/Letter)
+          const maxW = pageW - (margin * 2);
+          const footerY = pageH - 28;
+          let y = margin;
+
+          const sp = (b = 3, a = 3) => { y += b; return () => { y += a; }; };
+          const newPageIfNeeded = (need = 0) => {
+            if (y + need > pageH - 56) { doc.addPage(); y = margin; }
+          };
+          const addWrapped = (text, fontSize = 11, bold = false, italics = false, align = 'left', indentX = 0, lineH = 14) => {
+            doc.setFont(FONT, bold ? 'bold' : (italics ? 'italic' : 'normal'));
+            doc.setFontSize(fontSize);
+            const lines = doc.splitTextToSize(String(text || ''), maxW - indentX);
+            const x = margin + indentX;
+            if (align === 'center') {
+              for (const ln of lines) {
+                if (y + lineH > pageH - 56) { doc.addPage(); y = margin; }
+                doc.text(ln, pageW / 2, y, { align: 'center' });
+                y += lineH;
+              }
+              return;
+            }
+            for (const ln of lines) {
+              if (y + lineH > pageH - 56) { doc.addPage(); y = margin; }
+              doc.text(ln, x, y);
+              y += lineH;
+            }
+          };
+
+          let contentText = maNormalizeContent(M);
+          const { pre: preLKPD, lkpd: lkpdText, post: postLKPD } = maSplitLKPD(contentText);
+          const lkpdData = maEnsureLKPDData(lkpdText ? maParseLKPD(lkpdText, M) : { judul: M.judulModul || '', tujuan: [], alat: [], langkah: [], refleksi: [], kesimpulan: [] }, M, lkpdText);
+
+          // Header ala docx: judul tengah + subjudul miring
+          { const after = sp(10, 3); addWrapped(`MODUL AJAR ${(M.mapel || '').toUpperCase()}`.trim(), 14, true, false, 'center', 0, 18); after(); }
+          sp(0, 12)();
+          if (M.judulModul) {
+            addWrapped(`"${M.judulModul}"`, 12, false, true, 'center', 0, 16);
+            sp(0, 18)();
+          } else {
+            sp(0, 10)();
+          }
+
+          function parseContent(raw) {
+            const lines = String(raw || '').split('\n');
+            const out = [];
+            let tblRows = [];
+            let inTbl = false;
+
+            const flushTbl = () => {
+              if (!tblRows.length) return;
+              const nc = Math.max(...tblRows.map(r => r.length));
+              out.push({ t: 'tbl', rows: tblRows, nc });
+              tblRows = [];
+              inTbl = false;
+            };
+
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i] || '';
+              if (line.trim() === '[[PAGE_BREAK]]') { out.push({ t: 'pb' }); continue; }
+              if (line.match(/^\|[-|: ]+\|?$/)) continue; // separator
+              if (line.trim().startsWith('|')) {
+                inTbl = true;
+                tblRows.push(line.split('|').slice(1, -1).map(c =>
+                  String(c || '')
+                    .trim()
+                    .replace(/<[^>]+>/g, ' ')
+                    .replace(/&nbsp;/g, ' ')
+                    .replace(/\*\*(.+?)\*\*/g, '$1')
+                    .replace(/\*(.+?)\*/g, '$1')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                ));
+                continue;
+              }
+              if (inTbl) flushTbl();
+              if (!line.trim()) { out.push({ t: 'sp' }); continue; }
+              if (/^####\s*/.test(line)) out.push({ t: 'h', l: 4, v: line.replace(/^####\s*/, '') });
+              else if (/^###\s*/.test(line)) out.push({ t: 'h', l: 3, v: line.replace(/^###\s*/, '') });
+              else if (/^##\s*/.test(line)) out.push({ t: 'h', l: 2, v: line.replace(/^##\s*/, '') });
+              else if (/^#\s*/.test(line)) out.push({ t: 'h', l: 1, v: line.replace(/^#\s*/, '') });
+              else if (line.match(/^[-•] /)) out.push({ t: 'ul', v: line.replace(/^[-•] /, '').replace(/\*\*(.+?)\*\*/g, '$1') });
+              else if (line.match(/^\d+\. /)) {
+                const m = line.match(/^(\d+)\. (.*)/);
+                out.push({ t: 'ol', n: m ? m[1] : '', v: m ? m[2].replace(/\*\*(.+?)\*\*/g, '$1') : line });
+              } else out.push({ t: 'p', v: line.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1') });
+            }
+            if (inTbl) flushTbl();
+            return out;
+          }
+
+          const renderBlocks = (blocks) => {
+            for (const b of blocks) {
+              if (b.t === 'pb') {
+                if (y !== margin) { doc.addPage(); y = margin; }
+                continue;
+              }
+              if (b.t === 'sp') { sp(3, 3)(); continue; }
+              if (b.t === 'h') {
+                const fs = b.l === 1 ? 14 : b.l === 2 ? 13 : b.l === 3 ? 12 : 11;
+                const after = sp(b.l === 1 ? 14 : 12, 6);
+                addWrapped(b.v, fs, true, false, 'left', 0, 16);
+                after();
+                continue;
+              }
+              if (b.t === 'p') { const after = sp(3, 3); addWrapped(b.v, 11, false, false, 'left', 0, 14); after(); continue; }
+              if (b.t === 'ul') { const after = sp(2, 2); addWrapped(`• ${b.v}`, 11, false, false, 'left', 24, 14); after(); continue; }
+              if (b.t === 'ol') { const after = sp(2, 2); addWrapped(`${b.n}. ${b.v}`, 11, false, false, 'left', 24, 14); after(); continue; }
+              if (b.t === 'tbl') {
+                const after = sp(6, 6);
+                newPageIfNeeded(120);
+                const header = b.rows[0] || [];
+                const body = (b.rows || []).slice(1);
+                doc.autoTable({
+                  head: [header],
+                  body,
+                  startY: y,
+                  margin: { left: margin, right: margin },
+                  styles: { font: FONT, fontSize: 11, cellPadding: 5, lineWidth: 0.5, lineColor: [120,120,120], textColor: [0,0,0] },
+                  headStyles: { fillColor: [217,217,217], textColor: [0,0,0], fontStyle: 'bold' },
+                  bodyStyles: { textColor: [0,0,0] },
+                });
+                y = (doc.lastAutoTable?.finalY || y);
+                after();
+                continue;
+              }
+            }
+          };
+          const renderLKPD = (d) => {
+            if (!d) return;
+            if (y > margin + 10) { doc.addPage(); y = margin; }
+            sp(10, 6)();
+            doc.setFont(FONT, 'bold'); doc.setFontSize(12); doc.setTextColor(0, 0, 0);
+            addWrapped('C. LAMPIRAN', 12, true, false, 'left', 0, 16);
+            const afterLamp = sp(6, 6);
+            addWrapped('1. Lembar Kerja Peserta Didik (LKPD)', 12, true, false, 'left', 0, 16);
+            afterLamp();
+            sp(6, 0)();
+            const boxX = margin;
+            const boxW = maxW;
+            const headerH = 34;
+            const startY = y;
+            doc.setDrawColor(90);
+            doc.setFillColor(217, 217, 217);
+            doc.rect(boxX, startY, boxW, headerH, 'F');
+            doc.setTextColor(0, 0, 0);
+            doc.setFont(FONT, 'bold'); doc.setFontSize(11);
+            doc.text('LEMBAR KERJA PESERTA DIDIK (LKPD)', boxX + boxW / 2, startY + 16, { align: 'center' });
+            doc.setFont(FONT, 'normal'); doc.setFontSize(10);
+            doc.text(String(d.judul || ' ').trim() || ' ', boxX + boxW / 2, startY + 29, { align: 'center' });
+            doc.setTextColor(0, 0, 0);
+            y = startY + headerH + 16;
+            doc.setFont(FONT, 'normal'); doc.setFontSize(11);
+            const lineW = boxW - 120;
+            const field = (label) => {
+              doc.text(label, boxX + 10, y);
+              doc.line(boxX + 90, y + 2, boxX + 90 + lineW, y + 2);
+              y += 18;
+            };
+            field('Nama Siswa :');
+            field('Kelas     :');
+            field('Kelompok  :');
+            y += 4;
+            const sectionTitle = (t) => { doc.setFont(FONT, 'bold'); doc.text(t, boxX + 10, y); y += 16; doc.setFont(FONT, 'normal'); };
+            const bullet = (t) => { addWrapped('• ' + t, 11, false, false, 'left', 24, 14); };
+            const numbered = (t, idx) => { const v = /^\d+[\.\)]\s+/.test(t) ? t : `${idx + 1}. ${t}`; addWrapped(v, 11, false, false, 'left', 24, 14); };
+            sectionTitle('A. Tujuan');
+            (d.tujuan && d.tujuan.length ? d.tujuan : ['-']).forEach(x => bullet(String(x)));
+            y += 6;
+            sectionTitle('B. Alat dan Bahan');
+            (d.alat && d.alat.length ? d.alat : ['-']).forEach(x => bullet(String(x)));
+            y += 6;
+            sectionTitle('C. Langkah Kegiatan');
+            (d.langkah && d.langkah.length ? d.langkah : ['-']).forEach((x, i) => numbered(String(x), i));
+            y += 6;
+            sectionTitle('D. Pertanyaan Refleksi');
+            (d.refleksi && d.refleksi.length ? d.refleksi : ['-']).forEach((x, i) => numbered(String(x), i));
+            doc.text('Jawaban:', boxX + 10, y); y += 14;
+            for (let i = 0; i < 3; i++) { doc.line(boxX + 10, y + 2, boxX + boxW - 10, y + 2); y += 16; }
+            y += 4;
+            sectionTitle('E. Kesimpulan');
+            for (let i = 0; i < 3; i++) { doc.line(boxX + 10, y + 2, boxX + boxW - 10, y + 2); y += 16; }
+            const endY = y + 10;
+            doc.setDrawColor(90);
+            doc.rect(boxX, startY, boxW, endY - startY);
+            y = endY + 14;
+          };
+
+          renderBlocks(parseContent(maInsertPageBreakMarkers(maStripCLampiranHeading(preLKPD || ''))));
+          renderLKPD(lkpdData);
+          if (String(postLKPD || '').trim()) { doc.addPage(); y = margin; }
+          renderBlocks(parseContent(maInsertPageBreakMarkers(maStripCLampiranHeading(postLKPD || ''))));
+
+          const totalPages = doc.getNumberOfPages();
+          for (let p = 1; p <= totalPages; p++) {
+            doc.setPage(p);
+            doc.setFont(FONT, 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(136, 136, 136);
+            const footer = `Modul Ajar ${M.mapel || ''} — ${M.institusi || ''} ${new Date().getFullYear()} | Halaman ${p}`;
+            doc.text(footer, pageW / 2, footerY, { align: 'center' });
+          }
+          doc.setTextColor(0, 0, 0);
+          doc.save(`ModulAjar_${(M.mapel||'Mapel').replace(/\s+/g,'')}_${(M.judulModul||'Modul').replace(/[\s/]+/g,'_')}.pdf`);
+        } catch (e) {
+          alert('Gagal membuat PDF. Silakan coba lagi atau unduh .docx terlebih dahulu.');
+        }
+      }
+      async function generateRekapPDF() {
+        await ensureJsPDF();
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p','pt','a4');
+        const title = 'Rekap Nilai';
+        const mapel = (el('printMapel')?.value || '').trim();
+        const guru = (el('printGuru')?.value || '').trim();
+        // Header
+        doc.setFont('helvetica','bold'); doc.setFontSize(18);
+        doc.text(title, 40, 50);
+        doc.setFont('helvetica','normal'); doc.setFontSize(11);
+        if (mapel) doc.text(`Mata pelajaran: ${mapel}`, 40, 72);
+        if (guru) doc.text(`Guru: ${guru}`, 40, 88);
+        // Logo (opsional)
+        const logoFile = el('rekapPrintLogoPicker')?.files?.[0] || null;
+        if (logoFile) {
+          const dataUrl = await new Promise(res => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result);
+            fr.readAsDataURL(logoFile);
+          });
+          try { doc.addImage(dataUrl, 'PNG', 450, 30, 120, 60); } catch {}
+        }
+        // Ringkasan
+        const max = el('rekapMax')?.textContent || '0';
+        const min = el('rekapMin')?.textContent || '0';
+        const avg = el('rekapAvg')?.textContent || '0';
+        doc.setFontSize(11);
+        doc.roundedRect(40, 110, 160, 50, 6, 6);
+        doc.text('Nilai Tertinggi', 50, 130); doc.setFont('helvetica','bold'); doc.text(String(max), 50, 150); doc.setFont('helvetica','normal');
+        doc.roundedRect(220, 110, 160, 50, 6, 6);
+        doc.text('Nilai Terendah', 230, 130); doc.setFont('helvetica','bold'); doc.text(String(min), 230, 150); doc.setFont('helvetica','normal');
+        doc.roundedRect(400, 110, 160, 50, 6, 6);
+        doc.text('Rata-Rata Kelas', 410, 130); doc.setFont('helvetica','bold'); doc.text(String(avg), 410, 150); doc.setFont('helvetica','normal');
+        // Tabel
+        const rows = (state.rekap?.data || []).map((r, i) => [i+1, String(r.nama||''), String(r.kelas||''), String(r.nilaiAkhir||0), String(r.predikat||''), String(r.ranking||'')]);
+        const head = [['No','Nama Siswa','Kelas','Nilai Akhir','Predikat','Ranking']];
+        doc.autoTable({
+          head, body: rows,
+          startY: 180,
+          styles: { font: 'helvetica', fontSize: 9, cellPadding: 4, lineWidth: 0.1 },
+          headStyles: { fillColor: [240,240,240], textColor: [0,0,0] },
+          columnStyles: { 0: { halign: 'center', cellWidth: 30 }, 2: { halign:'center', cellWidth: 60 }, 3: { halign:'center', cellWidth: 80 }, 4: { halign:'center', cellWidth: 70 }, 5:{halign:'center', cellWidth:60 } }
+        });
+        doc.save('rekap_nilai.pdf');
+        closeRekapPrint();
+      }
+      function openPredikatModal() {
+        const m = el('modalPredikat');
+        const c = el('predikatInputs');
+        if (!m || !c) return;
+        const rules = (state.rekap?.predikatRules || []).slice();
+        const order = ['A','B','C','D','E'];
+        const byGrade = (g)=> rules.find(r => String(r.grade).toUpperCase()===g) || {grade:g,min:0,max:0};
+        const inputsHTML = order.map(g => {
+          const r = byGrade(g);
+          return `
+            <div class="flex items-center gap-3 bg-background-light dark:bg-background-dark rounded-lg p-3">
+              <label class="w-32 whitespace-nowrap font-semibold">Predikat ${g}</label>
+              <span class="text-sm text-text-sub-light">Min</span>
+              <input type="number" class="predikat-min w-24 h-10 rounded-lg border bg-white dark:bg-surface-dark text-center" data-grade="${g}" value="${Number(r.min)}" min="0" max="100" step="0.1">
+              <span class="text-sm text-text-sub-light">Max</span>
+              <input type="number" class="predikat-max w-24 h-10 rounded-lg border bg-white dark:bg-surface-dark text-center" data-grade="${g}" value="${Number(r.max)}" min="0" max="100" step="0.1">
+            </div>
+          `;
+        }).join('');
+        c.innerHTML = inputsHTML;
+        m.style.display = 'flex';
+      }
+      function closePredikatModal() {
+        const m = el('modalPredikat');
+        if (m) m.style.display = 'none';
+      }
+      function resetPredikat() {
+        if (!state.rekap) state.rekap = {};
+        state.rekap.predikatRules = [
+          { grade: 'A', min: 85, max: 100 },
+          { grade: 'B', min: 70, max: 84.9 },
+          { grade: 'C', min: 55, max: 69.9 },
+          { grade: 'D', min: 40, max: 54.9 },
+          { grade: 'E', min: 0,  max: 39.9 },
+        ];
+        openPredikatModal();
+      }
+      function savePredikatSettings() {
+        const mins = document.querySelectorAll('.predikat-min');
+        const maxs = document.querySelectorAll('.predikat-max');
+        const map = {};
+        mins.forEach(inp => {
+          const g = inp.getAttribute('data-grade');
+          map[g] = map[g] || {};
+          map[g].min = clamp(parseFloat(inp.value)||0, 0, 100);
+        });
+        maxs.forEach(inp => {
+          const g = inp.getAttribute('data-grade');
+          map[g] = map[g] || {};
+          map[g].max = clamp(parseFloat(inp.value)||0, 0, 100);
+        });
+        const order = ['A','B','C','D','E'];
+        // Bentuk aturan dan filter predikat nonaktif (0-0)
+        let rules = order.map(g => ({ grade:g, min: map[g]?.min ?? 0, max: map[g]?.max ?? 0 }));
+        // Tolak jika ada min>max pada aturan aktif
+        for (const r of rules) {
+          const disabled = (r.min===0 && r.max===0);
+          if (!disabled && r.min > r.max) {
+            alert(`Predikat ${r.grade}: Min tidak boleh lebih besar dari Max.`);
+            return;
+          }
+        }
+        // Gunakan hanya aturan aktif untuk validasi overlap
+        const enabled = rules.filter(r => !(r.min===0 && r.max===0));
+        for (let i=0;i<enabled.length;i++){
+          for (let j=i+1;j<enabled.length;j++){
+            const a = enabled[i], b = enabled[j];
+            if (Math.max(a.min, b.min) <= Math.min(a.max, b.max)) {
+              alert(`Rentang predikat ${a.grade} dan ${b.grade} bertumpuk. Mohon sesuaikan.`);
+              return;
+            }
+          }
+        }
+        // Simpan aturan (aktif saja), urutkan dari min tertinggi ke terendah
+        enabled.sort((x,y)=>y.min - x.min);
+        state.rekap.predikatRules = enabled;
+        closePredikatModal();
+        // Re-hitung predikat & ranking
+        if (state.rekap && state.rekap.raw && state.rekap.raw.length) {
+          rekapProcessData(state.rekap.raw);
+        } else {
+          // Jika tidak ada raw, hanya re-render
+          rekapRenderTable();
+        }
+      }
 
       const autoFillPaket = () => {
         const mapel = String(state.identity.mataPelajaran || "");
@@ -1083,6 +1858,14 @@ if (!isset($_SESSION['user_id'])) {
         const essay = state.questions.filter(q => q.type !== 'pg');
 
         return `
+          <div class="space-y-3">
+          <div class="flex items-center justify-end">
+            <button class="inline-flex items-center gap-2 h-9 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm"
+              onclick="window.__sp.openPreviewHelp()">
+              <span class="material-symbols-outlined text-[16px]">help</span>
+              <span class="hidden md:inline">Petunjuk</span>
+            </button>
+          </div>
           <div id="paper" class="bg-white text-black p-10 shadow-paper min-h-[297mm] font-serif border border-gray-200 mx-auto print:border-none print:shadow-none print:p-0">
             <div class="border-b-2 border-black pb-6 mb-8 relative">
               ${state.identity.logo ? `<img src="${state.identity.logo}" class="absolute right-0 top-0 h-16 w-auto">` : ``}
@@ -1147,6 +1930,34 @@ if (!isset($_SESSION['user_id'])) {
                 return html;
               })()}
             </div>
+          </div>
+          <div id="modalPreviewHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+            <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[800px] max-h-[85vh] overflow-auto">
+              <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Naskah Soal</div>
+                <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closePreviewHelp()">&times;</button>
+              </div>
+              <div class="p-5 space-y-3 text-sm leading-relaxed">
+                <ol class="list-decimal pl-5 space-y-2">
+                  <li>Buat ulang soal: gunakan ikon refresh/bolt pada setiap butir untuk menghasilkan versi baru soal tersebut.</li>
+                  <li>Buat gambar: aktifkan opsi gambar pada Konfigurasi bagian; di tiap soal tersedia tombol untuk membuat/ulang gambar (prioritas ASCII/SVG, jika perlu prompt image).</li>
+                  <li>Prompt gambar: teks acuan yang dipakai AI untuk membuat ilustrasi. Tombol di samping prompt:
+                    <ul class="list-disc pl-5 mt-1">
+                      <li>Salin prompt: menyalin prompt ke clipboard.</li>
+                      <li>Buka ChatGPT: membuka ChatGPT (prompt otomatis tersalin).</li>
+                      <li>Upload gambar: unggah file gambar jika ingin mengganti hasil AI.</li>
+                    </ul>
+                  </li>
+                  <li>Simpan: tombol “Simpan” di header atas menyimpan proyek Anda (identitas, konfigurasi, dan naskah yang sudah dibuat).</li>
+                  <li>Muat: tombol “Muat” memulihkan file proyek (.json) yang tersimpan sebelumnya.</li>
+                  <li>Cetak / Unduh: gunakan “Cetak” untuk mencetak halaman, dan “Unduh .docx” untuk mengunduh naskah dalam format Word.</li>
+                </ol>
+                <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
+                  Tips: Lakukan “Simpan” setelah selesai membuat paket, agar konfigurasi dan hasil dapat dimuat ulang kapan saja.
+                </div>
+              </div>
+            </div>
+          </div>
           </div>
         `;
       };
@@ -1297,6 +2108,236 @@ if (!isset($_SESSION['user_id'])) {
       // ═══════════════════════════════════════════════
       //  MODUL AJAR — renderModulAjar / build / export
       // ═══════════════════════════════════════════════
+      const renderRekap = () => {
+        const statCard = (title, value, color) => `
+          <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-4 flex items-center gap-3">
+            <div class="size-9 rounded-lg ${color} text-white flex items-center justify-center">
+              <span class="material-symbols-outlined">insights</span>
+            </div>
+            <div>
+              <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${title}</div>
+              <div class="text-lg font-extrabold">${value}</div>
+            </div>
+          </div>`;
+        const chip = (label, active=false) => `
+          <button class="px-3 h-9 rounded-full border text-sm font-semibold ${active ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark'}">${label}</button>`;
+        const rows = [
+          {no:1,nama:'Andi Pratama',kelas:'7A',rata:'92.5',tugas:'92.0',uts:'95',uas:'95',uak:'95',akhir:'95.0',pred:'A',rank:1},
+          {no:2,nama:'Budi Setiawan',kelas:'7A',rata:'96.0',tugas:'92.0',uts:'95',uas:'95',uak:'92',akhir:'97.0',pred:'A',rank:2},
+          {no:3,nama:'Citra Dewi',kelas:'7A',rata:'86.7',tugas:'84.0',uts:'90',uas:'80',uak:'87',akhir:'72.0',pred:'B',rank:3},
+          {no:4,nama:'Dewi Cahya',kelas:'7A',rata:'85.0',tugas:'85.0',uts:'95',uas:'88',uak:'86',akhir:'85.5',pred:'B',rank:4},
+          {no:5,nama:'Erika Lestari',kelas:'7A',rata:'89.3',tugas:'82.0',uts:'85',uas:'86',uak:'80',akhir:'88.0',pred:'B',rank:5},
+          {no:6,nama:'Farhan Maulana',kelas:'7A',rata:'83.5',tugas:'92.0',uts:'95',uas:'90',uak:'88',akhir:'85.5',pred:'B',rank:6},
+          {no:7,nama:'Galih Putra',kelas:'7A',rata:'91.5',tugas:'92.0',uts:'96',uas:'76',uak:'76',akhir:'62.0',pred:'C',rank:7},
+          {no:8,nama:'Hafiz Alamsyah',kelas:'7A',rata:'81.9',tugas:'84.0',uts:'96',uas:'76',uak:'76',akhir:'62.0',pred:'C',rank:8},
+          {no:9,nama:'Indah Wati',kelas:'7A',rata:'62.0',tugas:'62.0',uts:'86',uas:'70',uak:'76',akhir:'62.0',pred:'C',rank:9},
+          {no:10,nama:'Joko Santoso',kelas:'7A',rata:'70.0',tugas:'73.0',uts:'76',uas:'70',uak:'70',akhir:'73.5',pred:'C',rank:10},
+        ].map(r => {
+          const gradeClass = Number(r.akhir) >= 90 ? 'bg-green-100 text-green-700' : Number(r.akhir)>=75 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700';
+          return `<tr>
+            <td class="border px-3 py-2 text-center">${r.no}</td>
+            <td class="border px-3 py-2">${r.nama}</td>
+            <td class="border px-3 py-2 text-center">${r.kelas}</td>
+            <td class="border px-3 py-2 text-center">${r.rata}</td>
+            <td class="border px-3 py-2 text-center">${r.tugas}</td>
+            <td class="border px-3 py-2 text-center">${r.uts}</td>
+            <td class="border px-3 py-2 text-center">${r.uas}</td>
+            <td class="border px-3 py-2 text-center">${r.uak}</td>
+            <td class="border px-3 py-2 text-center"><span class="px-2 py-1 rounded ${gradeClass}">${r.akhir}</span></td>
+            <td class="border px-3 py-2 text-center">${r.pred}</td>
+            <td class="border px-3 py-2 text-center">${r.rank <= 3 ? `<span class="material-symbols-outlined text-amber-500 align-middle">trophy</span> ${r.rank}` : r.rank}</td>
+          </tr>`;
+        }).join('');
+        return `
+          <div class="space-y-4">
+            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
+              <div class="p-6 border-b border-border-light dark:border-border-dark">
+                <div>
+                  <div class="text-2xl font-bold">Rekap Nilai Otomatis</div>
+                  <div class="text-sm text-text-sub-light">Rekap nilai untuk semua jenjang dan mata pelajaran</div>
+                </div>
+              </div>
+              <div class="p-6 space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div class="flex items-center gap-2">
+                    <button onclick="document.getElementById('rekapExcelPicker').click()" class="px-4 h-10 rounded-lg bg-primary text-white font-bold"><span class="material-symbols-outlined text-[18px]">upload</span> <span class="ml-1">Upload Excel</span></button>
+                    <button onclick="window.__sp.rekapDownloadTemplate()" class="px-4 h-10 rounded-lg border bg-white dark:bg-surface-dark"><span class="material-symbols-outlined text-[18px]">download</span> <span class="ml-1">Download Template</span></button>
+                    
+                    <button class="px-4 h-10 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.openBobotModal()"><span class="material-symbols-outlined text-[18px]">tune</span> <span class="ml-1">Atur Bobot</span></button>
+                    <button class="px-4 h-10 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.openPredikatModal()"><span class="material-symbols-outlined text-[18px]">grading</span> <span class="ml-1">Atur Predikat</span></button>
+                    <button class="px-4 h-10 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.openRekapHelp()"><span class="material-symbols-outlined text-[18px]">help</span> <span class="ml-1">Petunjuk</span></button>
+                  </div>
+                  <div>
+                    <button class="px-4 h-10 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.openRekapPrint()"><span class="material-symbols-outlined text-[18px]">print</span> <span class="ml-1">Cetak</span></button>
+                  </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-4 flex items-center gap-3">
+                    <div class="size-9 rounded-lg bg-green-500 text-white flex items-center justify-center">
+                      <span class="material-symbols-outlined">insights</span>
+                    </div>
+                    <div>
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Nilai Tertinggi</div>
+                      <div id="rekapMax" class="text-lg font-extrabold">0</div>
+                    </div>
+                  </div>
+                  <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-4 flex items-center gap-3">
+                    <div class="size-9 rounded-lg bg-red-500 text-white flex items-center justify-center">
+                      <span class="material-symbols-outlined">insights</span>
+                    </div>
+                    <div>
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Nilai Terendah</div>
+                      <div id="rekapMin" class="text-lg font-extrabold">0</div>
+                    </div>
+                  </div>
+                  <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-4 flex items-center gap-3">
+                    <div class="size-9 rounded-lg bg-blue-500 text-white flex items-center justify-center">
+                      <span class="material-symbols-outlined">insights</span>
+                    </div>
+                    <div>
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Rata-Rata Kelas</div>
+                      <div id="rekapAvg" class="text-lg font-extrabold">0</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <div class="inline-flex items-center gap-2">
+                      <button class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark flex items-center gap-2"><span class="material-symbols-outlined text-[18px]">event</span> Periode</button>
+                      <button class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark flex items-center gap-2"><span class="material-symbols-outlined text-[18px]">tune</span> Kolom</button>
+                    </div>
+                  </div>
+                  <div class="relative">
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-sub-light text-[18px]">search</span>
+                    <input id="rekapSearch" placeholder="Cari siswa..." class="pl-9 pr-3 h-9 rounded-lg border bg-white dark:bg-surface-dark w-64" />
+                  </div>
+                </div>
+                <div class="overflow-auto">
+                  <table id="rekapTable" class="min-w-full text-sm border">
+                    <thead class="bg-background-light dark:bg-background-dark">
+                      <tr id="rekapHeadRow">
+                        <th class="border px-3 py-2">No</th>
+                        <th class="border px-3 py-2 text-left">Nama Siswa</th>
+                        <th class="border px-3 py-2">Kelas</th>
+                        <th class="border px-3 py-2">Rata-Rata</th>
+                        <th class="border px-3 py-2">Rata-Rata Tugas</th>
+                        <th class="border px-3 py-2">Nilai UTS</th>
+                        <th class="border px-3 py-2">Nilai UAS</th>
+                        <th class="border px-3 py-2">Nilai UAK</th>
+                        <th class="border px-3 py-2">Nilai Akhir</th>
+                        <th class="border px-3 py-2">Predikat</th>
+                        <th class="border px-3 py-2">Ranking</th>
+                      </tr>
+                    </thead>
+                    <tbody id="rekapTBody">${rows}</tbody>
+                  </table>
+                </div>
+                <div class="flex items-center justify-between text-xs text-text-sub-light">
+                  <div>Menampilkan <span id="rekapTotalRows">0</span> dari <span id="rekapTotalData">0</span> data</div>
+                  <div class="flex items-center gap-1">
+                    <button class="size-8 rounded border bg-white dark:bg-surface-dark">&laquo;</button>
+                    <button class="size-8 rounded border bg-white dark:bg-surface-dark">1</button>
+                    <button class="size-8 rounded border bg-white dark:bg-surface-dark">&raquo;</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="modalBobot" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+              <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[90vw] max-w-[720px] max-h-[80vh] overflow-auto">
+                <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                  <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">scale</span> Atur Bobot Penilaian</div>
+                  <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeBobotModal()">&times;</button>
+                </div>
+                <div class="p-5 space-y-3">
+                  <div class="text-xs rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3">Total bobot harus 100%. Atur sesuai kebijakan sekolah.</div>
+                  <div id="bobotInputs" class="grid grid-cols-1 gap-2"></div>
+                  <div class="flex items-center justify-between bg-background-light dark:bg-background-dark rounded-lg p-3">
+                    <div class="text-sm font-semibold">Total Bobot</div>
+                    <div id="totalBobotDisplay" class="text-lg font-extrabold text-primary">0%</div>
+                  </div>
+                  <div class="flex items-center justify-end gap-2">
+                    <button class="px-3 h-10 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.resetBobot()">Reset (Rata)</button>
+                    <button class="px-4 h-10 rounded-lg bg-primary text-white" onclick="window.__sp.saveBobotSettings()">Simpan</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="modalPredikat" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+              <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[90vw] max-w-[720px] max-h-[80vh] overflow-auto">
+                <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                  <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">grading</span> Atur Predikat</div>
+                  <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closePredikatModal()">&times;</button>
+                </div>
+                <div class="p-5 space-y-3">
+                  <div class="text-xs rounded-md border border-amber-200 bg-amber-50 text-amber-800 p-3">Rentang nilai 0–100, tanpa tumpang tindih. Untuk menonaktifkan predikat, set Min=0 dan Max=0.</div>
+                  <div id="predikatInputs" class="grid grid-cols-1 gap-2"></div>
+                  <div class="flex items-center justify-end gap-2">
+                    <button class="px-3 h-10 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.resetPredikat()">Reset Default</button>
+                    <button class="px-4 h-10 rounded-lg bg-primary text-white" onclick="window.__sp.savePredikatSettings()">Simpan</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="modalRekapHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+              <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[800px] max-h-[85vh] overflow-auto">
+                <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                  <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Rekap Nilai</div>
+                  <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeRekapHelp()">&times;</button>
+                </div>
+                <div class="p-5 space-y-4 text-sm leading-relaxed">
+                  <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3">Gunakan template agar header dikenali otomatis. Sistem akan melewati baris judul seperti “TEMPLATE 1”.</div>
+                  <ol class="list-decimal pl-5 space-y-2">
+                    <li>Siapkan file Excel dengan header minimal: No, Nama Siswa, Kelas, lalu kolom nilai bebas (mis. Tugas, UH, UTS, UAS).</li>
+                    <li>Pilih Upload Excel dan buka file Anda.</li>
+                    <li>Sistem mendeteksi kolom nilai dan membagi bobot rata. Nilai Akhir, Predikat, dan Ranking dihitung otomatis.</li>
+                    <li>Klik Atur Bobot untuk mengubah bobot per kolom hingga total tepat 100%. Simpan untuk menghitung ulang.</li>
+                    <li>Klik Atur Predikat untuk mengubah rentang nilai tiap grade. Untuk menonaktifkan grade, set Min=0 dan Max=0.</li>
+                    <li>Gunakan kolom Cari siswa untuk memfilter tabel secara cepat.</li>
+                    <li>Download Template untuk mengunduh contoh template Excel.</li>
+                    <li>Gunakan Cetak untuk mencetak laporan rekap.</li>
+                  </ol>
+                  <div>
+                    <div class="font-semibold mb-1">Catatan</div>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>Range nilai dibatasi 0–100 dan tidak boleh tumpang tindih.</li>
+                      <li>Jika sebuah nilai di luar semua rentang aktif, sistem menggunakan grade dengan batas minimum terendah sebagai fallback.</li>
+                      <li>Jika Anda mengubah bobot atau predikat, pastikan klik Simpan agar perhitungan diperbarui.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="modalRekapPrint" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+              <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[700px] max-h-[85vh] overflow-auto">
+                <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                  <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">print</span> Cetak Laporan Rekap</div>
+                  <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeRekapPrint()">&times;</button>
+                </div>
+                <div class="p-5 space-y-4 text-sm">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label class="text-xs font-semibold text-text-sub-light">Nama Mata Pelajaran (opsional)</label>
+                      <input id="printMapel" class="w-full h-10 rounded-lg border bg-white dark:bg-surface-dark px-3" placeholder="mis. Matematika" />
+                    </div>
+                    <div>
+                      <label class="text-xs font-semibold text-text-sub-light">Nama Guru (opsional)</label>
+                      <input id="printGuru" class="w-full h-10 rounded-lg border bg-white dark:bg-surface-dark px-3" placeholder="mis. Budi Hartono, S.Pd" />
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <button onclick="document.getElementById('rekapPrintLogoPicker').click()" class="px-3 h-10 rounded-lg border bg-white dark:bg-surface-dark"><span class="material-symbols-outlined text-[18px]">imagesmode</span> <span class="ml-1">Upload Logo Sekolah (opsional)</span></button>
+                    <span id="printLogoName" class="text-xs text-text-sub-light"></span>
+                  </div>
+                  <div class="flex items-center justify-end gap-2 pt-2">
+                    <button class="px-4 h-10 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeRekapPrint()">Batal</button>
+                    <button class="px-4 h-10 rounded-lg bg-primary text-white" onclick="window.__sp.generateRekapPDF()">Cetak (PDF)</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      };
       const MA_FASE_MAP = {
         "SD/MI":   ["Fase A (Kelas 1–2)","Fase B (Kelas 3–4)","Fase C (Kelas 5–6)"],
         "SMP/MTs": ["Fase D (Kelas 7–9)"],
@@ -1364,7 +2405,14 @@ if (!isset($_SESSION['user_id'])) {
             <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
               <div class="p-6 space-y-5">
                 <div>
-                  <div class="text-xs font-bold text-primary bg-primary/10 inline-flex px-3 py-1 rounded-full">Langkah 1</div>
+                  <div class="flex items-center gap-2">
+                    <div class="text-xs font-bold text-primary bg-primary/10 inline-flex px-3 py-1 rounded-full">Langkah 1</div>
+                    <button class="h-6 w-6 rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark inline-flex items-center justify-center"
+                      title="Petunjuk Langkah 1"
+                      onclick="window.__sp.openMAHelp1()">
+                      <span class="material-symbols-outlined text-[16px]">help</span>
+                    </button>
+                  </div>
                   <div class="text-xl font-bold mt-2">Informasi Dasar</div>
                   <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Identitas pendidik dan konteks akademik</div>
                 </div>
@@ -1387,7 +2435,14 @@ if (!isset($_SESSION['user_id'])) {
             <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
               <div class="p-6 space-y-5">
                 <div>
-                  <div class="text-xs font-bold text-primary bg-primary/10 inline-flex px-3 py-1 rounded-full">Langkah 2</div>
+                  <div class="flex items-center gap-2">
+                    <div class="text-xs font-bold text-primary bg-primary/10 inline-flex px-3 py-1 rounded-full">Langkah 2</div>
+                    <button class="h-6 w-6 rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark inline-flex items-center justify-center"
+                      title="Petunjuk Langkah 2"
+                      onclick="window.__sp.openMAHelp2()">
+                      <span class="material-symbols-outlined text-[16px]">help</span>
+                    </button>
+                  </div>
                   <div class="text-xl font-bold mt-2">Detail Pembelajaran</div>
                   <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Materi, durasi, model, dan profil lulusan</div>
                 </div>
@@ -1421,6 +2476,11 @@ if (!isset($_SESSION['user_id'])) {
                     class="flex items-center gap-2 rounded-lg h-10 px-5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors">
                     <span class="material-symbols-outlined text-[18px]">download</span>
                     Download .docx
+                  </button>
+                  <button id="btnExportMAPDF" onclick="window.__sp.exportModulAjarPDF()"
+                    class="flex items-center gap-2 rounded-lg h-10 px-5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-sm transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                    Download PDF
                   </button>` : ''}
                 </div>
               </div>
@@ -1438,19 +2498,26 @@ if (!isset($_SESSION['user_id'])) {
                     <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${safeText(M.mapel||'')} · ${safeText(M.judulModul||'')}</div>
                   </div>
                 </div>
-                <button id="btnExportMA2" onclick="window.__sp.exportModulAjarDocx()"
-                  class="flex items-center gap-2 rounded-lg h-9 px-4 bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors">
-                  <span class="material-symbols-outlined text-[16px]">download</span>
-                  Download .docx
-                </button>
+                <div class="flex items-center gap-2">
+                  <button id="btnExportMA2" onclick="window.__sp.exportModulAjarDocx()"
+                    class="flex items-center gap-2 rounded-lg h-9 px-4 bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors">
+                    <span class="material-symbols-outlined text-[16px]">download</span>
+                    Download .docx
+                  </button>
+                  <button id="btnExportMAPDF2" onclick="window.__sp.exportModulAjarPDF()"
+                    class="flex items-center gap-2 rounded-lg h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-sm transition-colors">
+                    <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                    Download PDF
+                  </button>
+                </div>
               </div>
-              <div class="p-6">
-                <div class="bg-white dark:bg-gray-950 border border-border-light dark:border-border-dark rounded-lg p-8
-                  font-serif text-[15px] leading-relaxed max-h-[72vh] overflow-y-auto custom-scrollbar
-                  [&_h1]:text-[17px] [&_h1]:font-bold [&_h1]:mt-8 [&_h1]:mb-3
+              <div class="p-6 overflow-auto max-h-[72vh] custom-scrollbar">
+                <div id="maPreview" class="bg-white dark:bg-gray-950 border border-border-light dark:border-border-dark rounded-lg px-20 py-16 mx-auto
+                  font-serif text-[16px] leading-6 min-h-[1056px] max-w-[816px]
+                  [&_h1]:text-[18px] [&_h1]:font-bold [&_h1]:mt-8 [&_h1]:mb-3
                   [&_h2]:text-[16px] [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-2
                   [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:mt-5 [&_h3]:mb-2
-                  [&_table]:w-full [&_table]:border-collapse [&_table]:my-3 [&_table]:text-[13px]
+                  [&_table]:w-full [&_table]:border-collapse [&_table]:my-3 [&_table]:text-[14px]
                   [&_td]:border [&_td]:border-gray-300 dark:[&_td]:border-gray-600 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top
                   [&_th]:border [&_th]:border-gray-300 dark:[&_th]:border-gray-600 [&_th]:px-3 [&_th]:py-2 [&_th]:bg-gray-100 dark:[&_th]:bg-gray-800 [&_th]:font-bold
                   [&_.ma-tbl>tbody>tr:nth-child(even)>td]:bg-gray-50 dark:[&_.ma-tbl>tbody>tr:nth-child(even)>td]:bg-gray-900/20
@@ -1458,7 +2525,7 @@ if (!isset($_SESSION['user_id'])) {
                   [&_ol]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol>li]:mb-1.5
                   [&_em]:italic [&_strong]:font-bold
                   [&_p]:mb-3 [&_p]:text-justify">
-                  ${maMarkdownToHtml(M.hasil)}
+                  ${maBuildPreviewHtml(M)}
                 </div>
               </div>
             </div>` : ''}
@@ -1484,6 +2551,122 @@ if (!isset($_SESSION['user_id'])) {
         return formHtml;
       };
 
+      const renderLimit = () => {
+        const info = state.limitInfo || {};
+        const sisa = Number(info?.limitpaket ?? 0);
+        const awal = Number(info?.initial_limitpaket ?? info?.total ?? 0);
+        const pakai = Math.max(awal - sisa, 0);
+        const rows = (state.creditHistory || []).map((r, idx) => {
+          const dt = new Date(r.ts || Date.now());
+          const t = dt.toLocaleString('id-ID', { day:'2-digit', month:'short', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+          return `<tr>
+            <td class="border px-3 py-2 text-center">${idx+1}</td>
+            <td class="border px-3 py-2">${t}</td>
+            <td class="border px-3 py-2">${safeText(r.kind||'-')}</td>
+            <td class="border px-3 py-2">${safeText(r.detail||'')}</td>
+            <td class="border px-3 py-2 text-center text-red-600 font-semibold">-${Number(r.cost||0)}</td>
+          </tr>`;
+        }).join('');
+        const cfg = state.limitConfig?.costs || {};
+        const cPublish = Number(cfg.publish_quiz ?? 3);
+        const cModul = Number(cfg.modul_ajar ?? 3);
+        const cSoal = Number(cfg.buat_soal ?? 2);
+        const cRekap = Number(cfg.rekap_nilai ?? 0);
+        const initLimit = Number(state.limitConfig?.initial_limit ?? 300);
+        return `
+          <div class="space-y-4">
+            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
+              <div class="p-6 border-b border-border-light dark:border-border-dark">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <div class="text-2xl font-bold">Kredit Limit</div>
+                    <div class="text-sm text-text-sub-light">Kuota penggunaan fitur berbayar aplikasi</div>
+                  </div>
+                  <button class="px-3 h-10 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.refreshCreditLimit(true)"><span class="material-symbols-outlined text-[18px]">refresh</span> Segarkan</button>
+                </div>
+              </div>
+              <div class="p-6 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div class="rounded-xl border bg-white dark:bg-surface-dark p-4">
+                    <div class="text-xs text-text-sub-light">Sisa Kredit</div>
+                    <div class="text-2xl font-extrabold text-green-600">${sisa}</div>
+                  </div>
+                  <div class="rounded-xl border bg-white dark:bg-surface-dark p-4">
+                    <div class="text-xs text-text-sub-light">Kredit Awal</div>
+                    <div class="text-2xl font-extrabold">${awal}</div>
+                  </div>
+                  <div class="rounded-xl border bg-white dark:bg-surface-dark p-4">
+                    <div class="text-xs text-text-sub-light">Terpakai</div>
+                    <div class="text-2xl font-extrabold text-amber-600">${pakai}</div>
+                  </div>
+                </div>
+                <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
+                  <div class="font-bold mb-2">Biaya Kredit per Fitur</div>
+                  <ul class="text-sm list-disc pl-5 space-y-1">
+                    <li>Publish Quiz: ${cPublish} kredit</li>
+                    <li>Modul Ajar: ${cModul} kredit</li>
+                    <li>Buat Soal: ${cSoal} kredit</li>
+                    <li>Rekap Nilai: ${cRekap} kredit</li>
+                  </ul>
+                  <div class="mt-3 text-sm">
+                    Top up kredit: hubungi Admin via WhatsApp <a class="text-blue-600 underline" href="https://wa.me/6285882412124" target="_blank" rel="noopener">0858-8241-2124</a>.
+                  </div>
+                </div>
+                ${IS_ADMIN ? `
+                <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
+                  <div class="font-bold mb-3">Pengaturan (Admin)</div>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label class="text-sm">Publish Quiz (kredit)
+                      <input class="w-full h-10 rounded-lg border bg-white dark:bg-surface-dark px-3"
+                        value="${cPublish}" oninput="(state.limitConfig=state.limitConfig||{}, state.limitConfig.costs=state.limitConfig.costs||{}, state.limitConfig.costs.publish_quiz=Number(this.value)||0)">
+                    </label>
+                    <label class="text-sm">Modul Ajar (kredit)
+                      <input class="w-full h-10 rounded-lg border bg-white dark:bg-surface-dark px-3"
+                        value="${cModul}" oninput="(state.limitConfig=state.limitConfig||{}, state.limitConfig.costs=state.limitConfig.costs||{}, state.limitConfig.costs.modul_ajar=Number(this.value)||0)">
+                    </label>
+                    <label class="text-sm">Buat Soal (kredit)
+                      <input class="w-full h-10 rounded-lg border bg-white dark:bg-surface-dark px-3"
+                        value="${cSoal}" oninput="(state.limitConfig=state.limitConfig||{}, state.limitConfig.costs=state.limitConfig.costs||{}, state.limitConfig.costs.buat_soal=Number(this.value)||0)">
+                    </label>
+                    <label class="text-sm">Rekap Nilai (kredit)
+                      <input class="w-full h-10 rounded-lg border bg-white dark:bg-surface-dark px-3"
+                        value="${cRekap}" oninput="(state.limitConfig=state.limitConfig||{}, state.limitConfig.costs=state.limitConfig.costs||{}, state.limitConfig.costs.rekap_nilai=Number(this.value)||0)">
+                    </label>
+                    <label class="text-sm">Limit Awal User Baru
+                      <input class="w-full h-10 rounded-lg border bg-white dark:bg-surface-dark px-3"
+                        value="${initLimit}" oninput="(state.limitConfig=state.limitConfig||{}, state.limitConfig.initial_limit=Number(this.value)||0)">
+                    </label>
+                  </div>
+                  <div class="flex items-center justify-end mt-3">
+                    <button class="px-4 h-10 rounded-lg bg-primary text-white" onclick="window.__sp.saveLimitConfig()">Simpan Pengaturan</button>
+                  </div>
+                </div>
+                ` : ``}
+                <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
+                  <div class="flex items-center justify-between">
+                    <div class="font-bold">Riwayat Penggunaan Kredit</div>
+                    <div class="text-xs text-text-sub-light">${Array.isArray(state.creditHistory)?state.creditHistory.length:0} entri tersimpan (lokal)</div>
+                  </div>
+                  <div class="overflow-auto mt-2">
+                    <table class="min-w-full text-sm border">
+                      <thead class="bg-background-light dark:bg-background-dark">
+                        <tr>
+                          <th class="border px-3 py-2 text-center">No</th>
+                          <th class="border px-3 py-2">Waktu</th>
+                          <th class="border px-3 py-2">Kegiatan</th>
+                          <th class="border px-3 py-2">Rincian</th>
+                          <th class="border px-3 py-2 text-center">Kredit</th>
+                        </tr>
+                      </thead>
+                      <tbody>${rows || `<tr><td colspan="5" class="border px-3 py-6 text-center text-text-sub-light">Belum ada riwayat lokal. Publikasi/Generate akan muncul di sini.</td></tr>`}</tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      };
       function maMarkdownToHtml(md) {
         if (!md) return '';
         const esc = (s) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -1505,7 +2688,11 @@ if (!isset($_SESSION['user_id'])) {
               j++;
             }
             if (rows.length) {
-              const cells = rows.map(r => r.trim().replace(/^\|?/, '').replace(/\|?$/, '').split('|').map(c => esc(c.trim())));
+              const fmtCell = (raw) =>
+                esc(String(raw || '').trim())
+                  .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                  .replace(/\*(.+?)\*/g, '<em>$1</em>');
+              const cells = rows.map(r => r.trim().replace(/^\|?/, '').replace(/\|?$/, '').split('|').map(c => fmtCell(c)));
               let html = '<table class="ma-tbl">';
               if (headerSep && cells.length > 0) {
                 html += '<thead><tr>' + cells[0].map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
@@ -1600,6 +2787,218 @@ if (!isset($_SESSION['user_id'])) {
         }
         let h = parts.join('\n');
         return h;
+      }
+      function maNormalizeContent(M) {
+        const cleanRaw = (raw) => {
+          let s = String(raw || '');
+          s = s.replace(/\r\n/g, '\n');
+          s = s.replace(/<br\s*\/?>/gi, ' ');
+          s = s.replace(/&nbsp;/gi, ' ');
+          s = s.replace(/<\/?(?:div|span|p|strong|em|b|i|u|small|mark|code|pre|h1|h2|h3|h4|h5|h6|table|thead|tbody|tr|th|td)[^>]*>/gi, ' ');
+          s = s.replace(/<[^>]+>/g, ' ');
+          s = s.replace(/[ \t]+/g, ' ');
+          s = s.replace(/\n[ \t]+\n/g, '\n\n');
+          s = s.replace(/\n{3,}/g, '\n\n');
+          return s;
+        };
+        let contentText = cleanRaw(M?.hasil || '');
+        contentText = contentText.replace(/^\s*#{1,3}\s*MODUL AJAR[^\n]*\n?/i, '');
+        contentText = contentText.replace(/^\s*#{1,3}\s*["“][^\n"”]+["”]\s*\n?/i, '');
+        return contentText.trim();
+      }
+      function maInsertPageBreakMarkers(text) {
+        let s = String(text || '');
+        const marker = '[[PAGE_BREAK]]';
+        const addBeforeLine = (reWithGroups) => {
+          s = s.replace(reWithGroups, (_m, p1, p2) => `${p1}${marker}\n${p2}`);
+        };
+        // Page break sebelum Komponen Inti agar halaman 1 hanya Judul + Informasi Umum
+        addBeforeLine(/(^|\n)([^\S\r\n]*(?:#{1,4}\s*)?(?:\*{0,2})B\.\s*KOMPONEN\s+INTI\b[^\n]*)/im);
+        // Kegiatan Pembelajaran mulai halaman baru
+        addBeforeLine(/(^|\n)([^\S\r\n]*(?:#{1,4}\s*)?(?:\*{0,2})?(?:\d+\.\s*)?Kegiatan\s+Pembelajaran\b[^\n]*)/im);
+        // Rubrik Penilaian mulai halaman baru
+        addBeforeLine(/(^|\n)([^\S\r\n]*(?:#{1,4}\s*)?(?:\*{0,2})?(?:\d+\.\s*)?Rubrik\s+Penilaian\b[^\n]*)/im);
+        // rapikan marker berulang
+        s = s.replace(new RegExp(`${marker}\\s*\\n\\s*${marker}`, 'g'), marker);
+        return s;
+      }
+      function maStripCLampiranHeading(text) {
+        let s = String(text || '');
+        s = s.replace(/(^|\n)\s*(?:#{1,4}\s*)?(?:\*{0,2})C\.\s*LAMPIRAN\b[^\n]*\n?/im, '$1');
+        s = s.replace(/\n{3,}/g, '\n\n');
+        return s.trim();
+      }
+      function maSplitLKPD(raw) {
+        const src = String(raw || '');
+        const startRe = /^###\s*(?:1\.)?\s*LKPD\b.*$/im;
+        const m = startRe.exec(src);
+        if (!m) return { pre: src, lkpd: '', post: '' };
+        const startLineIdx = m.index;
+        const afterStartLine = src.indexOf('\n', startLineIdx);
+        const bodyStart = afterStartLine === -1 ? src.length : afterStartLine + 1;
+        const rest = src.slice(bodyStart);
+        const endRe = /^###\s*(?!1\.)\d+\.\s+/m;
+        const mEnd = endRe.exec(rest);
+        const bodyEnd = mEnd ? bodyStart + mEnd.index : src.length;
+        return {
+          pre: src.slice(0, startLineIdx).trim(),
+          lkpd: src.slice(bodyStart, bodyEnd).trim(),
+          post: src.slice(bodyEnd).trim(),
+        };
+      }
+      function maParseLKPD(lkpdText, M) {
+        const lines = String(lkpdText || '').split('\n').map(s => s.trim()).filter(Boolean);
+        let judul = String(M?.judulModul || '').trim();
+        if (!judul && lines.length) {
+          const l0 = lines[0];
+          const m0 = l0.match(/^(judul(\s+lkpd)?|topik)\s*[:\-]\s*(.+)$/i);
+          judul = (m0 ? m0[3] : l0).trim();
+        }
+        const data = { judul, tujuan: [], alat: [], langkah: [], refleksi: [], kesimpulan: [] };
+        let cur = '';
+        const setCur = (k) => { cur = k; };
+        const pushLine = (k, v) => { if (v) data[k].push(v); };
+        for (const line of lines) {
+          if (/^a[\.\)]\s*tujuan\b/i.test(line) || /^tujuan\b/i.test(line)) { setCur('tujuan'); continue; }
+          if (/^b[\.\)]\s*alat\b/i.test(line) || /^alat\s+dan\s+bahan\b/i.test(line) || /^alat\b/i.test(line)) { setCur('alat'); continue; }
+          if (/^c[\.\)]\s*langkah\b/i.test(line) || /^langkah\s+kegiatan\b/i.test(line) || /^langkah\b/i.test(line)) { setCur('langkah'); continue; }
+          if (/^d[\.\)]\s*pertanyaan\b/i.test(line) || /^pertanyaan\s+refleksi\b/i.test(line) || /^refleksi\b/i.test(line)) { setCur('refleksi'); continue; }
+          if (/^e[\.\)]\s*kesimpulan\b/i.test(line) || /^kesimpulan\b/i.test(line)) { setCur('kesimpulan'); continue; }
+          const cleaned = line
+            .replace(/^\s*[-•*]\s+/, '')
+            .replace(/^\s*\d+[\.\)]\s+/, (m) => m)
+            .trim();
+          if (!cur) continue;
+          pushLine(cur, cleaned);
+        }
+        return data;
+      }
+      function maEnsureLKPDData(data, M, sourceText) {
+        const mapel = String(M?.mapel || '').trim();
+        const judul = String(data?.judul || M?.judulModul || '').trim() || 'Topik Pembelajaran';
+        const d = data || { judul, tujuan: [], alat: [], langkah: [], refleksi: [], kesimpulan: [] };
+        d.judul = judul;
+        const hasAny = (arr) => Array.isArray(arr) && arr.some(x => String(x || '').trim());
+        const safeArr = (arr) => (Array.isArray(arr) ? arr.filter(x => String(x || '').trim()) : []);
+        d.tujuan = safeArr(d.tujuan);
+        d.alat = safeArr(d.alat);
+        d.langkah = safeArr(d.langkah);
+        d.refleksi = safeArr(d.refleksi);
+        const fromAI = String(sourceText || '').trim();
+        if (!hasAny(d.tujuan)) {
+          d.tujuan = [
+            `Memahami konsep utama materi "${judul}"${mapel ? ` pada mata pelajaran ${mapel}` : ''}.`,
+            `Menerapkan konsep melalui kegiatan terarah dan bekerja sama dalam kelompok.`,
+            `Menyampaikan hasil kerja dan menarik kesimpulan berdasarkan kegiatan.`,
+          ];
+        }
+        if (!hasAny(d.alat)) {
+          d.alat = [
+            mapel ? `Buku/handout ${mapel}` : 'Buku/handout materi',
+            'Lembar kerja ini (LKPD)',
+            'Alat tulis (pensil/pulpen) dan penghapus',
+            'Kertas/lembar presentasi (opsional)',
+          ];
+        }
+        if (!hasAny(d.langkah)) {
+          d.langkah = [
+            `Baca petunjuk dan tujuan pembelajaran pada LKPD ini dengan cermat.`,
+            `Diskusikan bersama kelompok tentang materi "${judul}" berdasarkan sumber yang tersedia.`,
+            `Catat poin penting (konsep, istilah, contoh) yang ditemukan selama diskusi.`,
+            `Kerjakan tugas/aktivitas yang diminta guru sesuai arahan dan waktu yang ditentukan.`,
+            `Siapkan hasil kerja untuk dipresentasikan (ringkas, jelas, dan rapi).`,
+            `Presentasikan hasil dan berikan tanggapan terhadap presentasi kelompok lain.`,
+            `Perbaiki hasil kerja bila ada masukan, lalu simpulkan bersama.`,
+          ];
+        }
+        if (!hasAny(d.refleksi)) {
+          d.refleksi = [
+            `Apa hal baru yang kamu pelajari dari materi "${judul}"?`,
+            `Bagian mana yang paling menantang dan bagaimana cara kamu mengatasinya?`,
+            `Bagaimana kerja sama kelompokmu membantu memahami materi?`,
+          ];
+        }
+        if (fromAI && (fromAI.length < 40)) {
+          d.refleksi = d.refleksi.length ? d.refleksi : [
+            `Apa hal baru yang kamu pelajari hari ini?`,
+            `Bagian mana yang paling sulit?`,
+            `Apa yang akan kamu lakukan agar lebih paham?`,
+          ];
+        }
+        return d;
+      }
+      function maRenderLKPDHtml(data) {
+        const title = safeText(data.judul || 'LKPD');
+        const list = (arr, ordered = false) => {
+          if (!arr || !arr.length) return '<div class="text-gray-600">-</div>';
+          if (ordered) {
+            const items = arr.map(x => `<li>${safeText(String(x).replace(/^\d+[\.\)]\s+/, ''))}</li>`).join('');
+            return `<ol class="list-decimal pl-6 space-y-1">${items}</ol>`;
+          }
+          const items = arr.map(x => `<li>${safeText(String(x).replace(/^\d+[\.\)]\s+/, ''))}</li>`).join('');
+          return `<ul class="list-disc pl-6 space-y-1">${items}</ul>`;
+        };
+        const answerLines = `<div class="mt-1 space-y-2">${Array.from({length:3}).map(()=>`<div class="border-b border-gray-400 h-5"></div>`).join('')}</div>`;
+        return `
+          <div class="mt-8">
+            <div class="font-bold text-[16px]">C. LAMPIRAN</div>
+            <div class="mt-2 font-bold text-[15px]">1. Lembar Kerja Peserta Didik (LKPD)</div>
+            <div class="mt-3 border border-gray-500">
+              <div class="px-3 py-2 text-center text-black" style="background:#D9D9D9;">
+                <div class="font-bold text-[14px]">LEMBAR KERJA PESERTA DIDIK (LKPD)</div>
+                <div class="text-[12px]">${title}</div>
+              </div>
+              <div class="p-3 text-[13px] leading-5">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+                  <div><span class="font-semibold">Nama Siswa</span> : <span class="inline-block border-b border-gray-400 w-[180px] align-middle"></span></div>
+                  <div><span class="font-semibold">Kelas</span> : <span class="inline-block border-b border-gray-400 w-[180px] align-middle"></span></div>
+                  <div><span class="font-semibold">Kelompok</span> : <span class="inline-block border-b border-gray-400 w-[180px] align-middle"></span></div>
+                </div>
+                <div class="space-y-3">
+                  <div>
+                    <div class="font-bold">A. Tujuan</div>
+                    <div class="mt-1">${list(data.tujuan, false)}</div>
+                  </div>
+                  <div>
+                    <div class="font-bold">B. Alat dan Bahan</div>
+                    <div class="mt-1">${list(data.alat, false)}</div>
+                  </div>
+                  <div>
+                    <div class="font-bold">C. Langkah Kegiatan</div>
+                    <div class="mt-1">${list(data.langkah, true)}</div>
+                  </div>
+                  <div>
+                    <div class="font-bold">D. Pertanyaan Refleksi</div>
+                    <div class="mt-1">${list(data.refleksi, true)}</div>
+                    ${answerLines}
+                  </div>
+                  <div>
+                    <div class="font-bold">E. Kesimpulan</div>
+                    ${answerLines}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      function maBuildPreviewHtml(M) {
+        const mapel = String(M?.mapel || '').trim();
+        const judul = String(M?.judulModul || '').trim();
+        const normalized = maNormalizeContent(M);
+        const { pre, lkpd, post } = maSplitLKPD(normalized);
+        const lkpdData = maEnsureLKPDData(lkpd ? maParseLKPD(lkpd, M) : { judul, tujuan: [], alat: [], langkah: [], refleksi: [], kesimpulan: [] }, M, lkpd);
+        const lkpdHtml = maRenderLKPDHtml(lkpdData);
+        const body = maMarkdownToHtml(maStripCLampiranHeading(pre)) + lkpdHtml + maMarkdownToHtml(maStripCLampiranHeading(post));
+        const title = mapel ? `MODUL AJAR ${mapel.toUpperCase()}` : 'MODUL AJAR';
+        const sub = judul ? `"${safeText(judul)}"` : '';
+        return `
+          <div class="text-center">
+            <div class="font-bold text-[20px] tracking-wide">${safeText(title)}</div>
+            ${sub ? `<div class="italic text-[18px] mt-2">${sub}</div>` : ``}
+          </div>
+          <div class="mt-10">${body}</div>
+        `;
       }
 
       async function buildModulAjar() {
@@ -1732,12 +3131,19 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
               headers: {"Content-Type":"application/json"},
               body: JSON.stringify({ type: "add_tokens", input_tokens: usageIn, output_tokens: usageOut })
             });
-            await fetch("api/openai_proxy.php", {
-              method: "POST",
-              headers: {"Content-Type":"application/json"},
-              body: JSON.stringify({ type: "decrement_package" })
-            });
+            const maCost = Number(state.limitConfig?.costs?.modul_ajar ?? 3);
+            const calls = [];
+            for (let i=0;i<maCost;i++) {
+              calls.push(fetch("api/openai_proxy.php", {
+                method: "POST",
+                headers: {"Content-Type":"application/json"},
+                body: JSON.stringify({ type: "decrement_package" })
+              }));
+            }
+            await Promise.all(calls);
             try { await computeStats(); } catch {}
+            // Log kredit lokal
+            logCreditUsage('Modul Ajar', maCost, `${M.mapel||''} • ${M.judulModul||''}`);
           } catch {}
         } catch(e) {
           state.modulAjar.isGenerating = false;
@@ -1756,15 +3162,16 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         try {
           const { Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,
                   AlignmentType,BorderStyle,WidthType,ShadingType,
-                  Footer,PageNumber } = docx;
+                  Footer,PageNumber,PageBreak } = docx;
 
-          const FONT='Times New Roman', SZ=22, CW=9638;
+          const FONT='Times New Roman', SZ=24, CW=9360;
           const bdr={style:BorderStyle.SINGLE,size:4,color:'999999'};
           const borders={top:bdr,bottom:bdr,left:bdr,right:bdr};
           const sp=(b=60,a=60)=>({spacing:{before:b,after:a}});
 
           function parseContent(raw) {
-            const lines = raw.split('\n');
+            const src = maInsertPageBreakMarkers(String(raw || ''));
+            const lines = src.split('\n');
             const out = [];
             let tblRows=[], inTbl=false;
 
@@ -1777,7 +3184,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 columnWidths:Array(nc).fill(cw),
                 rows: tblRows.map((row,ri)=>new TableRow({
                   children: Array.from({length:nc},(_,ci)=>{
-                    const txt=(row[ci]||'').trim().replace(/\*\*/g,'');
+                    const txt=(row[ci]||'').trim().replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1').replace(/\s+/g,' ').trim();
                     return new TableCell({
                       borders, width:{size:cw,type:WidthType.DXA},
                       shading: ri===0?{fill:'D9D9D9',type:ShadingType.CLEAR}:{fill:'FFFFFF',type:ShadingType.CLEAR},
@@ -1792,6 +3199,10 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
 
             for (let i=0;i<lines.length;i++) {
               const line=lines[i];
+              if (String(line || '').trim() === '[[PAGE_BREAK]]') {
+                out.push(new Paragraph({ children: [new PageBreak()] }));
+                continue;
+              }
               if (line.match(/^\|[-|: ]+\|?$/)) continue;
               if (line.trim().startsWith('|')) {
                 inTbl=true;
@@ -1800,14 +3211,14 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
               }
               if (inTbl) flushTbl();
               if (!line.trim()) { out.push(new Paragraph({...sp()})); continue; }
-              if (/^#\s*/.test(line)) {
-                out.push(new Paragraph({...sp(280,120),children:[new TextRun({text:line.replace(/^#\s*/,''),font:FONT,size:28,bold:true})]}));
-              } else if (/^##\s*/.test(line)) {
-                out.push(new Paragraph({...sp(240,100),children:[new TextRun({text:line.replace(/^##\s*/,''),font:FONT,size:26,bold:true})]}));
+              if (/^####\s*/.test(line)) {
+                out.push(new Paragraph({...sp(140,60),children:[new TextRun({text:line.replace(/^####\s*/,''),font:FONT,size:24,bold:true})]}));
               } else if (/^###\s*/.test(line)) {
-                out.push(new Paragraph({...sp(180,80),children:[new TextRun({text:line.replace(/^###\s*/,''),font:FONT,size:24,bold:true})]}));
-              } else if (/^####\s*/.test(line)) {
-                out.push(new Paragraph({...sp(140,60),children:[new TextRun({text:line.replace(/^####\s*/,''),font:FONT,size:SZ,bold:true})]}));
+                out.push(new Paragraph({...sp(180,80),children:[new TextRun({text:line.replace(/^###\s*/,''),font:FONT,size:26,bold:true})]}));
+              } else if (/^##\s*/.test(line)) {
+                out.push(new Paragraph({...sp(240,100),children:[new TextRun({text:line.replace(/^##\s*/,''),font:FONT,size:28,bold:true})]}));
+              } else if (/^#\s*/.test(line)) {
+                out.push(new Paragraph({...sp(280,120),children:[new TextRun({text:line.replace(/^#\s*/,''),font:FONT,size:32,bold:true})]}));
               } else if (line.match(/^[-•] /)) {
                 out.push(new Paragraph({...sp(40,40),indent:{left:400,hanging:200},children:[new TextRun({text:'• '+line.replace(/^[-•] /,'').replace(/\*\*(.+?)\*\*/g,'$1'),font:FONT,size:SZ})]}));
               } else if (line.match(/^\d+\. /)) {
@@ -1822,23 +3233,92 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             return out;
           }
 
-          // Hapus judul ganda dari konten jika sudah ada di M.hasil
-          let contentText = String(M.hasil || '');
-          contentText = contentText.replace(/^\s*#{1,3}\s*MODUL AJAR[^\n]*\n?/i, '');
-          contentText = contentText.replace(/^\s*#{1,3}\s*["“][^\n"”]+["”]\s*\n?/i, '');
+          let contentText = maNormalizeContent(M);
+          const { pre: preLKPD, lkpd: lkpdText, post: postLKPD } = maSplitLKPD(contentText);
+          const lkpdData = maEnsureLKPDData(lkpdText ? maParseLKPD(lkpdText, M) : { judul: M.judulModul || '', tujuan: [], alat: [], langkah: [], refleksi: [], kesimpulan: [] }, M, lkpdText);
+          const lkpdTable = lkpdData ? new Table({
+            width: { size: CW, type: WidthType.DXA },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    borders,
+                    shading: { fill: 'D9D9D9', type: ShadingType.CLEAR },
+                    margins: { top: 120, bottom: 120, left: 120, right: 120 },
+                    children: [
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [new TextRun({ text: 'LEMBAR KERJA PESERTA DIDIK (LKPD)', font: FONT, size: 22, bold: true })],
+                      }),
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [new TextRun({ text: String(lkpdData.judul || '').trim() || ' ', font: FONT, size: 20 })],
+                      }),
+                    ],
+                  }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({
+                    borders,
+                    margins: { top: 120, bottom: 120, left: 160, right: 160 },
+                    children: [
+                      new Paragraph({ ...sp(60, 80), children: [new TextRun({ text: 'Nama Siswa : ________________________________', font: FONT, size: SZ })] }),
+                      new Paragraph({ ...sp(20, 80), children: [new TextRun({ text: 'Kelas     : ________________________________', font: FONT, size: SZ })] }),
+                      new Paragraph({ ...sp(20, 120), children: [new TextRun({ text: 'Kelompok  : ________________________________', font: FONT, size: SZ })] }),
+                      new Paragraph({ ...sp(120, 40), children: [new TextRun({ text: 'A. Tujuan', font: FONT, size: SZ, bold: true })] }),
+                      ...((lkpdData.tujuan && lkpdData.tujuan.length) ? lkpdData.tujuan : ['-']).map(t =>
+                        new Paragraph({ ...sp(20, 20), indent: { left: 400, hanging: 200 }, children: [new TextRun({ text: '• ' + String(t), font: FONT, size: SZ })] })
+                      ),
+                      new Paragraph({ ...sp(120, 40), children: [new TextRun({ text: 'B. Alat dan Bahan', font: FONT, size: SZ, bold: true })] }),
+                      ...((lkpdData.alat && lkpdData.alat.length) ? lkpdData.alat : ['-']).map(t =>
+                        new Paragraph({ ...sp(20, 20), indent: { left: 400, hanging: 200 }, children: [new TextRun({ text: '• ' + String(t), font: FONT, size: SZ })] })
+                      ),
+                      new Paragraph({ ...sp(120, 40), children: [new TextRun({ text: 'C. Langkah Kegiatan', font: FONT, size: SZ, bold: true })] }),
+                      ...((lkpdData.langkah && lkpdData.langkah.length) ? lkpdData.langkah : ['-']).map((t, idx) => {
+                        const txt = String(t);
+                        const numbered = /^\d+[\.\)]\s+/.test(txt) ? txt : `${idx + 1}. ${txt}`;
+                        return new Paragraph({ ...sp(20, 20), indent: { left: 400, hanging: 200 }, children: [new TextRun({ text: numbered, font: FONT, size: SZ })] });
+                      }),
+                      new Paragraph({ ...sp(120, 40), children: [new TextRun({ text: 'D. Pertanyaan Refleksi', font: FONT, size: SZ, bold: true })] }),
+                      ...((lkpdData.refleksi && lkpdData.refleksi.length) ? lkpdData.refleksi : ['-']).map((t, idx) => {
+                        const txt = String(t);
+                        const numbered = /^\d+[\.\)]\s+/.test(txt) ? txt : `${idx + 1}. ${txt}`;
+                        return new Paragraph({ ...sp(20, 20), indent: { left: 400, hanging: 200 }, children: [new TextRun({ text: numbered, font: FONT, size: SZ })] });
+                      }),
+                      new Paragraph({ ...sp(60, 20), children: [new TextRun({ text: 'Jawaban:', font: FONT, size: SZ })] }),
+                      ...Array.from({ length: 3 }).map(() => new Paragraph({ ...sp(20, 60), children: [new TextRun({ text: '____________________________________________', font: FONT, size: SZ })] })),
+                      new Paragraph({ ...sp(120, 40), children: [new TextRun({ text: 'E. Kesimpulan', font: FONT, size: SZ, bold: true })] }),
+                      ...Array.from({ length: 3 }).map(() => new Paragraph({ ...sp(20, 60), children: [new TextRun({ text: '____________________________________________', font: FONT, size: SZ })] })),
+                    ],
+                  }),
+                ],
+              }),
+            ],
+          }) : null;
 
           const children = [
             new Paragraph({alignment:AlignmentType.CENTER,...sp(200,60),
-              children:[new TextRun({text:`MODUL AJAR ${(M.mapel||'').toUpperCase()}`,font:FONT,size:28,bold:true})]}),
-            new Paragraph({alignment:AlignmentType.CENTER,...sp(0,280),
-              children:[new TextRun({text:`"${M.judulModul||''}"`,font:FONT,size:24,italics:true})]}),
-            ...parseContent(contentText)
+              children:[new TextRun({text:`MODUL AJAR ${(M.mapel||'').toUpperCase()}`,font:FONT,size:32,bold:true})]}),
+            new Paragraph({alignment:AlignmentType.CENTER,...sp(0,260),
+              children:[new TextRun({text:`"${M.judulModul||''}"`,font:FONT,size:26,italics:true})]}),
+            ...parseContent(maStripCLampiranHeading(preLKPD || '')),
+            ...(lkpdTable ? [
+              new Paragraph({ children: [new PageBreak()] }),
+              new Paragraph({ ...sp(200, 80), children: [new TextRun({ text: 'C. LAMPIRAN', font: FONT, size: 26, bold: true })] }),
+              new Paragraph({ ...sp(80, 80), children: [new TextRun({ text: '1. Lembar Kerja Peserta Didik (LKPD)', font: FONT, size: 24, bold: true })] }),
+              lkpdTable,
+              new Paragraph({ ...sp(120, 60) }),
+              new Paragraph({ children: [new PageBreak()] }),
+            ] : []),
+            ...parseContent(maStripCLampiranHeading(postLKPD || ''))
           ];
 
           const doc2 = new Document({
             styles:{default:{document:{run:{font:FONT,size:SZ}}}},
             sections:[{
-              properties:{page:{size:{width:11906,height:16838},margin:{top:1134,right:1134,bottom:1134,left:1134}}},
+              properties:{page:{size:{width:12240,height:15840},margin:{top:1440,right:1440,bottom:1440,left:1440}}},
               footers:{default:new Footer({children:[new Paragraph({
                 alignment:AlignmentType.CENTER,
                 children:[
@@ -1964,6 +3444,8 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         if (state.activeView === "lkpd") return renderLKPD();
         if (state.activeView === "modul_ajar") return renderModulAjar();
         if (state.activeView === "quiz") return renderQuizLanding();
+        if (state.activeView === "rekap") return renderRekap();
+        if (state.activeView === "limit") return renderLimit();
         if (state.activeView === "riwayat") return renderRiwayat();
         return renderIdentitas();
       };
@@ -1981,6 +3463,8 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             lkpd: "Generator LKPD otomatis sesuai tema aplikasi",
             modul_ajar: "Generator Modul Ajar Kurikulum Merdeka 2025 · Deep Learning",
             quiz: "Mode kuis interaktif untuk kelas",
+            rekap: "Rekap nilai otomatis, tabel ringkasan dan unduhan",
+            limit: "Pantau sisa kredit dan riwayat penggunaannya",
             riwayat: "Riwayat paket soal yang tersimpan",
           }[state.activeView] || "";
         const root = el("viewRoot");
@@ -1988,6 +3472,22 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         wireInputs(root);
         if (state.activeView === "riwayat") {
           loadRiwayat();
+        }
+        if (state.activeView === "rekap") {
+          const picker = el("rekapExcelPicker");
+          if (picker) picker.onchange = rekapHandlePicker;
+          const q = el("rekapSearch");
+          if (q) q.oninput = rekapFilter;
+          rekapRenderTable();
+        }
+        if (state.activeView === "limit") {
+          if (IS_ADMIN) await loadLimitConfig();
+          await refreshCreditLimit(false);
+          const root2 = el("viewRoot");
+          if (root2) {
+            root2.innerHTML = computeView();
+            wireInputs(root2);
+          }
         }
       };
 
@@ -1998,19 +3498,26 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="lg:col-span-2 bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
               <div class="p-6 space-y-6">
-                <div class="flex items-center justify-between gap-3">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div>
-                    <div class="text-xs font-bold text-primary bg-primary/10 inline-flex px-3 py-1 rounded-full">Langkah 1</div>
+                    <div class="flex items-center gap-2">
+                      <div class="text-[10px] font-bold text-primary bg-primary/10 inline-flex px-2 py-0.5 rounded-full">Langkah 1</div>
+                      <button class="h-6 w-6 rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark inline-flex items-center justify-center"
+                        title="Petunjuk pengisian identitas"
+                        onclick="window.__sp.openIdentitasHelp()">
+                        <span class="material-symbols-outlined text-[16px]">help</span>
+                      </button>
+                    </div>
                     <div class="text-xl font-bold mt-2">Identitas Soal</div>
                     <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Data identitas disimpan otomatis</div>
                   </div>
                   <div class="flex gap-2">
-                    <label class="btn-secondary h-10 px-4 rounded-lg cursor-pointer flex items-center gap-2 border border-border-light dark:border-border-dark text-sm font-bold bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <label class="h-10 px-4 rounded-lg cursor-pointer flex items-center gap-2 border border-border-light dark:border-border-dark text-sm font-bold bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors">
                       <span class="material-symbols-outlined text-[18px]">upload</span>
                       <span>Muat</span>
                       <input type="file" accept=".json" class="hidden" onchange="loadProject(event)" />
                     </label>
-                    <button class="btn-secondary h-10 px-4 rounded-lg flex items-center gap-2 border border-border-light dark:border-border-dark text-sm font-bold bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors" onclick="saveProject()">
+                    <button class="h-10 px-4 rounded-lg flex items-center gap-2 border border-border-light dark:border-border-dark text-sm font-bold bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors" onclick="saveProject()">
                       <span class="material-symbols-outlined text-[18px]">save</span>
                       <span>Simpan</span>
                     </button>
@@ -2090,6 +3597,31 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 </div>
               </div>
             </div>
+            <div id="modalIdentitasHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+              <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-height-[85vh] overflow-auto">
+                <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                  <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Pengisian Identitas</div>
+                  <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeIdentitasHelp()">&times;</button>
+                </div>
+                <div class="p-5 space-y-3 text-sm leading-relaxed">
+                  <ol class="list-decimal pl-5 space-y-2">
+                    <li>Isi Nama Guru dan Nama Sekolah. Unggah logo sekolah (opsional, ≤ 200KB) untuk terlihat di kop lembar soal.</li>
+                    <li>Pilih Jenjang, Fase, dan Kelas sesuai peserta didik.</li>
+                    <li>Pilih Mata Pelajaran dan Jenis Topik:
+                      <ul class="list-disc pl-5 mt-1">
+                        <li>Spesifik: tuliskan topik/lingkup materi (mis. “Pecahan” atau “Sistem Pernapasan”).</li>
+                        <li>Campuran: sistem akan membuat topik beragam otomatis.</li>
+                      </ul>
+                    </li>
+                    <li>Isi Judul Paket, Semester, dan Tahun Ajaran untuk identitas dokumen.</li>
+                    <li>Klik Simpan untuk menyimpan identitas, atau klik Konfigurasi untuk lanjut mengatur bagian soal.</li>
+                  </ol>
+                  <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
+                    Tips: Data identitas tersimpan otomatis. Anda selalu dapat kembali mengubahnya sebelum “Buat Paket Soal”.
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         `;
       };
@@ -2103,9 +3635,15 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
 
       const renderKonfigurasi = () => `
         <div class="space-y-6">
+          <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm p-6">
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div class="flex items-center gap-2">
               <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">Langkah 2</span>
+              <button class="h-6 w-6 rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark inline-flex items-center justify-center"
+                title="Petunjuk konfigurasi paket"
+                onclick="window.__sp.openKonfigurasiHelp()">
+                <span class="material-symbols-outlined text-[16px]">help</span>
+              </button>
               <div class="text-sm text-text-sub-light dark:text-text-sub-dark">Multi-bagian (bertingkat) dalam satu paket</div>
             </div>
             <div class="flex gap-2">
@@ -2123,6 +3661,29 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 <span class="material-symbols-outlined text-[18px]">bolt</span>
                 Buat Paket Soal
               </button>
+            </div>
+          </div>
+          </div>
+          <div id="modalKonfigurasiHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+            <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-height-[85vh] overflow-auto">
+              <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Konfigurasi Paket</div>
+                <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeKonfigurasiHelp()">&times;</button>
+              </div>
+              <div class="p-5 space-y-3 text-sm leading-relaxed">
+                <ol class="list-decimal pl-5 space-y-2">
+                  <li>Klik Tambah Bagian untuk membuat bagian baru (A, B, C, ...).</li>
+                  <li>Pilih Bentuk Soal per bagian: Pilihan Ganda, PG Kompleks, Menjodohkan, Isian, atau Uraian.</li>
+                  <li>Atur Jumlah Soal. Jika PG, tentukan juga Jumlah Opsi (3–5).</li>
+                  <li>Pilih Tingkat Kesulitan dan Cakupan Dimensi Bloom untuk variasi kognitif.</li>
+                  <li>Aktifkan Ilustrasi/Gambar jika diperlukan agar sistem menyiapkan diagram/ascii/svg.</li>
+                  <li>Ulangi untuk setiap bagian sesuai kebutuhan paket.</li>
+                  <li>Setelah selesai, klik Buat Paket Soal untuk menghasilkan naskah lengkap.</li>
+                </ol>
+                <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
+                  Tips: Anda dapat menduplikasi bagian yang sudah sesuai lalu melakukan penyesuaian kecil.
+                </div>
+              </div>
             </div>
           </div>
           <div class="grid grid-cols-1 gap-5">
@@ -2294,10 +3855,14 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         const slugDefault = baseForSlug.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
         if (!state.quizPublishForm.slug) state.quizPublishForm.slug = slugDefault || 'kelas';
         const tabs = `
-          <div class="flex items-center gap-2 border-b border-border-light dark:border-border-dark px-4 pt-4">
-            <button onclick="window.__sp.setQuizTab('live')" class="px-3 py-2 text-sm font-semibold ${sub==='live'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Live</button>
-            <button onclick="window.__sp.setQuizTab('publish')" class="px-3 py-2 text-sm font-semibold ${sub==='publish'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Buat Link</button>
-            ${IS_ADMIN ? `<button onclick="window.__sp.setQuizTab('results')" class="px-3 py-2 text-sm font-semibold ${sub==='results'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Hasil</button>` : ``}
+          <div class="flex items-center justify-between gap-2 border-b border-border-light dark:border-border-dark px-4 pt-4">
+            <div class="flex items-center gap-2">
+              <button onclick="window.__sp.setQuizTab('live')" class="px-3 py-2 text-sm font-semibold ${sub==='live'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Live</button>
+              <button onclick="window.__sp.setQuizTab('publish')" class="px-3 py-2 text-sm font-semibold ${sub==='publish'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Buat Link</button>
+              ${IS_ADMIN ? `<button onclick="window.__sp.setQuizTab('results')" class="px-3 py-2 text-sm font-semibold ${sub==='results'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Hasil</button>` : ``}
+            </div>
+            <button class="inline-flex items-center gap-2 h-9 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm"
+              onclick="window.__sp.openQuizHelp()"><span class="material-symbols-outlined text-[16px]">help</span><span class="hidden md:inline">Petunjuk</span></button>
           </div>
         `;
         const haveQuestions = Array.isArray(state.questions) && state.questions.length > 0;
@@ -2369,9 +3934,15 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 }).join('');
                 return `
                   <div class="mt-3">
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between gap-2">
                       <div class="text-sm font-semibold">Daftar Link Siswa (${f.roster.length})</div>
-                      <button class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.exportRosterLinksCSV(${Number(state.quizLastPubId)}, '${safeText(state.quizLastSlug||'')}')">Download CSV</button>
+                      <div class="flex items-center gap-2">
+                        <button class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.exportRosterLinksCSV(${Number(state.quizLastPubId)}, '${safeText(state.quizLastSlug||'')}')">Download CSV</button>
+                        <button class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark inline-flex items-center gap-2" onclick="window.__sp.exportRosterLinksPDF(${Number(state.quizLastPubId)}, '${safeText(state.quizLastSlug||'')}')">
+                          <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                          Download PDF
+                        </button>
+                      </div>
                     </div>
                     <div class="overflow-auto mt-2">
                       <table class="min-w-full text-xs border">
@@ -2474,14 +4045,70 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             </div>
           `;
         })();
+        const quizHelpModal = `
+          <div id="modalQuizHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+            <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-h-[85vh] overflow-auto">
+              <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Quiz</div>
+                <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeQuizHelp()">&times;</button>
+              </div>
+              <div class="p-5 space-y-3 text-sm leading-relaxed">
+                <ol class="list-decimal pl-5 space-y-2">
+                  <li>Live: jalankan kuis interaktif menggunakan naskah yang sudah dibuat (butuh soal tersedia).</li>
+                  <li>Buat Link: isi slug, jumlah siswa, dan (opsional) unggah roster CSV/TXT “NoAbsen,Nama Siswa” untuk menghasilkan link unik per siswa.</li>
+                  <li>Publish: setelah berhasil, sistem menampilkan link contoh dan dapat mengunduh daftar link siswa (CSV).</li>
+                  <li>Hasil: muat dan unduh laporan JSON/ZIP/CSV; ringkasan nilai dan peringkat tersedia.</li>
+                </ol>
+                <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
+                  Catatan: Link dan data hasil akan otomatis dihapus 24 jam setelah publish. Segera simpan arsip JSON/ZIP.
+                </div>
+              </div>
+            </div>
+            <div id="modalMAHelp1" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+              <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-h-[85vh] overflow-auto">
+                <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                  <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Modul Ajar • Langkah 1</div>
+                  <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeMAHelp1()">&times;</button>
+                </div>
+                <div class="p-5 space-y-3 text-sm leading-relaxed">
+                  <ol class="list-decimal pl-5 space-y-2">
+                    <li>Isi Nama Guru dan Institusi.</li>
+                    <li>Pilih Kurikulum, Jenjang, Fase, dan Kelas.</li>
+                    <li>Isi Mata Pelajaran dan Materi Pokok/Judul Modul.</li>
+                    <li>Pastikan identitas lengkap sebelum lanjut ke Langkah 2.</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+            <div id="modalMAHelp2" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+              <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-h-[85vh] overflow-auto">
+                <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                  <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Modul Ajar • Langkah 2</div>
+                  <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeMAHelp2()">&times;</button>
+                </div>
+                <div class="p-5 space-y-3 text-sm leading-relaxed">
+                  <ol class="list-decimal pl-5 space-y-2">
+                    <li>Isi jumlah pertemuan, durasi per pertemuan, jumlah siswa.</li>
+                    <li>Pilih Model Pembelajaran yang relevan.</li>
+                    <li>Pilih Dimensi Profil Pelajar Pancasila (min. satu).</li>
+                    <li>Klik GENERATE MODUL AJAR untuk membuat dokumen.</li>
+                    <li>Gunakan Download .docx untuk menyimpan hasil.</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </div>`;
         const body = sub==='publish' ? pub : sub==='results' ? res : live;
         return `
           <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
             ${tabs}
             ${body}
+            ${quizHelpModal}
           </div>
         `;
       };
+      function openQuizHelp(){ const m = el('modalQuizHelp'); if (m) m.style.display='flex'; }
+      function closeQuizHelp(){ const m = el('modalQuizHelp'); if (m) m.style.display='none'; }
 
       const openQuiz = () => {
         if (!Array.isArray(state.questions) || state.questions.length === 0) {
@@ -2595,6 +4222,52 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         a.click();
         URL.revokeObjectURL(a.href);
       };
+      const exportRosterLinksPDF = async (pubId, slug) => {
+        const roster = Array.isArray(state.quizPublishForm?.roster) ? state.quizPublishForm.roster : [];
+        if (!pubId || roster.length === 0) return;
+        await ensureJsPDF();
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'pt', 'a4');
+        const pageW = doc.internal.pageSize.getWidth();
+        const margin = 40;
+        const base = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(pubId))}`;
+        const title = 'Daftar Link Siswa (Quiz Online)';
+        const subtitle = `${String(slug || 'publikasi')} • ${new Date().toLocaleString()}`;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text(title, margin, 40);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(90, 90, 90);
+        doc.text(subtitle, margin, 58);
+        doc.setTextColor(0, 0, 0);
+        const body = roster.map(r => {
+          const link = `${base}&n=${encodeURIComponent(String(r.absen))}&name=${encodeURIComponent(String(r.nama||''))}`;
+          return [String(r.absen), String(r.nama || ''), link];
+        });
+        doc.autoTable({
+          head: [['No Absen', 'Nama Siswa', 'Link']],
+          body,
+          startY: 74,
+          margin: { left: margin, right: margin },
+          styles: { font: 'helvetica', fontSize: 9, cellPadding: 4, lineWidth: 0.5, lineColor: [120,120,120], textColor: [0,0,0], overflow: 'linebreak' },
+          headStyles: { fillColor: [217,217,217], textColor: [0,0,0], fontStyle: 'bold' },
+          columnStyles: {
+            0: { cellWidth: 58 },
+            1: { cellWidth: 150 },
+            2: { cellWidth: pageW - (margin * 2) - 58 - 150 },
+          },
+          didDrawCell: (data) => {
+            if (data.section !== 'body') return;
+            if (data.column.index !== 2) return;
+            const url = body[data.row.index]?.[2];
+            if (!url) return;
+            const c = data.cell;
+            doc.link(c.x, c.y, c.width, c.height, { url: String(url) });
+          },
+        });
+        doc.save(`DaftarLink_${slug || 'publikasi'}.pdf`);
+      };
       const publishQuiz = async () => {
         const mapel = String(state.identity.mataPelajaran || "").trim();
         if (!mapel) { alert("Lengkapi mata pelajaran di Identitas."); return; }
@@ -2669,6 +4342,14 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             state.quizLastSlug = String(js.slug || '');
             saveDebounced(true);
             render();
+            try {
+              const cost = Number(state.limitConfig?.costs?.publish_quiz ?? 3);
+              const calls = [];
+              for (let i=0;i<cost;i++) calls.push(fetch("api/openai_proxy.php", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ type:"decrement_package" }) }));
+              await Promise.all(calls);
+              try { await computeStats(); } catch {}
+              logCreditUsage('Publish Quiz', cost, `Slug: ${String(js.slug||'')}`);
+            } catch {}
           } else {
             const snippet = raw ? String(raw).slice(0,120).replace(/\s+/g,' ').trim() : '';
             const detail = js?.error || (res.status === 409 ? 'slug_exists' : `http_${res.status}${snippet ? ': '+snippet : ''}`);
@@ -2744,8 +4425,8 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           const res = await fetch("api/openai_proxy.php", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ type: "get_limits" }) });
           if (res.ok) {
             const limits = await res.json();
-            if ((limits?.limitpaket ?? 0) <= 0) {
-              alert("Batas pembuatan paket habis. Hubungi admin untuk menambah kuota.");
+            if ((limits?.limitpaket ?? 0) < 2) {
+              alert("Kredit tidak mencukupi untuk membuat paket soal (butuh 2 kredit). Hubungi admin untuk menambah kuota.");
               return;
             }
           }
@@ -2892,7 +4573,10 @@ Kembalikan JSON persis: {"items": [...]}`;
         const actual = state.questions.length;
         if (actual === total) {
           try {
-            await fetch("api/openai_proxy.php", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ type: "decrement_package" }) });
+            await Promise.all([
+              fetch("api/openai_proxy.php", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ type: "decrement_package" }) }),
+              fetch("api/openai_proxy.php", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ type: "decrement_package" }) }),
+            ]);
           } catch {}
           try {
             await fetch("api/openai_proxy.php", {
@@ -2901,6 +4585,9 @@ Kembalikan JSON persis: {"items": [...]}`;
               body: JSON.stringify({ type: "add_tokens", input_tokens: pkgTokenIn, output_tokens: pkgTokenOut })
             });
           } catch {}
+          // Log kredit lokal (2 kredit untuk Buat Soal)
+          logCreditUsage('Buat Soal', 2, `${state.identity.mataPelajaran||''} • ${state.identity.kelas||''} • ${total} butir`);
+          try { await computeStats(); } catch {}
         } else {
           alert(`Paket tersusun ${actual} dari ${total}. Kuota tidak berkurang.`);
         }
@@ -4592,7 +6279,35 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         exportJSON,
         exportZIP,
         exportRosterLinksCSV,
+        exportRosterLinksPDF,
         exportResultsCSV,
+        rekapDownloadTemplate,
+        openBobotModal,
+        closeBobotModal,
+        resetBobot,
+        saveBobotSettings,
+        openPredikatModal,
+        closePredikatModal,
+        resetPredikat,
+        savePredikatSettings,
+        openRekapHelp,
+        closeRekapHelp,
+        openRekapPrint,
+        closeRekapPrint,
+        generateRekapPDF,
+        openIdentitasHelp,
+        closeIdentitasHelp,
+        openKonfigurasiHelp,
+        closeKonfigurasiHelp,
+        openPreviewHelp,
+        closePreviewHelp,
+        openQuizHelp,
+        closeQuizHelp,
+        openMAHelp1,
+        closeMAHelp1,
+        openMAHelp2,
+        closeMAHelp2,
+        exportModulAjarPDF,
         setLkpdSource,
         buildLKPD,
         pickLkpdImage,
@@ -4670,6 +6385,16 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       if (lkpdTxt) lkpdTxt.addEventListener("change", handleLkpdTextSelected);
       const rosterPicker = el("rosterPicker");
       if (rosterPicker) rosterPicker.addEventListener("change", handleRosterSelected);
+      const rekapPicker = el("rekapExcelPicker");
+      if (rekapPicker) rekapPicker.addEventListener("change", rekapHandlePicker);
+      const rekapPrintLogoPicker = el("rekapPrintLogoPicker");
+      if (rekapPrintLogoPicker) {
+        rekapPrintLogoPicker.addEventListener("change", (e) => {
+          const f = e.target?.files?.[0];
+          const nameEl = el("printLogoName");
+          if (nameEl) nameEl.textContent = f ? `Logo: ${f.name}` : '';
+        });
+      }
       let historyItems = [];
       let historyPage = 1;
       const historyPageSize = 10;
