@@ -3998,6 +3998,12 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 <select id="selPub" class="flex-1 min-w-0 h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark">${options}</select>
                 <button onclick="window.__sp.loadResults()" class="px-4 h-11 rounded-lg border bg-white dark:bg-surface-dark">Muat</button>
                 <button onclick="window.__sp.loadPublications()" class="px-3 h-11 rounded-lg border bg-white dark:bg-surface-dark">Segarkan</button>
+                ${pubObj && IS_ADMIN ? `
+                  <button onclick="window.__sp.seedQuizResults('${safeText(pubObj.slug)}', 30, true)" title="Buat data dummy 30 siswa"
+                    class="px-3 h-11 rounded-lg border bg-white dark:bg-surface-dark">
+                    Dummy 30
+                  </button>
+                ` : ``}
                 ${pubObj ? `
                   <button onclick="window.__sp.exportJSON('${safeText(pubObj.slug)}')" title="Download JSON"
                     class="flex items-center justify-center h-11 w-11 rounded-lg bg-primary text-white">
@@ -4273,6 +4279,26 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           },
         });
         doc.save(`DaftarLink_${slug || 'publikasi'}.pdf`);
+      };
+      const seedQuizResults = async (slug, count = 30, overwrite = true) => {
+        const s = String(slug || '').trim();
+        if (!s) return;
+        try {
+          const res = await fetch('api/seed_quiz_results.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ slug: s, count: Number(count || 30), overwrite: overwrite ? 1 : 0 }),
+          });
+          const js = await res.json().catch(() => null);
+          if (!res.ok || !js || !js.ok) {
+            alert('Gagal membuat dummy hasil.');
+            return;
+          }
+          await loadResults();
+        } catch {
+          alert('Gagal membuat dummy hasil.');
+        }
       };
       const publishQuiz = async () => {
         const mapel = String(state.identity.mataPelajaran || "").trim();
@@ -6329,6 +6355,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         exportZIP,
         exportRosterLinksCSV,
         exportRosterLinksPDF,
+        seedQuizResults,
         exportResultsCSV,
         rekapDownloadTemplate,
         openBobotModal,
