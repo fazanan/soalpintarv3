@@ -4005,15 +4005,9 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                   </button>
                 ` : ``}
                 ${pubObj ? `
-                  <button onclick="window.__sp.exportJSON('${safeText(pubObj.slug)}')" title="Download JSON"
-                    class="flex items-center justify-center h-11 w-11 rounded-lg bg-primary text-white">
-                    <span class="material-symbols-outlined">download</span>
-                  </button>
-                ` : ``}
-                ${pubObj ? `
-                  <button onclick="window.__sp.exportZIP('${safeText(pubObj.slug)}')" title="Download ZIP (JSON+Gambar)"
-                    class="flex items-center justify-center h-11 w-11 rounded-lg border bg-white dark:bg-surface-dark">
-                    <span class="material-symbols-outlined">folder_zip</span>
+                  <button onclick="window.__sp.exportResultsPDF('${safeText(pubObj.slug)}')" title="Download PDF"
+                    class="flex items-center justify-center h-11 w-11 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">
+                    <span class="material-symbols-outlined">picture_as_pdf</span>
                   </button>
                 ` : ``}
                 ${pubObj ? `
@@ -4481,6 +4475,119 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         a.download = `Laporan_${slug||'hasil'}.csv`;
         a.click();
         URL.revokeObjectURL(a.href);
+      };
+      const exportResultsPDF = async (slug) => {
+        const s = String(slug || '').trim();
+        if (!s) return;
+        await ensureJsPDF();
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'pt', 'a4');
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        const margin = 40;
+        const now = new Date();
+
+        const items = Array.isArray(state.quizPublications) ? state.quizPublications : [];
+        const pub = items.find(it => String(it.slug) === s) || null;
+        const mapel = String(pub?.mapel || state.quizResultsMapel || '').trim();
+        const kelas = String(pub?.kelas || '').trim();
+        const createdAt = String(pub?.created_at || '').trim();
+        const expireAt = String(pub?.expire_at || '').trim();
+
+        const roster = Array.isArray(state.quizPublishForm?.roster) ? state.quizPublishForm.roster : [];
+        const nameMap = new Map(roster.map(r => [Number(r.absen), String(r.nama || '')]));
+        const rows = Array.isArray(state.quizResults) ? state.quizResults.slice() : [];
+        rows.sort((a,b)=>{
+          const pa = a && a.total ? (Number(a.score||0)/Number(a.total||1)) : 0;
+          const pb = b && b.total ? (Number(b.score||0)/Number(b.total||1)) : 0;
+          if (pb !== pa) return pb - pa;
+          return Number(a.absen||0) - Number(b.absen||0);
+        });
+        const totalPeserta = rows.length;
+        const scores = rows.map(r => r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0);
+        const avg = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+        const max = scores.length ? Math.max(...scores) : 0;
+        const min = scores.length ? Math.min(...scores) : 0;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.text('Laporan Hasil Quiz Online', margin, 44);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(90, 90, 90);
+        const metaLeft = [
+          mapel ? `Mapel: ${mapel}` : '',
+          kelas ? `Kelas: ${kelas}` : '',
+          s ? `Slug: ${s}` : '',
+        ].filter(Boolean).join(' • ');
+        doc.text(metaLeft, margin, 62);
+        const metaRight = [
+          createdAt ? `Publish: ${createdAt}` : '',
+          expireAt ? `Expire: ${expireAt}` : '',
+          `Cetak: ${now.toLocaleString()}`,
+        ].filter(Boolean).join(' • ');
+        doc.text(metaRight, pageW - margin, 62, { align: 'right' });
+        doc.setTextColor(0, 0, 0);
+
+        doc.autoTable({
+          startY: 78,
+          margin: { left: margin, right: margin },
+          theme: 'grid',
+          head: [['Peserta', 'Rata-rata', 'Tertinggi', 'Terendah']],
+          body: [[String(totalPeserta), String(avg), String(max), String(min)]],
+          styles: { font: 'helvetica', fontSize: 10, cellPadding: 6, lineWidth: 0.5, lineColor: [120,120,120], textColor: [0,0,0] },
+          headStyles: { fillColor: [217,217,217], textColor: [0,0,0], fontStyle: 'bold' },
+          bodyStyles: { textColor: [0,0,0] },
+          columnStyles: { 0: { halign: 'center' }, 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' } }
+        });
+
+        const top3 = rows.slice(0, 3).map((r, i) => {
+          const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
+          return [String(i+1), String(r.absen||''), nameMap.get(Number(r.absen)) || '-', String(pct)];
+        });
+        doc.autoTable({
+          startY: (doc.lastAutoTable?.finalY || 78) + 14,
+          margin: { left: margin, right: margin },
+          theme: 'grid',
+          head: [['Peringkat', 'No Absen', 'Nama Siswa', 'Nilai']],
+          body: top3.length ? top3 : [['-','-','-','-']],
+          styles: { font: 'helvetica', fontSize: 10, cellPadding: 5, lineWidth: 0.5, lineColor: [120,120,120], textColor: [0,0,0] },
+          headStyles: { fillColor: [217,217,217], textColor: [0,0,0], fontStyle: 'bold' },
+          columnStyles: { 0: { halign: 'center', cellWidth: 70 }, 1: { halign: 'center', cellWidth: 80 }, 3: { halign: 'center', cellWidth: 60 } }
+        });
+
+        const body = rows.map((r, idx) => {
+          const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
+          const nm = nameMap.get(Number(r.absen)) || '';
+          const dt = String(r.created_at || '');
+          return [String(idx+1), String(r.absen||''), nm || '-', String(pct), dt];
+        });
+        doc.autoTable({
+          startY: (doc.lastAutoTable?.finalY || 100) + 14,
+          margin: { left: margin, right: margin },
+          theme: 'grid',
+          head: [['#', 'No Absen', 'Nama Siswa', 'Nilai', 'Waktu Submit']],
+          body: body.length ? body : [['-','-','-','-','-']],
+          styles: { font: 'helvetica', fontSize: 9, cellPadding: 4, lineWidth: 0.5, lineColor: [120,120,120], textColor: [0,0,0] },
+          headStyles: { fillColor: [217,217,217], textColor: [0,0,0], fontStyle: 'bold' },
+          columnStyles: {
+            0: { halign: 'center', cellWidth: 28 },
+            1: { halign: 'center', cellWidth: 70 },
+            3: { halign: 'center', cellWidth: 50 },
+            4: { cellWidth: 120 },
+          },
+          didDrawPage: () => {
+            const pageNum = doc.getNumberOfPages();
+            doc.setFont('helvetica','normal');
+            doc.setFontSize(9);
+            doc.setTextColor(120,120,120);
+            doc.text(`Halaman ${pageNum}`, pageW - margin, pageH - 20, { align: 'right' });
+            doc.setTextColor(0,0,0);
+          }
+        });
+
+        const safeSlug = (s || 'hasil').replace(/[^a-z0-9_\-]/gi, '_');
+        doc.save(`HasilQuiz_${safeSlug}.pdf`);
       };
       const exportJSON = (slug) => {
         if (!slug) return;
@@ -6356,6 +6463,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         exportRosterLinksCSV,
         exportRosterLinksPDF,
         seedQuizResults,
+        exportResultsPDF,
         exportResultsCSV,
         rekapDownloadTemplate,
         openBobotModal,
