@@ -48,8 +48,8 @@ if ($total <= 0) $total = 10;
 $mysqli->begin_transaction();
 try {
   if ($overwrite) {
-    $stmt = $mysqli->prepare("DELETE FROM published_quiz_results WHERE published_id=? AND absen BETWEEN 1 AND ?");
-    $stmt->bind_param('ii', $pubId, $count);
+    $stmt = $mysqli->prepare("DELETE FROM published_quiz_results WHERE published_id=?");
+    $stmt->bind_param('i', $pubId);
     $stmt->execute();
     $stmt->close();
   }

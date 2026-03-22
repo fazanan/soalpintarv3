@@ -2601,7 +2601,7 @@ if (!isset($_SESSION['user_id'])) {
                   </div>
                 </div>
                 <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
-                  <div class="font-bold mb-2">Biaya Kredit per Fitur</div>
+                  <div class="font-bold mb-2">Biaya Kredit per Fitur <span class="text-green-600">(GRATIS*)</span></div>
                   <ul class="text-sm list-disc pl-5 space-y-1">
                     <li>Publish Quiz: ${cPublish} kredit</li>
                     <li>Modul Ajar: ${cModul} kredit</li>
@@ -2610,6 +2610,9 @@ if (!isset($_SESSION['user_id'])) {
                   </ul>
                   <div class="mt-3 text-sm">
                     Top up kredit: hubungi Admin via WhatsApp <a class="text-blue-600 underline" href="https://wa.me/6285882412124" target="_blank" rel="noopener">0858-8241-2124</a>.
+                  </div>
+                  <div class="mt-1 text-xs text-green-700">
+                    *Saat ini top up masih gratis. Apabila ke depannya biaya operasional aplikasi meningkat, top up akan dikenakan biaya yang tetap terjangkau.
                   </div>
                 </div>
                 ${IS_ADMIN ? `
@@ -3999,6 +4002,10 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 <button onclick="window.__sp.loadResults()" class="px-4 h-11 rounded-lg border bg-white dark:bg-surface-dark">Muat</button>
                 <button onclick="window.__sp.loadPublications()" class="px-3 h-11 rounded-lg border bg-white dark:bg-surface-dark">Segarkan</button>
                 ${pubObj && IS_ADMIN ? `
+                  <button onclick="window.__sp.seedQuizResults('${safeText(pubObj.slug)}', 20, true)" title="Buat data dummy 20 siswa"
+                    class="px-3 h-11 rounded-lg border bg-white dark:bg-surface-dark">
+                    Dummy 20
+                  </button>
                   <button onclick="window.__sp.seedQuizResults('${safeText(pubObj.slug)}', 30, true)" title="Buat data dummy 30 siswa"
                     class="px-3 h-11 rounded-lg border bg-white dark:bg-surface-dark">
                     Dummy 30
@@ -4515,46 +4522,30 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
         doc.setTextColor(90, 90, 90);
-        const metaLeft = [
+        const metaLeftLines = [
           mapel ? `Mapel: ${mapel}` : '',
           kelas ? `Kelas: ${kelas}` : '',
           s ? `Slug: ${s}` : '',
-        ].filter(Boolean).join(' • ');
-        doc.text(metaLeft, margin, 62);
-        const metaRight = [
+        ].filter(Boolean);
+        const metaRightLines = [
           createdAt ? `Publish: ${createdAt}` : '',
           expireAt ? `Expire: ${expireAt}` : '',
           `Cetak: ${now.toLocaleString()}`,
-        ].filter(Boolean).join(' • ');
-        doc.text(metaRight, pageW - margin, 62, { align: 'right' });
+        ].filter(Boolean);
+        const colGap = 14;
+        const colW = (pageW - (margin * 2) - colGap) / 2;
+        let metaY = 62;
+        const metaLineH = 12;
+        const wrapLines = (arr, width) => arr.flatMap(t => doc.splitTextToSize(String(t), width));
+        const leftWrapped = wrapLines(metaLeftLines, colW);
+        const rightWrapped = wrapLines(metaRightLines, colW);
+        const maxLines = Math.max(leftWrapped.length, rightWrapped.length, 1);
+        for (let i = 0; i < maxLines; i++) {
+          if (leftWrapped[i]) doc.text(leftWrapped[i], margin, metaY);
+          if (rightWrapped[i]) doc.text(rightWrapped[i], pageW - margin, metaY, { align: 'right' });
+          metaY += metaLineH;
+        }
         doc.setTextColor(0, 0, 0);
-
-        doc.autoTable({
-          startY: 78,
-          margin: { left: margin, right: margin },
-          theme: 'grid',
-          head: [['Peserta', 'Rata-rata', 'Tertinggi', 'Terendah']],
-          body: [[String(totalPeserta), String(avg), String(max), String(min)]],
-          styles: { font: 'helvetica', fontSize: 10, cellPadding: 6, lineWidth: 0.5, lineColor: [120,120,120], textColor: [0,0,0] },
-          headStyles: { fillColor: [217,217,217], textColor: [0,0,0], fontStyle: 'bold' },
-          bodyStyles: { textColor: [0,0,0] },
-          columnStyles: { 0: { halign: 'center' }, 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' } }
-        });
-
-        const top3 = rows.slice(0, 3).map((r, i) => {
-          const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
-          return [String(i+1), String(r.absen||''), nameMap.get(Number(r.absen)) || '-', String(pct)];
-        });
-        doc.autoTable({
-          startY: (doc.lastAutoTable?.finalY || 78) + 14,
-          margin: { left: margin, right: margin },
-          theme: 'grid',
-          head: [['Peringkat', 'No Absen', 'Nama Siswa', 'Nilai']],
-          body: top3.length ? top3 : [['-','-','-','-']],
-          styles: { font: 'helvetica', fontSize: 10, cellPadding: 5, lineWidth: 0.5, lineColor: [120,120,120], textColor: [0,0,0] },
-          headStyles: { fillColor: [217,217,217], textColor: [0,0,0], fontStyle: 'bold' },
-          columnStyles: { 0: { halign: 'center', cellWidth: 70 }, 1: { halign: 'center', cellWidth: 80 }, 3: { halign: 'center', cellWidth: 60 } }
-        });
 
         const body = rows.map((r, idx) => {
           const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
@@ -4563,7 +4554,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           return [String(idx+1), String(r.absen||''), nm || '-', String(pct), dt];
         });
         doc.autoTable({
-          startY: (doc.lastAutoTable?.finalY || 100) + 14,
+          startY: metaY + 10,
           margin: { left: margin, right: margin },
           theme: 'grid',
           head: [['#', 'No Absen', 'Nama Siswa', 'Nilai', 'Waktu Submit']],
@@ -4584,6 +4575,46 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             doc.text(`Halaman ${pageNum}`, pageW - margin, pageH - 20, { align: 'right' });
             doc.setTextColor(0,0,0);
           }
+        });
+
+        if (totalPeserta > 30) { doc.addPage(); }
+        const afterResultsY = totalPeserta > 30 ? 60 : (doc.lastAutoTable?.finalY || (metaY + 10)) + 16;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text('Ringkasan Nilai', margin, afterResultsY);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.autoTable({
+          startY: afterResultsY + 8,
+          margin: { left: margin, right: margin },
+          theme: 'grid',
+          head: [['Peserta', 'Rata-rata', 'Tertinggi', 'Terendah']],
+          body: [[String(totalPeserta), String(avg), String(max), String(min)]],
+          styles: { font: 'helvetica', fontSize: 10, cellPadding: 6, lineWidth: 0.5, lineColor: [120,120,120], textColor: [0,0,0] },
+          headStyles: { fillColor: [217,217,217], textColor: [0,0,0], fontStyle: 'bold' },
+          bodyStyles: { textColor: [0,0,0] },
+          columnStyles: { 0: { halign: 'center' }, 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' } }
+        });
+
+        const top3 = rows.slice(0, 3).map((r, i) => {
+          const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
+          return [String(i+1), String(r.absen||''), nameMap.get(Number(r.absen)) || '-', String(pct)];
+        });
+        const afterSummaryY = (doc.lastAutoTable?.finalY || (afterResultsY + 8)) + 16;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.text('3 Besar (Peringkat)', margin, afterSummaryY);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.autoTable({
+          startY: afterSummaryY + 8,
+          margin: { left: margin, right: margin },
+          theme: 'grid',
+          head: [['Peringkat', 'No Absen', 'Nama Siswa', 'Nilai']],
+          body: top3.length ? top3 : [['-','-','-','-']],
+          styles: { font: 'helvetica', fontSize: 10, cellPadding: 5, lineWidth: 0.5, lineColor: [120,120,120], textColor: [0,0,0] },
+          headStyles: { fillColor: [217,217,217], textColor: [0,0,0], fontStyle: 'bold' },
+          columnStyles: { 0: { halign: 'center', cellWidth: 70 }, 1: { halign: 'center', cellWidth: 80 }, 3: { halign: 'center', cellWidth: 60 } }
         });
 
         const safeSlug = (s || 'hasil').replace(/[^a-z0-9_\-]/gi, '_');
