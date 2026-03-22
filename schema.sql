@@ -130,3 +130,19 @@ CREATE TABLE IF NOT EXISTS published_quiz_results (
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS scalev_webhook_events (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  unique_id VARCHAR(64) NOT NULL,
+  event VARCHAR(128) NOT NULL,
+  order_id VARCHAR(64) NULL,
+  email VARCHAR(160) NULL,
+  payment_status VARCHAR(32) NULL,
+  created_user_id INT UNSIGNED NULL,
+  received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  processed_at TIMESTAMP NULL DEFAULT NULL,
+  UNIQUE KEY uniq_unique_id (unique_id),
+  INDEX idx_event_received (event, received_at)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;

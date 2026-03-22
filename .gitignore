@@ -26,4 +26,4 @@ storage/
 .env
 .env.*
 db.php
-
+SCALEV_SIGNING_SECRET.txt
