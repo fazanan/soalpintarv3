@@ -122,9 +122,8 @@ if ($event !== 'order.payment_status_changed') {
 }
 
 $paymentStatus = isset($data['payment_status']) ? trim((string)$data['payment_status']) : '';
-if (strtolower($paymentStatus) !== 'paid') {
-  respond_ok(['handled' => 'not_paid']);
-}
+$ps = strtolower($paymentStatus);
+if (!in_array($ps, ['paid', 'settled'], true)) respond_ok(['handled' => 'not_paid']);
 
 $email = '';
 if (isset($data['destination_address']) && is_array($data['destination_address'])) $email = (string)($data['destination_address']['email'] ?? '');
@@ -202,4 +201,3 @@ if ($uniqueId !== '') {
 }
 
 respond_ok(['handled' => 'created_or_exists', 'username' => $email]);
-
