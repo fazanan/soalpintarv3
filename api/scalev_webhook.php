@@ -29,6 +29,29 @@ function log_audit(mysqli $db, string $level, string $category, string $message,
   }
 }
 
+function extract_customer_email(array $data): string {
+  $candidates = [];
+  if (isset($data['destination_address']) && is_array($data['destination_address'])) {
+    $da = $data['destination_address'];
+    $candidates[] = (string)($da['email'] ?? '');
+    $candidates[] = (string)($da['email_address'] ?? '');
+  }
+  $candidates[] = (string)($data['customer_email'] ?? '');
+  if (isset($data['customer']) && is_array($data['customer'])) {
+    $candidates[] = (string)($data['customer']['email'] ?? '');
+  }
+  $candidates[] = (string)($data['destination_email'] ?? '');
+  $candidates[] = (string)($data['email'] ?? '');
+  foreach ($candidates as $raw) {
+    $email = trim(strtolower((string)$raw));
+    if ($email === '') continue;
+    if (str_ends_with($email, '@scalev.id')) continue;
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) continue;
+    return $email;
+  }
+  return '';
+}
+
 function get_signing_secret(): string {
   $secret = getenv('SCALEV_SIGNING_SECRET') ?: '';
   if ($secret !== '') return $secret;
@@ -102,10 +125,7 @@ if ($uniqueId !== '') {
   $stmt = $mysqli->prepare("INSERT IGNORE INTO scalev_webhook_events (unique_id, event, order_id, email, payment_status) VALUES (?,?,?,?,?)");
   if ($stmt) {
     $orderIdIns = isset($data['order_id']) ? (string)$data['order_id'] : '';
-    $emailIns = '';
-    if (isset($data['destination_address']) && is_array($data['destination_address'])) $emailIns = (string)($data['destination_address']['email'] ?? '');
-    if ($emailIns === '' && isset($data['customer_email'])) $emailIns = (string)$data['customer_email'];
-    $emailIns = trim(strtolower($emailIns));
+    $emailIns = extract_customer_email($data);
     $payIns = isset($data['payment_status']) ? (string)$data['payment_status'] : '';
     $stmt->bind_param('sssss', $uniqueId, $event, $orderIdIns, $emailIns, $payIns);
     $stmt->execute();
@@ -125,19 +145,8 @@ $paymentStatus = isset($data['payment_status']) ? trim((string)$data['payment_st
 $ps = strtolower($paymentStatus);
 if (!in_array($ps, ['paid', 'settled'], true)) respond_ok(['handled' => 'not_paid']);
 
-$email = '';
-if (isset($data['destination_address']) && is_array($data['destination_address'])) $email = (string)($data['destination_address']['email'] ?? '');
-if ($email === '' && isset($data['customer_email'])) $email = (string)$data['customer_email'];
-if ($email === '' && isset($data['payment_status_history']) && is_array($data['payment_status_history'])) {
-  foreach (array_reverse($data['payment_status_history']) as $h) {
-    if (is_array($h) && isset($h['by']) && is_array($h['by'])) {
-      $email = (string)($h['by']['email'] ?? '');
-      if ($email !== '') break;
-    }
-  }
-}
-$email = trim(strtolower($email));
-if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+$email = extract_customer_email($data);
+if ($email === '') {
   log_audit($mysqli, 'warn', 'scalev_webhook', 'Email tidak ditemukan / invalid', 200, ['event' => $event]);
   respond_ok(['handled' => 'missing_email']);
 }
