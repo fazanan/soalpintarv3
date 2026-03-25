@@ -2142,7 +2142,7 @@ if (!isset($_SESSION['user_id'])) {
                 </div>
                 <div class="p-6">
                   <div class="rounded-lg border border-amber-200 bg-amber-50 text-amber-900 p-4 text-sm">
-                    Akses fitur Rekap Nilai belum diaktifkan untuk akun Anda. Silakan hubungi Admin untuk mengaktifkan akses.
+                    Akses fitur Rekap Nilai belum diaktifkan untuk akun Anda. Upgrade ke paket Pro (50rb) untuk akses modul Quiz Online dan Rekap Nilai. Hubungi Admin <a class="font-semibold underline text-blue-700" href="https://wa.me/6282174028646" target="_blank" rel="noopener">klik di sini</a>.
                   </div>
                 </div>
               </div>
@@ -3913,7 +3913,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           <div class="p-6 space-y-2">
             <div class="text-xl font-bold">Quiz Online</div>
             <div class="rounded-lg border border-amber-200 bg-amber-50 text-amber-900 p-4 text-sm">
-              Akses fitur Quiz Online belum diaktifkan untuk akun Anda. Silakan hubungi Admin untuk mengaktifkan akses.
+              Akses fitur Quiz Online belum diaktifkan untuk akun Anda. Upgrade ke paket Pro (50rb) untuk akses modul Quiz Online dan Rekap Nilai. Hubungi Admin <a class="font-semibold underline text-blue-700" href="https://wa.me/6282174028646" target="_blank" rel="noopener">klik di sini</a>.
             </div>
           </div>
         `;
