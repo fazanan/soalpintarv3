@@ -23,6 +23,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lgRaw = post('limitgambar', '');
     $lp = $lpRaw === '' ? 300 : (int)max(0, (int)$lpRaw);
     $lg = $lgRaw === '' ? 5 : (int)max(0, (int)$lgRaw);
+    $accessQuiz = isset($_POST['access_quiz']) ? 1 : 0;
+    $accessRekap = isset($_POST['access_rekap_nilai']) ? 1 : 0;
+    if ($role === 'admin') { $accessQuiz = 1; $accessRekap = 1; }
 
     if ($username === '' || $password === '') {
       $error = 'Username dan password wajib diisi.';
@@ -30,9 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $error = 'Username terlalu panjang.';
     } else {
       $hash = password_hash($password, PASSWORD_BCRYPT);
-      $stmt = $mysqli->prepare("INSERT INTO users (username, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?)");
+      $stmt = $mysqli->prepare("INSERT INTO users (username, password, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?, ?, ?)");
       if ($stmt) {
-        $stmt->bind_param('sssii', $username, $hash, $role, $lp, $lg);
+        $stmt->bind_param('sssiiii', $username, $hash, $role, $accessQuiz, $accessRekap, $lp, $lg);
         if ($stmt->execute()) $message = 'Pengguna berhasil dibuat.';
         else {
           $code = (int)($stmt->errno ?: $mysqli->errno);
@@ -58,11 +61,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $id = (int)post('id', '0');
     $lp = (int)max(0, (int)post('limitpaket', '0'));
     $lg = (int)max(0, (int)post('limitgambar', '0'));
-    $stmt = $mysqli->prepare("UPDATE users SET limitpaket=?, limitgambar=? WHERE id=?");
+    $accessQuiz = isset($_POST['access_quiz']) ? 1 : 0;
+    $accessRekap = isset($_POST['access_rekap_nilai']) ? 1 : 0;
+    $stmt = $mysqli->prepare("UPDATE users SET limitpaket=?, limitgambar=?, access_quiz=?, access_rekap_nilai=? WHERE id=?");
     if ($stmt) {
-      $stmt->bind_param('iii', $lp, $lg, $id);
-      if ($stmt->execute()) $message = 'Batas penggunaan diperbarui.';
-      else $error = 'Gagal memperbarui batas penggunaan.';
+      $stmt->bind_param('iiiii', $lp, $lg, $accessQuiz, $accessRekap, $id);
+      if ($stmt->execute()) $message = 'Pengaturan pengguna diperbarui.';
+      else $error = 'Gagal memperbarui pengaturan pengguna.';
       $stmt->close();
     } else {
       $error = 'Gagal menyiapkan pembaruan batas.';
@@ -123,7 +128,7 @@ if ($page > $totalPages) $page = $totalPages;
 $offset = ($page - 1) * $perPage;
 
 // Ambil data per halaman
-$stmt = $mysqli->prepare("SELECT id, username, role, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?");
+$stmt = $mysqli->prepare("SELECT id, username, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?");
 if ($stmt) {
   $stmt->bind_param('ii', $perPage, $offset);
   $stmt->execute();
@@ -170,6 +175,8 @@ if ($stmt) {
               <th class="border px-3 py-2 text-left">ID</th>
               <th class="border px-3 py-2 text-left">Username</th>
               <th class="border px-3 py-2 text-left">Role</th>
+              <th class="border px-3 py-2 text-left">Akses Quiz</th>
+              <th class="border px-3 py-2 text-left">Akses Rekap</th>
               <th class="border px-3 py-2 text-left">Limit Paket</th>
               <th class="border px-3 py-2 text-left">Limit Gambar</th>
               <th class="border px-3 py-2 text-left">Dibuat</th>
@@ -178,10 +185,12 @@ if ($stmt) {
           </thead>
           <tbody>
             <?php foreach ($users as $u): ?>
-              <tr data-row="<?php echo (int)$u['id']; ?>" data-u="<?php echo htmlspecialchars($u['username']); ?>" data-lp="<?php echo (int)($u['limitpaket'] ?? 0); ?>" data-lg="<?php echo (int)($u['limitgambar'] ?? 0); ?>">
+              <tr data-row="<?php echo (int)$u['id']; ?>" data-u="<?php echo htmlspecialchars($u['username']); ?>" data-lp="<?php echo (int)($u['limitpaket'] ?? 0); ?>" data-lg="<?php echo (int)($u['limitgambar'] ?? 0); ?>" data-aq="<?php echo (int)($u['access_quiz'] ?? 1); ?>" data-ar="<?php echo (int)($u['access_rekap_nilai'] ?? 1); ?>">
                 <td class="border px-3 py-2"><?php echo (int)$u['id']; ?></td>
                 <td class="border px-3 py-2"><?php echo htmlspecialchars($u['username']); ?></td>
                 <td class="border px-3 py-2"><?php echo htmlspecialchars($u['role'] ?: 'user'); ?></td>
+                <td class="border px-3 py-2"><?php echo ((int)($u['access_quiz'] ?? 1) === 1) ? 'Aktif' : 'Nonaktif'; ?></td>
+                <td class="border px-3 py-2"><?php echo ((int)($u['access_rekap_nilai'] ?? 1) === 1) ? 'Aktif' : 'Nonaktif'; ?></td>
                 <td class="border px-3 py-2">
                   <span><?php echo (int)($u['limitpaket'] ?? 0); ?></span>
                 </td>
@@ -206,7 +215,7 @@ if ($stmt) {
               </tr>
             <?php endforeach; ?>
             <?php if (empty($users)): ?>
-              <tr><td colspan="7" class="border px-3 py-6 text-center text-gray-500">Belum ada pengguna.</td></tr>
+              <tr><td colspan="9" class="border px-3 py-6 text-center text-gray-500">Belum ada pengguna.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
@@ -238,13 +247,23 @@ if ($stmt) {
   </div>
   <div id="editModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
     <div class="bg-white rounded-xl border shadow-lg w-full max-w-md p-6">
-      <h2 class="text-lg font-semibold mb-4">Edit Batas Pengguna</h2>
+      <h2 class="text-lg font-semibold mb-4">Edit Pengguna</h2>
       <form id="modalForm" class="space-y-4">
         <input type="hidden" name="action" value="update_limits">
         <input type="hidden" name="id" id="modalUserId" value="">
         <div>
           <label class="block text-sm font-medium mb-1">Username</label>
           <input id="modalUsername" type="text" class="w-full rounded border h-10 px-3 bg-gray-50" readonly>
+        </div>
+        <div class="grid grid-cols-1 gap-2">
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input id="modalAccessQuiz" name="access_quiz" type="checkbox">
+            <span>Akses Quiz</span>
+          </label>
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input id="modalAccessRekap" name="access_rekap_nilai" type="checkbox">
+            <span>Akses Rekap Nilai</span>
+          </label>
         </div>
         <div class="grid grid-cols-2 gap-4">
           <div>
@@ -338,6 +357,16 @@ if ($stmt) {
           <label class="block text-sm font-medium mb-1">Limit Gambar</label>
           <input id="createLimitGambar" name="limitgambar" type="number" min="0" class="w-full rounded border h-10 px-3" placeholder="5">
         </div>
+        <div class="grid grid-cols-1 gap-2">
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input id="createAccessQuiz" name="access_quiz" type="checkbox" checked>
+            <span>Akses Quiz</span>
+          </label>
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input id="createAccessRekap" name="access_rekap_nilai" type="checkbox" checked>
+            <span>Akses Rekap Nilai</span>
+          </label>
+        </div>
         <div class="flex items-center justify-end gap-2 pt-2">
           <button type="button" id="createCancel" class="px-4 h-10 rounded border bg-white hover:bg-gray-50">Batal</button>
           <button type="submit" class="px-4 h-10 rounded border bg-blue-600 text-white hover:bg-blue-700">Tambah</button>
@@ -352,6 +381,8 @@ if ($stmt) {
     const inputUsername = document.getElementById('modalUsername');
     const inputLP = document.getElementById('modalLimitPaket');
     const inputLG = document.getElementById('modalLimitGambar');
+    const inputAQ = document.getElementById('modalAccessQuiz');
+    const inputAR = document.getElementById('modalAccessRekap');
     const currentPage = new URLSearchParams(location.search).get('page') || '1';
     const roleModal = document.getElementById('roleModal');
     const roleForm = document.getElementById('roleForm');
@@ -371,12 +402,16 @@ if ($stmt) {
     const createRole = document.getElementById('createRole');
     const createLimitPaket = document.getElementById('createLimitPaket');
     const createLimitGambar = document.getElementById('createLimitGambar');
+    const createAccessQuiz = document.getElementById('createAccessQuiz');
+    const createAccessRekap = document.getElementById('createAccessRekap');
 
     function openModalFromRow(row) {
       inputId.value = row.getAttribute('data-row');
       inputUsername.value = row.getAttribute('data-u') || '';
       inputLP.value = row.getAttribute('data-lp') || '0';
       inputLG.value = row.getAttribute('data-lg') || '0';
+      inputAQ.checked = (row.getAttribute('data-aq') || '1') === '1';
+      inputAR.checked = (row.getAttribute('data-ar') || '1') === '1';
       modal.classList.remove('hidden');
       modal.classList.add('flex');
     }
@@ -412,6 +447,8 @@ if ($stmt) {
       createRole.value = 'user';
       createLimitPaket.value = '';
       createLimitGambar.value = '';
+      createAccessQuiz.checked = true;
+      createAccessRekap.checked = true;
       createModal.classList.remove('hidden');
       createModal.classList.add('flex');
       setTimeout(() => createUsername.focus(), 0);

@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
   username VARCHAR(100) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
   role ENUM('admin','user') NOT NULL DEFAULT 'user',
+  access_quiz TINYINT(1) NOT NULL DEFAULT 1,
+  access_rekap_nilai TINYINT(1) NOT NULL DEFAULT 1,
   limitpaket INT NOT NULL DEFAULT 300,
   limitgambar INT NOT NULL DEFAULT 5,
   token_input BIGINT UNSIGNED NOT NULL DEFAULT 0,

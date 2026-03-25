@@ -7,6 +7,25 @@ if (!isset($_SESSION['user_id'])) {
   exit;
 }
 require_once __DIR__ . '/../db.php';
+$role = (string)($_SESSION['role'] ?? 'user');
+if ($role !== 'admin') {
+  $access = isset($_SESSION['access_quiz']) ? (int)$_SESSION['access_quiz'] : null;
+  if ($access === null) {
+    $stmtAcc = $mysqli->prepare("SELECT access_quiz FROM users WHERE id=? LIMIT 1");
+    if ($stmtAcc) {
+      $stmtAcc->bind_param('i', $_SESSION['user_id']);
+      $stmtAcc->execute();
+      $stmtAcc->bind_result($aq);
+      if ($stmtAcc->fetch()) $access = (int)$aq;
+      $stmtAcc->close();
+    }
+  }
+  if ($access !== 1) {
+    http_response_code(403);
+    echo json_encode(['ok'=>false,'error'=>'no_access']);
+    exit;
+  }
+}
 $slug = isset($_GET['slug']) ? trim((string)$_GET['slug']) : '';
 if ($slug === '') {
   http_response_code(400);

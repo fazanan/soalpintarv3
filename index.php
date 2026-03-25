@@ -291,6 +291,10 @@ if (!isset($_SESSION['user_id'])) {
       const OPENAI_API_KEY = "";
       const OPENAI_MODEL = "gpt-4o-mini"; // or gpt-3.5-turbo, gpt-4
       const IS_ADMIN = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : 'false'; ?>;
+      const ACCESS_QUIZ = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_quiz']) && (int)$_SESSION['access_quiz'] === 0) ? 'false' : 'true'); ?>;
+      const ACCESS_REKAP = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_rekap_nilai']) && (int)$_SESSION['access_rekap_nilai'] === 0) ? 'false' : 'true'); ?>;
+      const HAS_QUIZ_ACCESS = IS_ADMIN || ACCESS_QUIZ;
+      const HAS_REKAP_ACCESS = IS_ADMIN || ACCESS_REKAP;
 
       const APP_KEY = "soalpintar:v1";
       const OPENAI_TIMEOUT_MS = 55000;
@@ -2126,6 +2130,25 @@ if (!isset($_SESSION['user_id'])) {
       //  MODUL AJAR — renderModulAjar / build / export
       // ═══════════════════════════════════════════════
       const renderRekap = () => {
+        if (!HAS_REKAP_ACCESS) {
+          return `
+            <div class="space-y-4">
+              <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-border-light dark:border-border-dark">
+                  <div>
+                    <div class="text-2xl font-bold">Rekap Nilai Otomatis</div>
+                    <div class="text-sm text-text-sub-light">Rekap nilai untuk semua jenjang dan mata pelajaran</div>
+                  </div>
+                </div>
+                <div class="p-6">
+                  <div class="rounded-lg border border-amber-200 bg-amber-50 text-amber-900 p-4 text-sm">
+                    Akses fitur Rekap Nilai belum diaktifkan untuk akun Anda. Silakan hubungi Admin untuk mengaktifkan akses.
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
         const statCard = (title, value, color) => `
           <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-4 flex items-center gap-3">
             <div class="size-9 rounded-lg ${color} text-white flex items-center justify-center">
@@ -3886,6 +3909,14 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           </div>
         `;
         const haveQuestions = Array.isArray(state.questions) && state.questions.length > 0;
+        const noAccess = `
+          <div class="p-6 space-y-2">
+            <div class="text-xl font-bold">Quiz Online</div>
+            <div class="rounded-lg border border-amber-200 bg-amber-50 text-amber-900 p-4 text-sm">
+              Akses fitur Quiz Online belum diaktifkan untuk akun Anda. Silakan hubungi Admin untuk mengaktifkan akses.
+            </div>
+          </div>
+        `;
         const live = `
           <div class="p-6 space-y-3">
             <div class="text-xl font-bold">Mode Kuis</div>
@@ -4128,7 +4159,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
               </div>
             </div>
           </div>`;
-        const body = sub==='publish' ? pub : sub==='results' ? res : live;
+        const body = !HAS_QUIZ_ACCESS ? noAccess : (sub==='publish' ? pub : sub==='results' ? res : live);
         return `
           <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
             ${tabs}

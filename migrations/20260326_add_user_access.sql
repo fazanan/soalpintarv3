@@ -1,0 +1,4 @@
+ALTER TABLE users
+  ADD COLUMN access_quiz TINYINT(1) NOT NULL DEFAULT 1 AFTER role,
+  ADD COLUMN access_rekap_nilai TINYINT(1) NOT NULL DEFAULT 1 AFTER access_quiz;
+
