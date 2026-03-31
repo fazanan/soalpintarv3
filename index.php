@@ -3953,8 +3953,13 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 <div class="flex items-center gap-3">
                   <button type="button" onclick="document.getElementById('rosterPicker').click()" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark">Upload CSV/TXT</button>
                   <button type="button" onclick="window.__sp.downloadRosterTemplate()" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark">Download Template TXT</button>
-                  <div class="text-xs text-text-sub-light">${Array.isArray(f.roster) && f.roster.length ? `Terbaca ${f.roster.length} siswa` : 'Belum ada file diunggah'}</div>
+                  <div class="text-xs text-text-sub-light">${Array.isArray(f.roster) && f.roster.length ? `Terbaca ${f.roster.length} siswa (berhasil diupload)` : 'Belum ada file diunggah'}</div>
                 </div>
+                ${Array.isArray(f.roster) && f.roster.length ? `
+                  <div class="rounded-lg border border-green-200 bg-green-50 text-green-800 p-3 text-sm">
+                    Berhasil diupload: terbaca <b>${f.roster.length}</b> siswa. Silakan klik tombol <b>Buat Link Siswa</b> di bawah ini.
+                  </div>
+                ` : ``}
               </div>
               <div class="flex items-center gap-3">
                 <label class="inline-flex items-center gap-2 text-sm">
@@ -3969,7 +3974,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 </label>
               </div>
               <div class="flex items-center gap-3">
-                <button onclick="window.__sp.publishQuiz()" class="px-4 h-11 rounded-lg bg-primary hover:bg-blue-600 text-white font-semibold">Publish</button>
+                <button onclick="window.__sp.publishQuiz()" class="px-4 h-11 rounded-lg bg-primary hover:bg-blue-600 text-white font-semibold">Buat Link Siswa</button>
                 <div id="pubMsg" class="text-sm text-text-sub-light"></div>
               </div>
               ${(() => {
@@ -4031,14 +4036,19 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           const scores = dataRows.map(r => r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0);
           const avg = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
           const max = scores.length ? Math.max(...scores) : 0;
-          const top3 = dataRows.slice(0,3).map((r,i) => ({ rank: i+1, absen: Number(r.absen), name: nameMap.get(Number(r.absen)) || '', nilai: r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0 }));
+          const top3 = dataRows.slice(0,3).map((r,i) => {
+            const ab = Number(r.absen);
+            const nm = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
+            return { rank: i+1, absen: ab, name: nm, nilai: r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0 };
+          });
           const rows = dataRows.map((r, idx) => {
             const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
-            const nm = nameMap.get(Number(r.absen)) || '';
+            const ab = Number(r.absen);
+            const nm = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
             const trophy = idx < 3 ? `<span class="material-symbols-outlined text-amber-500 text-[18px] align-middle">trophy</span>` : '';
             return `<tr>
               <td class="border px-3 py-2 text-center">${idx+1} ${trophy}</td>
-              <td class="border px-3 py-2 text-center">${Number(r.absen)}</td>
+              <td class="border px-3 py-2 text-center">${ab}</td>
               <td class="border px-3 py-2">${safeText(nm || '-')}</td>
               <td class="border px-3 py-2 text-center">${pct}</td>
             </tr>`;
@@ -4050,16 +4060,6 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 <select id="selPub" class="flex-1 min-w-0 h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark">${options}</select>
                 <button onclick="window.__sp.loadResults()" class="px-4 h-11 rounded-lg border bg-white dark:bg-surface-dark">Muat</button>
                 <button onclick="window.__sp.loadPublications()" class="px-3 h-11 rounded-lg border bg-white dark:bg-surface-dark">Segarkan</button>
-                ${pubObj && IS_ADMIN ? `
-                  <button onclick="window.__sp.seedQuizResults('${safeText(pubObj.slug)}', 20, true)" title="Buat data dummy 20 siswa"
-                    class="px-3 h-11 rounded-lg border bg-white dark:bg-surface-dark">
-                    Dummy 20
-                  </button>
-                  <button onclick="window.__sp.seedQuizResults('${safeText(pubObj.slug)}', 30, true)" title="Buat data dummy 30 siswa"
-                    class="px-3 h-11 rounded-lg border bg-white dark:bg-surface-dark">
-                    Dummy 30
-                  </button>
-                ` : ``}
                 ${pubObj ? `
                   <button onclick="window.__sp.exportResultsPDF('${safeText(pubObj.slug)}')" title="Download PDF"
                     class="flex items-center justify-center h-11 w-11 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">
@@ -4278,7 +4278,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           if (rows.length > 0) state.quizPublishForm.jumlah = rows.length;
           saveDebounced(false);
           render();
-          alert(rows.length ? `Daftar siswa terbaca: ${rows.length}` : 'Tidak ada data valid pada file.');
+          if (!rows.length) alert('Tidak ada data valid pada file.');
         };
         reader.readAsText(f);
       };
@@ -4472,11 +4472,12 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           try { js = JSON.parse(raw); } catch {}
           if (res.ok && js && js.ok) {
             const expText = (expire && expire.trim()) ? expire.trim() : '24 jam (otomatis)';
-            const msgLink = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(js.id))}&n=1`;
+            const classLink = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(js.id))}`;
+            const exampleLink = `${classLink}&n=1`;
             const adjusted = Number(js.slug_adjusted || 0) === 1 && String(js.slug_original || '') && String(js.slug || '') !== String(js.slug_original || '');
             const adjustedMsg = adjusted ? `<br><span class="text-amber-700">Slug disesuaikan menjadi: <b>${safeText(String(js.slug||''))}</b></span>` : ``;
-            if (btn) btn.innerHTML = `Berhasil publish.${adjustedMsg}<br>Contoh akses: <a class="text-blue-600 underline" href="${msgLink}" target="_blank" rel="noopener">${msgLink}</a><br>Maks absen: ${Number(state.quizPublishForm?.jumlah||0) || '-'} • Expire: ${expText}`;
-            state.quizLastLink = msgLink;
+            if (btn) btn.innerHTML = `Berhasil buat link siswa.${adjustedMsg}<br>Link untuk siswa: <a class="text-blue-600 underline" href="${classLink}" target="_blank" rel="noopener">${classLink}</a><br><span class="text-xs text-text-sub-light">Siswa akan diminta mengisi No Absen dan Nama saat membuka link.</span><br>Maks absen: ${Number(state.quizPublishForm?.jumlah||0) || '-'} • Expire: ${expText}<br><span class="text-xs text-text-sub-light">Contoh akses:</span> <a class="text-blue-600 underline text-xs" href="${exampleLink}" target="_blank" rel="noopener">${exampleLink}</a>`;
+            state.quizLastLink = classLink;
             await loadPublications();
             state.quizSelectedSlug = String(js.slug);
             state.quizLastPubId = Number(js.id);
@@ -4496,10 +4497,10 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           } else {
             const snippet = raw ? String(raw).slice(0,120).replace(/\s+/g,' ').trim() : '';
             const detail = js?.error || (res.status === 409 ? 'slug_exists' : `http_${res.status}${snippet ? ': '+snippet : ''}`);
-            if (btn) btn.textContent = `Gagal publish (${detail}).`;
+            if (btn) btn.textContent = `Gagal buat link siswa (${detail}).`;
           }
         } catch (e) {
-          if (btn) btn.textContent = "Gagal publish (network).";
+          if (btn) btn.textContent = "Gagal buat link siswa (network).";
         }
       };
       const loadPublications = async () => {
@@ -4538,9 +4539,10 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         const head = ['No Absen','Nama Siswa','Nilai','Tanggal Submit'];
         const body = rows.map(r => {
           const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
-          const nm = nameMap.get(Number(r.absen)) || '';
+          const ab = Number(r.absen);
+          const nm = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
           const dt = String(r.created_at || '');
-          return [String(r.absen), nm, String(pct), dt];
+          return [String(ab), nm, String(pct), dt];
         });
         const lines = [head.join(','), ...body.map(cols => cols.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))];
         const blob = new Blob([lines.join('\n')], { type:'text/csv;charset=utf-8' });
@@ -4616,9 +4618,10 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
 
         const body = rows.map((r, idx) => {
           const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
-          const nm = nameMap.get(Number(r.absen)) || '';
+          const ab = Number(r.absen);
+          const nm = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
           const dt = String(r.created_at || '');
-          return [String(idx+1), String(r.absen||''), nm || '-', String(pct), dt];
+          return [String(idx+1), String(ab||''), nm || '-', String(pct), dt];
         });
         doc.autoTable({
           startY: metaY + 10,
@@ -4665,7 +4668,9 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
 
         const top3 = rows.slice(0, 3).map((r, i) => {
           const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
-          return [String(i+1), String(r.absen||''), nameMap.get(Number(r.absen)) || '-', String(pct)];
+          const ab = Number(r.absen);
+          const nm = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
+          return [String(i+1), String(ab||''), nm || '-', String(pct)];
         });
         const afterSummaryY = (doc.lastAutoTable?.finalY || (afterResultsY + 8)) + 16;
         doc.setFont('helvetica', 'bold');

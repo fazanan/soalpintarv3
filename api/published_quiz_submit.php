@@ -6,6 +6,7 @@ $data = json_decode($raw, true);
 $slug = isset($data['slug']) ? trim((string)$data['slug']) : '';
 $pubIdParam = isset($data['id']) ? (int)$data['id'] : 0;
 $absen = isset($data['absen']) ? (int)$data['absen'] : 0;
+$nama = isset($data['nama']) ? trim((string)$data['nama']) : (isset($data['name']) ? trim((string)$data['name']) : '');
 $answers = isset($data['answers']) && is_array($data['answers']) ? $data['answers'] : [];
 $orderMap = isset($data['order_map']) && is_array($data['order_map']) ? $data['order_map'] : [];
 if (($slug === '' && $pubIdParam <= 0) || $absen <= 0 || empty($answers) || empty($orderMap)) {
@@ -13,6 +14,8 @@ if (($slug === '' && $pubIdParam <= 0) || $absen <= 0 || empty($answers) || empt
   echo json_encode(['ok'=>false,'error'=>'invalid_input']);
   exit;
 }
+$nama = preg_replace('/\s+/', ' ', $nama);
+if (strlen($nama) > 120) $nama = substr($nama, 0, 120);
 $sql = $pubIdParam > 0
   ? "SELECT id, answer_key, is_active, expire_at, total_soal, payload_public FROM published_quizzes WHERE id=? LIMIT 1"
   : "SELECT id, answer_key, is_active, expire_at, total_soal, payload_public FROM published_quizzes WHERE slug=? LIMIT 1";
@@ -67,13 +70,45 @@ for ($i=0; $i<$len; $i++) {
   if ($ansIdx === $correct) $score++;
 }
 $totalFinal = $total ?: $len;
-$stmt = $mysqli->prepare("INSERT INTO published_quiz_results (published_id, absen, score, total) VALUES (?, ?, ?, ?)");
+$stmt = null;
+try {
+  $stmt = $mysqli->prepare("INSERT INTO published_quiz_results (published_id, absen, nama, score, total) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nama=IF(nama IS NULL OR nama='', VALUES(nama), nama)");
+} catch (mysqli_sql_exception $e) {
+  $stmt = null;
+}
 if (!$stmt) {
-  http_response_code(500);
-  echo json_encode(['ok'=>false,'error'=>'stmt_fail']);
+  try { $mysqli->query("ALTER TABLE published_quiz_results ADD COLUMN nama VARCHAR(120) NULL AFTER absen"); } catch (mysqli_sql_exception $e) {}
+  try {
+    $stmt = $mysqli->prepare("INSERT INTO published_quiz_results (published_id, absen, nama, score, total) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nama=IF(nama IS NULL OR nama='', VALUES(nama), nama)");
+  } catch (mysqli_sql_exception $e) {
+    $stmt = null;
+  }
+}
+if (!$stmt) {
+  $stmt2 = $mysqli->prepare("INSERT INTO published_quiz_results (published_id, absen, score, total) VALUES (?, ?, ?, ?)");
+  if (!$stmt2) {
+    http_response_code(500);
+    echo json_encode(['ok'=>false,'error'=>'stmt_fail']);
+    exit;
+  }
+  $stmt2->bind_param('iiii', $pubId, $absen, $score, $totalFinal);
+  $ok = $stmt2->execute();
+  if (!$ok) {
+    $code = (int)($stmt2->errno ?: $mysqli->errno);
+    $stmt2->close();
+    if ($code === 1062) {
+      echo json_encode(['ok'=>true,'status'=>'duplicate','score_saved'=>false,'score'=>$score,'total'=>$totalFinal]);
+    } else {
+      http_response_code(500);
+      echo json_encode(['ok'=>false,'error'=>'insert_fail']);
+    }
+    exit;
+  }
+  $stmt2->close();
+  echo json_encode(['ok'=>true,'status'=>'saved','score'=>$score,'total'=>$totalFinal]);
   exit;
 }
-$stmt->bind_param('iiii', $pubId, $absen, $score, $totalFinal);
+$stmt->bind_param('iisii', $pubId, $absen, $nama, $score, $totalFinal);
 $ok = $stmt->execute();
 if (!$ok) {
   $code = (int)($stmt->errno ?: $mysqli->errno);

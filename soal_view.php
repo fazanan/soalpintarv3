@@ -3,7 +3,7 @@ require __DIR__ . '/db.php';
 $slug = isset($_GET['slug']) ? trim((string)$_GET['slug']) : '';
 $pubIdParam = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $n = isset($_GET['n']) ? (int)$_GET['n'] : 0;
-if (($slug === '' && $pubIdParam <= 0) || $n <= 0) {
+if ($slug === '' && $pubIdParam <= 0) {
   http_response_code(400);
   echo 'Bad Request';
   exit;
@@ -50,7 +50,7 @@ if (is_array($decoded)) {
     $items = $decoded;
   }
 }
-if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
+if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
   http_response_code(400);
   echo 'Nomor absen di luar jangkauan';
   exit;
@@ -60,7 +60,7 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?php echo htmlspecialchars($mapel ?: 'Soal'); ?> | No Absen <?php echo (int)$n; ?></title>
+  <title><?php echo htmlspecialchars($mapel ?: 'Soal'); ?></title>
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
   <style>
     .brand-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:9999px;border:1px solid #e7edf3;background:#fff}
@@ -96,11 +96,11 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
           <div class="space-y-1.5">
             <div class="flex items-center">
               <span class="w-36 font-semibold shrink-0">Nama</span><span class="mr-2">:</span>
-              <span><?php echo htmlspecialchars($studentName !== '' ? $studentName : '-'); ?></span>
+              <span id="studentName"><?php echo htmlspecialchars($studentName !== '' ? $studentName : '-'); ?></span>
             </div>
             <div class="flex items-start">
               <span class="w-36 font-semibold shrink-0">No. Absen</span><span class="mr-2">:</span>
-              <span><?php echo (int)$n; ?></span>
+              <span id="studentAbsen"><?php echo (int)$n; ?></span>
             </div>
           </div>
         </div>
@@ -108,9 +108,43 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       <div id="root"></div>
     </div>
   </div>
+  <div id="identityModal" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+    <div class="bg-white rounded-2xl border shadow-xl w-[92vw] max-w-[520px] overflow-hidden">
+      <div class="p-5 border-b flex items-center justify-between">
+        <div class="font-bold text-lg">Mulai Quiz</div>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="text-sm text-gray-700">Isi No Absen dan Nama terlebih dahulu agar hasil tercatat dengan benar.</div>
+        <?php if ($maxAbsen > 0): ?>
+          <div class="text-xs text-gray-500">No Absen: 1 sampai <?php echo (int)$maxAbsen; ?></div>
+        <?php endif; ?>
+        <div class="grid grid-cols-1 gap-3">
+          <div>
+            <label class="block text-sm font-semibold mb-1">No Absen</label>
+            <input id="inpAbsen" type="number" min="1" class="w-full h-11 rounded-lg border px-3" placeholder="Contoh: 12">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">Nama</label>
+            <input id="inpNama" type="text" class="w-full h-11 rounded-lg border px-3" placeholder="Contoh: Siti Aisyah">
+          </div>
+        </div>
+        <div class="rounded-lg border border-blue-200 bg-blue-50 text-blue-800 p-3 text-sm">
+          Setelah diisi, klik tombol <b>Mulai Kerjakan</b>.
+        </div>
+        <div class="flex items-center gap-3">
+          <button id="btnStart" class="flex-1 h-11 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">Mulai Kerjakan</button>
+        </div>
+        <div id="idErr" class="text-sm text-red-600"></div>
+      </div>
+    </div>
+  </div>
   <script>
     const payload = <?php echo json_encode($items, JSON_UNESCAPED_UNICODE); ?>;
-    const absen = <?php echo (int)$n; ?>;
+    const pubId = <?php echo (int)$pubId; ?>;
+    const slug = <?php echo json_encode($slug, JSON_UNESCAPED_UNICODE); ?>;
+    const maxAbsen = <?php echo (int)$maxAbsen; ?>;
+    let absen = <?php echo (int)$n; ?>;
+    let studentName = <?php echo json_encode($studentName, JSON_UNESCAPED_UNICODE); ?>;
     const showSolution = <?php echo (int)$showSolution; ?> === 1;
     const answerKey = <?php echo json_encode($answerKeySettings, JSON_UNESCAPED_UNICODE); ?>;
     (function(){
@@ -140,6 +174,14 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
     }
     function renderTabs() {
       const container = document.getElementById('root');
+      if (!absen || absen <= 0 || !studentName || String(studentName).trim() === '') {
+        container.innerHTML = `
+          <div class="p-4 rounded-xl border bg-gray-50 text-sm text-gray-700">
+            Silakan isi No Absen dan Nama untuk mulai mengerjakan.
+          </div>
+        `;
+        return;
+      }
       const hasSolutionTab = showSolution && submitted;
       const tabs = `
         <div class="flex items-center gap-2 border-b mb-4">
@@ -220,6 +262,7 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       const btn = document.getElementById('btnSubmit');
       if (!btn) return;
       btn.addEventListener('click', async () => {
+        if (!absen || absen <= 0) return;
         const questions = Array.isArray(payload) ? payload : [];
         const indices = questions.map((_, i) => i);
         const order = shuffleWithSeed(indices, absen);
@@ -234,7 +277,7 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
           const res = await fetch('api/published_quiz_submit.php', {
             method: 'POST',
             headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ slug: <?php echo json_encode($slug); ?>, absen: absen, answers, order_map: order })
+            body: JSON.stringify({ id: pubId, slug, absen, nama: studentName, answers, order_map: order })
           });
           const js = await res.json();
           if (js && js.ok) {
@@ -252,7 +295,77 @@ if ($maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         }
       });
     }
+    function setIdentity(a, n) {
+      absen = Number(a || 0);
+      studentName = String(n || '').trim();
+      const nameEl = document.getElementById('studentName');
+      const abEl = document.getElementById('studentAbsen');
+      if (nameEl) nameEl.textContent = studentName || '-';
+      if (abEl) abEl.textContent = absen > 0 ? String(absen) : '0';
+      if (absen > 0) document.title = `${<?php echo json_encode($mapel ?: 'Soal', JSON_UNESCAPED_UNICODE); ?>} | No Absen ${absen}`;
+    }
+    function openIdentityModal() {
+      const modal = document.getElementById('identityModal');
+      if (!modal) return;
+      modal.style.display = 'flex';
+      const inpA = document.getElementById('inpAbsen');
+      const inpN = document.getElementById('inpNama');
+      if (inpA && absen > 0) inpA.value = String(absen);
+      if (inpN && studentName) inpN.value = String(studentName);
+      setTimeout(() => (inpA || inpN)?.focus?.(), 50);
+    }
+    function closeIdentityModal() {
+      const modal = document.getElementById('identityModal');
+      if (!modal) return;
+      modal.style.display = 'none';
+    }
+    function loadIdentity() {
+      try {
+        const k = `gp_quiz_identity_${pubId}`;
+        const raw = localStorage.getItem(k);
+        if (!raw) return;
+        const obj = JSON.parse(raw);
+        if (!obj) return;
+        const a = Number(obj.absen || 0);
+        const n = String(obj.nama || '').trim();
+        if (a > 0 && n) setIdentity(a, n);
+      } catch {}
+    }
+    function saveIdentity() {
+      try {
+        const k = `gp_quiz_identity_${pubId}`;
+        localStorage.setItem(k, JSON.stringify({ absen, nama: studentName }));
+      } catch {}
+    }
+    function bindIdentityModal() {
+      const btn = document.getElementById('btnStart');
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        const err = document.getElementById('idErr');
+        const inpA = document.getElementById('inpAbsen');
+        const inpN = document.getElementById('inpNama');
+        const a = Number(inpA?.value || 0);
+        const n = String(inpN?.value || '').trim();
+        if (!a || a < 1) { if (err) err.textContent = 'No Absen wajib diisi.'; return; }
+        if (maxAbsen > 0 && a > maxAbsen) { if (err) err.textContent = `No Absen maksimal ${maxAbsen}.`; return; }
+        if (!n) { if (err) err.textContent = 'Nama wajib diisi.'; return; }
+        if (err) err.textContent = '';
+        setIdentity(a, n);
+        saveIdentity();
+        closeIdentityModal();
+        renderTabs();
+      });
+      const inpA = document.getElementById('inpAbsen');
+      const inpN = document.getElementById('inpNama');
+      const onEnter = (e) => { if (e.key === 'Enter') btn.click(); };
+      if (inpA) inpA.addEventListener('keydown', onEnter);
+      if (inpN) inpN.addEventListener('keydown', onEnter);
+    }
+    loadIdentity();
+    setIdentity(absen, studentName);
+    bindIdentityModal();
     renderTabs();
+    if (!absen || absen <= 0 || !studentName || String(studentName).trim() === '') openIdentityModal();
   </script>
 </body>
 </html>

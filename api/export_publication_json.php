@@ -57,7 +57,13 @@ if (!$stmt->fetch()) {
 }
 $stmt->close();
 
-$stmt = $mysqli->prepare("SELECT absen, score, total, created_at FROM published_quiz_results WHERE published_id=? ORDER BY created_at ASC");
+$stmt = null;
+try {
+  $stmt = $mysqli->prepare("SELECT absen, nama, score, total, created_at FROM published_quiz_results WHERE published_id=? ORDER BY created_at ASC");
+} catch (mysqli_sql_exception $e) {
+  $stmt = null;
+}
+if (!$stmt) $stmt = $mysqli->prepare("SELECT absen, score, total, created_at FROM published_quiz_results WHERE published_id=? ORDER BY created_at ASC");
 $stmt->bind_param('i', $pid);
 $stmt->execute();
 $res = $stmt->get_result();

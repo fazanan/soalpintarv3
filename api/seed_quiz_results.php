@@ -54,14 +54,25 @@ try {
     $stmt->close();
   }
 
-  $ins = $mysqli->prepare("INSERT INTO published_quiz_results (published_id, absen, score, total) VALUES (?, ?, ?, ?)");
+  $ins = null;
+  try {
+    $ins = $mysqli->prepare("INSERT INTO published_quiz_results (published_id, absen, nama, score, total) VALUES (?, ?, ?, ?, ?)");
+  } catch (mysqli_sql_exception $e) {
+    $ins = null;
+  }
+  if (!$ins) $ins = $mysqli->prepare("INSERT INTO published_quiz_results (published_id, absen, score, total) VALUES (?, ?, ?, ?)");
   $inserted = 0;
   for ($absen = 1; $absen <= $count; $absen++) {
     $pct = random_int(45, 100);
     $score = (int)round(($pct / 100.0) * $total);
     if ($score < 0) $score = 0;
     if ($score > $total) $score = $total;
-    $ins->bind_param('iiii', $pubId, $absen, $score, $total);
+    if ((int)$ins->param_count === 5) {
+      $nama = "Siswa $absen";
+      $ins->bind_param('iisii', $pubId, $absen, $nama, $score, $total);
+    } else {
+      $ins->bind_param('iiii', $pubId, $absen, $score, $total);
+    }
     if ($ins->execute()) $inserted++;
   }
   $ins->close();

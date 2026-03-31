@@ -116,10 +116,15 @@ $payloadObject['settings']['meta'] = [
 ];
 $payloadObject['settings']['show_solution'] = $showSolution ? 1 : 0;
 $payloadObject['settings']['answer_key'] = is_array($answerKey) ? array_map('intval', $answerKey) : [];
-$payloadJson = json_encode($payloadObject, JSON_UNESCAPED_UNICODE);
-$answerJson = is_string($answerKey) ? $answerKey : json_encode($answerKey, JSON_UNESCAPED_UNICODE);
-$arr = json_decode($payloadJson, true);
-$total = is_array($arr['items'] ?? null) ? count($arr['items']) : 0;
+$jsonFlags = JSON_UNESCAPED_UNICODE | (defined('JSON_INVALID_UTF8_SUBSTITUTE') ? JSON_INVALID_UTF8_SUBSTITUTE : 0);
+$payloadJson = json_encode($payloadObject, $jsonFlags);
+$answerJson = is_string($answerKey) ? $answerKey : json_encode($answerKey, $jsonFlags);
+$total = is_array($payloadObject['items'] ?? null) ? count($payloadObject['items']) : 0;
+if (!is_string($payloadJson) || $payloadJson === '' || !is_string($answerJson) || $answerJson === '') {
+  http_response_code(500);
+  echo json_encode(['ok'=>false,'error'=>'encode_fail'], JSON_UNESCAPED_UNICODE);
+  exit;
+}
 if ($expire === '') {
   $expire = date('Y-m-d H:i:s', time() + 86400);
 }
@@ -138,7 +143,11 @@ $slugAdjusted = false;
 $attempts = 0;
 while ($attempts < 8) {
   $attempts++;
-  $ok = $stmt->execute();
+  try {
+    $ok = $stmt->execute();
+  } catch (mysqli_sql_exception $e) {
+    $ok = false;
+  }
   if ($ok) break;
   $code = (int)($stmt->errno ?: $mysqli->errno);
   if ($code !== 1062) {
@@ -148,7 +157,11 @@ while ($attempts < 8) {
     exit;
   }
   $slugAdjusted = true;
-  $suffix = substr(bin2hex(random_bytes(3)), 0, 6);
+  try {
+    $suffix = substr(bin2hex(random_bytes(3)), 0, 6);
+  } catch (Exception $e) {
+    $suffix = substr(md5(uniqid('', true)), 0, 6);
+  }
   $maxLen = 128;
   $baseMax = $maxLen - 1 - strlen($suffix);
   $basePart = $baseSlug;
