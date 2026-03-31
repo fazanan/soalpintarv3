@@ -3952,6 +3952,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 <div class="text-xs text-text-sub-light">Unggah file .csv / .txt dengan format baris: <code>NoAbsen,Nama Siswa</code> atau dipisah tab/semicolon</div>
                 <div class="flex items-center gap-3">
                   <button type="button" onclick="document.getElementById('rosterPicker').click()" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark">Upload CSV/TXT</button>
+                  <button type="button" onclick="window.__sp.downloadRosterTemplate()" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark">Download Template TXT</button>
                   <div class="text-xs text-text-sub-light">${Array.isArray(f.roster) && f.roster.length ? `Terbaca ${f.roster.length} siswa` : 'Belum ada file diunggah'}</div>
                 </div>
               </div>
@@ -4251,6 +4252,20 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         }
         return rows;
       };
+      const downloadRosterTemplate = () => {
+        const lines = [
+          '1,Ahmad Fauzan',
+          '2,Siti Aisyah',
+          '3,Budi Setiawan',
+          '4,Citra Dewi',
+        ];
+        const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'Template_DaftarSiswa.txt';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      };
       const handleRosterSelected = (evt) => {
         const f = evt.target?.files?.[0];
         if (!f) return;
@@ -4458,12 +4473,16 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           if (res.ok && js && js.ok) {
             const expText = (expire && expire.trim()) ? expire.trim() : '24 jam (otomatis)';
             const msgLink = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(js.id))}&n=1`;
-            if (btn) btn.innerHTML = `Berhasil publish.<br>Contoh akses: <a class="text-blue-600 underline" href="${msgLink}" target="_blank" rel="noopener">${msgLink}</a><br>Maks absen: ${Number(state.quizPublishForm?.jumlah||0) || '-'} • Expire: ${expText}`;
+            const adjusted = Number(js.slug_adjusted || 0) === 1 && String(js.slug_original || '') && String(js.slug || '') !== String(js.slug_original || '');
+            const adjustedMsg = adjusted ? `<br><span class="text-amber-700">Slug disesuaikan menjadi: <b>${safeText(String(js.slug||''))}</b></span>` : ``;
+            if (btn) btn.innerHTML = `Berhasil publish.${adjustedMsg}<br>Contoh akses: <a class="text-blue-600 underline" href="${msgLink}" target="_blank" rel="noopener">${msgLink}</a><br>Maks absen: ${Number(state.quizPublishForm?.jumlah||0) || '-'} • Expire: ${expText}`;
             state.quizLastLink = msgLink;
             await loadPublications();
             state.quizSelectedSlug = String(js.slug);
             state.quizLastPubId = Number(js.id);
             state.quizLastSlug = String(js.slug || '');
+            state.quizPublishForm = state.quizPublishForm || {};
+            state.quizPublishForm.slug = String(js.slug || state.quizPublishForm.slug || '');
             saveDebounced(true);
             render();
             try {
@@ -6535,6 +6554,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         setQuizTab,
         setQuizPublish,
         publishQuiz,
+        downloadRosterTemplate,
         loadPublications,
         loadResults,
         exportJSON,

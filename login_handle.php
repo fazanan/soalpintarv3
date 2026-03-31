@@ -11,7 +11,12 @@ if ($u === '' || $p === '') {
   header('Location: login.php?e=1');
   exit;
 }
-$stmt = $mysqli->prepare('SELECT id, password, role, access_quiz, access_rekap_nilai FROM users WHERE username = ? LIMIT 1');
+$stmt = null;
+try {
+  $stmt = $mysqli->prepare('SELECT id, password, role, access_quiz, access_rekap_nilai FROM users WHERE username = ? LIMIT 1');
+} catch (mysqli_sql_exception $e) {
+  $stmt = null;
+}
 if ($stmt) {
   $stmt->bind_param('s', $u);
   $stmt->execute();

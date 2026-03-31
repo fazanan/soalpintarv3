@@ -13,7 +13,8 @@ $role = (string)($_SESSION['role'] ?? 'user');
 if ($role !== 'admin') {
   $access = isset($_SESSION['access_quiz']) ? (int)$_SESSION['access_quiz'] : null;
   if ($access === null) {
-    $stmtAcc = $mysqli->prepare("SELECT access_quiz FROM users WHERE id=? LIMIT 1");
+    $stmtAcc = null;
+    try { $stmtAcc = $mysqli->prepare("SELECT access_quiz FROM users WHERE id=? LIMIT 1"); } catch (mysqli_sql_exception $e) { $stmtAcc = null; }
     if ($stmtAcc) {
       $stmtAcc->bind_param('i', $_SESSION['user_id']);
       $stmtAcc->execute();
@@ -21,6 +22,7 @@ if ($role !== 'admin') {
       if ($stmtAcc->fetch()) $access = (int)$aq;
       $stmtAcc->close();
     }
+    if ($access === null) $access = 1;
   }
   if ($access !== 1) {
     http_response_code(403);
@@ -89,7 +91,15 @@ if ($missing) {
   echo json_encode(['ok'=>false,'error'=>'invalid_input','missing'=>$missing], JSON_UNESCAPED_UNICODE);
   exit;
 }
-$slug = strtolower(preg_replace('/[^a-z0-9\-]+/','-', $slug));
+function normalize_slug(string $s): string {
+  $s = trim(strtolower($s));
+  $s = preg_replace('/[^a-z0-9\-]+/', '-', $s);
+  $s = preg_replace('/-+/', '-', $s);
+  $s = trim($s, '-');
+  return $s;
+}
+$baseSlug = normalize_slug($slug);
+if ($baseSlug === '') $baseSlug = 'kelas';
 $payloadObject = [];
 if (isset($payload['items']) && is_array($payload['items'])) {
   $payloadObject = $payload;
@@ -120,29 +130,48 @@ if (!$stmt) {
   echo json_encode(['ok'=>false,'error'=>'stmt_fail','errno'=>(int)$mysqli->errno]);
   exit;
 }
-$stmt->bind_param('isssisss', $_SESSION['user_id'], $slug, $mapel, $kelas, $total, $payloadJson, $answerJson, $expire);
-$ok = $stmt->execute();
-if (!$ok) {
+$candidateSlug = $baseSlug;
+$userId = (int)$_SESSION['user_id'];
+$stmt->bind_param('isssisss', $userId, $candidateSlug, $mapel, $kelas, $total, $payloadJson, $answerJson, $expire);
+$ok = false;
+$slugAdjusted = false;
+$attempts = 0;
+while ($attempts < 8) {
+  $attempts++;
+  $ok = $stmt->execute();
+  if ($ok) break;
   $code = (int)($stmt->errno ?: $mysqli->errno);
-  $stmt->close();
-  if ($code === 1062) {
-    http_response_code(409);
-    echo json_encode(['ok'=>false,'error'=>'slug_exists']);
-  } else {
+  if ($code !== 1062) {
+    $stmt->close();
     http_response_code(500);
     echo json_encode(['ok'=>false,'error'=>'insert_fail','errno'=>$code]);
+    exit;
   }
+  $slugAdjusted = true;
+  $suffix = substr(bin2hex(random_bytes(3)), 0, 6);
+  $maxLen = 128;
+  $baseMax = $maxLen - 1 - strlen($suffix);
+  $basePart = $baseSlug;
+  if (strlen($basePart) > $baseMax) $basePart = substr($basePart, 0, $baseMax);
+  $candidateSlug = rtrim($basePart, '-') . '-' . $suffix;
+}
+if (!$ok) {
+  $stmt->close();
+  http_response_code(409);
+  echo json_encode(['ok'=>false,'error'=>'slug_exists']);
   exit;
 }
-$id = $stmt->insert_id;
+$id = (int)$stmt->insert_id;
 $stmt->close();
 echo json_encode([
   'ok'=>true,
   'id'=>$id,
-  'slug'=>$slug,
+  'slug'=>$candidateSlug,
+  'slug_original'=>$baseSlug,
+  'slug_adjusted'=>$slugAdjusted ? 1 : 0,
   'mapel'=>$mapel,
   'kelas'=>$kelas,
   'total'=>$total,
-  'public_link'=>"https://".$_SERVER['HTTP_HOST']."/{$slug}/{no_absen}"
+  'public_link'=>"https://".$_SERVER['HTTP_HOST']."/{$candidateSlug}/{no_absen}"
 ], JSON_UNESCAPED_UNICODE);
 exit;

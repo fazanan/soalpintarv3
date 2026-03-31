@@ -8,6 +8,16 @@ require_once __DIR__ . '/db.php';
 
 $message = '';
 $error = '';
+$hasAccessCols = false;
+try {
+  $ok1 = false;
+  $ok2 = false;
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_quiz'")) { $ok1 = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_rekap_nilai'")) { $ok2 = $rs->num_rows > 0; $rs->close(); }
+  $hasAccessCols = $ok1 && $ok2;
+} catch (mysqli_sql_exception $e) {
+  $hasAccessCols = false;
+}
 
 function post($k, $default = '') {
   return isset($_POST[$k]) ? trim((string)$_POST[$k]) : $default;
@@ -33,9 +43,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $error = 'Username terlalu panjang.';
     } else {
       $hash = password_hash($password, PASSWORD_BCRYPT);
-      $stmt = $mysqli->prepare("INSERT INTO users (username, password, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?, ?, ?)");
+      $stmt = null;
+      try {
+        $stmt = $hasAccessCols
+          ? $mysqli->prepare("INSERT INTO users (username, password, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?, ?, ?)")
+          : $mysqli->prepare("INSERT INTO users (username, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?)");
+      } catch (mysqli_sql_exception $e) {
+        $stmt = null;
+      }
       if ($stmt) {
-        $stmt->bind_param('sssiiii', $username, $hash, $role, $accessQuiz, $accessRekap, $lp, $lg);
+        if ($hasAccessCols) $stmt->bind_param('sssiiii', $username, $hash, $role, $accessQuiz, $accessRekap, $lp, $lg);
+        else $stmt->bind_param('sssii', $username, $hash, $role, $lp, $lg);
         if ($stmt->execute()) $message = 'Pengguna berhasil dibuat.';
         else {
           $code = (int)($stmt->errno ?: $mysqli->errno);
@@ -63,9 +81,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lg = (int)max(0, (int)post('limitgambar', '0'));
     $accessQuiz = isset($_POST['access_quiz']) ? 1 : 0;
     $accessRekap = isset($_POST['access_rekap_nilai']) ? 1 : 0;
-    $stmt = $mysqli->prepare("UPDATE users SET limitpaket=?, limitgambar=?, access_quiz=?, access_rekap_nilai=? WHERE id=?");
+    $stmt = null;
+    try {
+      $stmt = $hasAccessCols
+        ? $mysqli->prepare("UPDATE users SET limitpaket=?, limitgambar=?, access_quiz=?, access_rekap_nilai=? WHERE id=?")
+        : $mysqli->prepare("UPDATE users SET limitpaket=?, limitgambar=? WHERE id=?");
+    } catch (mysqli_sql_exception $e) {
+      $stmt = null;
+    }
     if ($stmt) {
-      $stmt->bind_param('iiiii', $lp, $lg, $accessQuiz, $accessRekap, $id);
+      if ($hasAccessCols) $stmt->bind_param('iiiii', $lp, $lg, $accessQuiz, $accessRekap, $id);
+      else $stmt->bind_param('iii', $lp, $lg, $id);
       if ($stmt->execute()) $message = 'Pengaturan pengguna diperbarui.';
       else $error = 'Gagal memperbarui pengaturan pengguna.';
       $stmt->close();
@@ -128,12 +154,25 @@ if ($page > $totalPages) $page = $totalPages;
 $offset = ($page - 1) * $perPage;
 
 // Ambil data per halaman
-$stmt = $mysqli->prepare("SELECT id, username, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?");
+$stmt = null;
+try {
+  $stmt = $hasAccessCols
+    ? $mysqli->prepare("SELECT id, username, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?")
+    : $mysqli->prepare("SELECT id, username, role, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?");
+} catch (mysqli_sql_exception $e) {
+  $stmt = null;
+}
 if ($stmt) {
   $stmt->bind_param('ii', $perPage, $offset);
   $stmt->execute();
   $res = $stmt->get_result();
-  while ($r = $res->fetch_assoc()) $users[] = $r;
+  while ($r = $res->fetch_assoc()) {
+    if (!$hasAccessCols) {
+      $r['access_quiz'] = 1;
+      $r['access_rekap_nilai'] = 1;
+    }
+    $users[] = $r;
+  }
   $stmt->close();
 }
 ?>

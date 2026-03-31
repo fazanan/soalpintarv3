@@ -13,7 +13,8 @@ $role = (string)($_SESSION['role'] ?? 'user');
 if ($role !== 'admin') {
   $access = isset($_SESSION['access_quiz']) ? (int)$_SESSION['access_quiz'] : null;
   if ($access === null) {
-    $stmtAcc = $mysqli->prepare("SELECT access_quiz FROM users WHERE id=? LIMIT 1");
+    $stmtAcc = null;
+    try { $stmtAcc = $mysqli->prepare("SELECT access_quiz FROM users WHERE id=? LIMIT 1"); } catch (mysqli_sql_exception $e) { $stmtAcc = null; }
     if ($stmtAcc) {
       $stmtAcc->bind_param('i', $_SESSION['user_id']);
       $stmtAcc->execute();
@@ -21,6 +22,7 @@ if ($role !== 'admin') {
       if ($stmtAcc->fetch()) $access = (int)$aq;
       $stmtAcc->close();
     }
+    if ($access === null) $access = 1;
   }
   if ($access !== 1) {
     http_response_code(403);
