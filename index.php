@@ -3902,7 +3902,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             <div class="flex items-center gap-2">
               <button onclick="window.__sp.setQuizTab('live')" class="px-3 py-2 text-sm font-semibold ${sub==='live'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Live</button>
               <button onclick="window.__sp.setQuizTab('publish')" class="px-3 py-2 text-sm font-semibold ${sub==='publish'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Buat Link</button>
-              ${IS_ADMIN ? `<button onclick="window.__sp.setQuizTab('results')" class="px-3 py-2 text-sm font-semibold ${sub==='results'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Hasil</button>` : ``}
+              ${(IS_ADMIN || HAS_QUIZ_ACCESS) ? `<button onclick="window.__sp.setQuizTab('results')" class="px-3 py-2 text-sm font-semibold ${sub==='results'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Hasil Nilai</button>` : ``}
             </div>
             <button class="inline-flex items-center gap-2 h-9 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm"
               onclick="window.__sp.openQuizHelp()"><span class="material-symbols-outlined text-[16px]">help</span><span class="hidden md:inline">Petunjuk</span></button>
@@ -4055,7 +4055,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           }).join('');
           return `
             <div class="p-6 space-y-4">
-              <div class="text-xl font-bold">Hasil</div>
+              <div class="text-xl font-bold">Hasil Nilai</div>
               <div class="flex items-center flex-wrap gap-2">
                 <select id="selPub" class="flex-1 min-w-0 h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark">${options}</select>
                 <button onclick="window.__sp.loadResults()" class="px-4 h-11 rounded-lg border bg-white dark:bg-surface-dark">Muat</button>
@@ -4119,7 +4119,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                   <li>Live: jalankan kuis interaktif menggunakan naskah yang sudah dibuat (butuh soal tersedia).</li>
                   <li>Buat Link: isi slug, jumlah siswa, dan (opsional) unggah roster CSV/TXT “NoAbsen,Nama Siswa” untuk menghasilkan link unik per siswa.</li>
                   <li>Publish: setelah berhasil, sistem menampilkan link contoh dan dapat mengunduh daftar link siswa (CSV).</li>
-                  <li>Hasil: muat dan unduh laporan JSON/ZIP/CSV; ringkasan nilai dan peringkat tersedia.</li>
+                  <li>Hasil Nilai: muat dan unduh laporan JSON/ZIP/CSV; ringkasan nilai dan peringkat tersedia.</li>
                 </ol>
                 <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
                   Catatan: Link dan data hasil akan otomatis dihapus 24 jam setelah publish. Segera simpan arsip JSON/ZIP.
