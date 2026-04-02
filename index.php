@@ -4041,12 +4041,15 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             const prev = tab === 'konfigurasi' ? 'identitas' : (tab === 'naskah' ? 'konfigurasi' : null);
             const next = tab === 'identitas' ? 'konfigurasi' : (tab === 'konfigurasi' ? 'naskah' : null);
             const rightLabel = tab === 'identitas' ? 'Konfigurasi' : (tab === 'konfigurasi' ? 'Buat Naskah' : '');
+            const rightOnClick = tab === 'konfigurasi'
+              ? `onclick="window.__sp.setPreviewTab('naskah'); window.__sp.buildPackage()"`
+              : (next ? `onclick="window.__sp.setPreviewTab('${next}')"` : '');
             return `
               <div class="md:hidden mt-6 flex items-center gap-3">
                 <button class="flex-1 h-12 rounded-xl border bg-white dark:bg-surface-dark font-bold" ${prev ? `onclick="window.__sp.setPreviewTab('${prev}')"` : 'disabled'}>
                   Kembali
                 </button>
-                <button class="flex-1 h-12 rounded-xl ${next ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'} font-bold" ${next ? `onclick="window.__sp.setPreviewTab('${next}')"` : 'disabled'}>
+                <button class="flex-1 h-12 rounded-xl ${next ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'} font-bold" ${next ? rightOnClick : 'disabled'}>
                   ${rightLabel || 'Lanjut'}
                 </button>
               </div>
@@ -4054,9 +4057,10 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           };
 
           let body = "";
-          if (state.previewTab === "identitas") body = renderIdentitas() + mobileStepNav("identitas");
+          if (state._isGenerating) {
+            body = generatingPreviewHtml();
+          } else if (state.previewTab === "identitas") body = renderIdentitas() + mobileStepNav("identitas");
           else if (state.previewTab === "konfigurasi") body = renderKonfigurasi() + mobileStepNav("konfigurasi");
-          else if (state._isGenerating) body = generatingPreviewHtml() + mobileStepNav("naskah");
           else {
             const parts = [renderNaskah()];
             if (state.previewFlags?.kunci) parts.push(`<div class="my-6 border-t border-dashed border-gray-300"></div><div style="break-before: page; page-break-before: always;"></div><div class="mt-10">${renderKunci()}</div>`);
