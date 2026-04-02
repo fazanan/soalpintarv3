@@ -628,6 +628,14 @@ if (!isset($_SESSION['user_id'])) {
 
       const setView = (id) => {
         state.activeView = id;
+        if (window.innerWidth < 1024) {
+          const sb = document.getElementById("mainSidebar");
+          if (sb) {
+            sb.classList.add("hidden");
+            sb.classList.remove("flex");
+          }
+          try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch {}
+        }
         saveDebounced(true);
         render();
       };
@@ -4014,17 +4022,17 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             : (state.previewTab === 'konfigurasi' ? "window.__sp.openKonfigurasiHelp()" : "window.__sp.openPreviewHelp()");
           const tabBar = `
             <div class="mb-4 flex items-center justify-between gap-3 sticky top-0 z-30 bg-background-light/90 dark:bg-background-dark/80 backdrop-blur md:static md:bg-transparent md:dark:bg-transparent py-2">
-              <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
+              <div class="hidden md:inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
                 ${["identitas","konfigurasi","naskah"].map(t=>{
                   const label = t==="identitas"?"1. Identitas":(t==="konfigurasi"?"2. Konfigurasi":"3. Naskah Soal");
                   const active = state.previewTab===t;
                   return `<button class="${active?'bg-primary text-white':'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setPreviewTab('${t}')">${label}</button>`;
                 }).join('')}
               </div>
-              <button class="inline-flex items-center gap-2 h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold whitespace-nowrap"
-                onclick="${helpOnClick}">
+              <button class="inline-flex items-center justify-center h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                onclick="${helpOnClick}" title="Petunjuk">
                 <span class="material-symbols-outlined text-[18px]">help</span>
-                <span>Petunjuk</span>
+                <span class="hidden md:inline ml-2">Petunjuk</span>
               </button>
             </div>
           `;
@@ -4032,36 +4040,18 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           const mobileStepNav = (tab) => {
             const prev = tab === 'konfigurasi' ? 'identitas' : (tab === 'naskah' ? 'konfigurasi' : null);
             const next = tab === 'identitas' ? 'konfigurasi' : (tab === 'konfigurasi' ? 'naskah' : null);
+            const rightLabel = tab === 'identitas' ? 'Konfigurasi' : (tab === 'konfigurasi' ? 'Buat Naskah' : '');
             return `
               <div class="md:hidden mt-6 flex items-center gap-3">
                 <button class="flex-1 h-12 rounded-xl border bg-white dark:bg-surface-dark font-bold" ${prev ? `onclick="window.__sp.setPreviewTab('${prev}')"` : 'disabled'}>
                   Kembali
                 </button>
                 <button class="flex-1 h-12 rounded-xl ${next ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'} font-bold" ${next ? `onclick="window.__sp.setPreviewTab('${next}')"` : 'disabled'}>
-                  Lanjut
+                  ${rightLabel || 'Lanjut'}
                 </button>
               </div>
             `;
           };
-
-          const mobileActionBar = `
-            <div class="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t bg-white/95 dark:bg-surface-dark/95 backdrop-blur">
-              <div class="max-w-[1100px] mx-auto px-4 py-3 grid grid-cols-4 gap-2">
-                <button class="h-12 rounded-xl border bg-white dark:bg-surface-dark font-bold text-sm" onclick="saveProject()">
-                  Simpan
-                </button>
-                <button class="h-12 rounded-xl border bg-white dark:bg-surface-dark font-bold text-sm" onclick="document.getElementById('projectPicker').click()">
-                  Muat
-                </button>
-                <button class="h-12 rounded-xl border bg-white dark:bg-surface-dark font-bold text-sm" onclick="document.getElementById('btnPrint').click()">
-                  Cetak
-                </button>
-                <button class="h-12 rounded-xl bg-primary text-white font-bold text-sm" onclick="window.__sp.buildPackage()">
-                  Buat Paket
-                </button>
-              </div>
-            </div>
-          `;
 
           let body = "";
           if (state.previewTab === "identitas") body = renderIdentitas() + mobileStepNav("identitas");
@@ -4074,7 +4064,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             body = parts.join("") + mobileStepNav("naskah");
           }
 
-          return `<div class="pb-24 md:pb-0">${tabBar}${body}${mobileActionBar}</div>`;
+          return `<div class="pb-6 md:pb-0">${tabBar}${body}</div>`;
         }
         if (state.activeView === "lkpd") return renderLKPD();
         if (state.activeView === "modul_ajar") return renderModulAjar();
