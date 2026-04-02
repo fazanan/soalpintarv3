@@ -1542,8 +1542,37 @@ if (!isset($_SESSION['user_id'])) {
         if (type === "pg") {
              answer = normalizeAnswerIndex(answer, cappedOptions);
         } else if (type === "pg_kompleks") {
-             if (!Array.isArray(answer)) answer = [answer];
-             answer = answer.map(a => normalizeAnswerIndex(a, cappedOptions)).filter(n => n >= 0);
+             const toList = (val) => {
+               const out = [];
+               const pushOne = (x) => {
+                 const idx = normalizeAnswerIndex(x, cappedOptions);
+                 if (Number.isFinite(idx) && idx >= 0) out.push(idx);
+               };
+               if (Array.isArray(val)) {
+                 for (const v of val) out.push(...toList(v));
+                 return out;
+               }
+               if (val == null) return out;
+               if (typeof val === 'string') {
+                 const s0 = val.trim();
+                 if (!s0) return out;
+                 const s = s0
+                   .toUpperCase()
+                   .replace(/\bDAN\b/g, ',')
+                   .replace(/\b&\b/g, ',')
+                   .replace(/\s+/g, ' ');
+                 const parts = s.split(/[^A-E0-9]+/).map(x => x.trim()).filter(Boolean);
+                 if (parts.length > 1) {
+                   for (const p of parts) pushOne(p);
+                   return out;
+                 }
+                 pushOne(s0);
+                 return out;
+               }
+               pushOne(val);
+               return out;
+             };
+             answer = toList(answer);
              answer = [...new Set(answer)].sort((a,b)=>a-b);
         } else if (type === "menjodohkan") {
              if (!Array.isArray(answer)) answer = [];
@@ -5119,6 +5148,11 @@ PARAMETER:
 - Opsi: ${opsi} pilihan (untuk PG).
 - SEMUA item bertipe: ${sec.bentuk} (JANGAN buat tipe lain).
 
+ATURAN JAWABAN (WAJIB):
+- Jika tipe "pg": field "answer" harus 1 angka index 0-based (0=A, 1=B, dst).
+- Jika tipe "pg_kompleks": field "answer" harus ARRAY angka index 0-based, MINIMAL 2 jawaban benar. Contoh: [0,2] berarti A dan C benar.
+- Jika tipe "menjodohkan": field "answer" harus ARRAY pasangan yang konsisten dengan opsi.
+
 INSTRUKSI FORMAT MATEMATIKA (WAJIB PATUH):
 1. JANGAN GUNAKAN FORMAT LATEX ($..$).
 2. Gunakan tag HTML <sup> untuk Pangkat, <sub> untuk Indeks.
@@ -5237,9 +5271,10 @@ Bloom: ${q.bloom || 'C2'}
 Materi: ${q.materi || '-'}
 Instruksi:
 1. Gunakan Bahasa Indonesia.
-2. Jika PG, buat ${clamp(Number(state.sections.find(s=>s.id===q.sectionId)?.opsiPG || 4), 3, 5)} opsi.
+2. Jika tipe "pg" atau "pg_kompleks", buat ${clamp(Number(state.sections.find(s=>s.id===q.sectionId)?.opsiPG || 4), 3, 5)} opsi.
 3. Pastikan jawaban benar dan disertai penjelasan singkat.
 4. Jika butuh gambar: Prioritas 1: "asciiDiagram", Prioritas 2: "svgSource", Prioritas 3: "imagePrompt".
+5. Jika tipe "pg_kompleks", field "answer" HARUS array minimal 2 jawaban benar (contoh: [0,2]).
 
 OUTPUT JSON:
 {
