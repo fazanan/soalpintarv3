@@ -4248,7 +4248,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 onclick="window.__sp.openKonfigurasiHelp()">
                 <span class="material-symbols-outlined text-[16px]">help</span>
               </button>
-              <div class="text-sm text-text-sub-light dark:text-text-sub-dark">Multi-bagian (bertingkat) dalam satu paket</div>
+              <div class="hidden md:block text-sm text-text-sub-light dark:text-text-sub-dark">Multi-bagian (bertingkat) dalam satu paket</div>
             </div>
             <div class="flex gap-2">
               <button
@@ -4259,7 +4259,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 Tambah Bagian
               </button>
               <button id="btnBuild"
-                class="flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors"
+                class="hidden md:flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors"
                 onclick="window.__sp.buildPackage()"
               >
                 <span class="material-symbols-outlined text-[18px]">bolt</span>
@@ -4292,22 +4292,6 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           </div>
           <div class="grid grid-cols-1 gap-5">
             ${state.sections.map((s, idx) => renderSectionCard(s, idx)).join("")}
-          </div>
-          <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
-            <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-              <div class="p-4 rounded-xl bg-background-light dark:bg-background-dark/30 border border-border-light dark:border-border-dark">
-                <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Total bagian</div>
-                <div class="text-2xl font-bold mt-1">${state.sections.length}</div>
-              </div>
-              <div class="p-4 rounded-xl bg-background-light dark:bg-background-dark/30 border border-border-light dark:border-border-dark">
-                <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Perkiraan total soal</div>
-                <div class="text-2xl font-bold mt-1">${estimateTotalQuestions()}</div>
-              </div>
-              <div class="p-4 rounded-xl bg-background-light dark:bg-background-dark/30 border border-border-light dark:border-border-dark">
-                <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Bagian pakai gambar</div>
-                <div class="text-2xl font-bold mt-1">${state.sections.filter((x) => x.pakaiGambar).length}</div>
-              </div>
-            </div>
           </div>
         </div>
       `;
