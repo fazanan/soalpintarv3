@@ -175,7 +175,7 @@ if (!isset($_SESSION['user_id'])) {
               </div>
               <button
                 id="btnExportTop"
-                class="md:hidden mt-2 flex items-center gap-2 px-3 py-1.5 rounded-md border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-medium transition-colors"
+                class="hidden mt-2 flex items-center gap-2 px-3 py-1.5 rounded-md border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-medium transition-colors"
               >
                 <span class="material-symbols-outlined text-[16px]">description</span>
                 Unduh .docx
@@ -184,18 +184,18 @@ if (!isset($_SESSION['user_id'])) {
           </div>
           <div class="flex items-center justify-start gap-2 pb-3">
             <div id="tabs" class="hidden"></div>
-            <div class="hidden md:flex items-center gap-2">
-              <button id="btnSave" class="inline-flex items-center gap-2 h-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors px-3">
+            <div class="flex items-center gap-2">
+              <button id="btnSave" class="hidden md:inline-flex items-center gap-2 h-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors px-3">
                 <span class="material-symbols-outlined text-[18px] shrink-0">save</span>
                 <span class="hidden lg:inline text-sm font-medium whitespace-nowrap">Simpan</span>
               </button>
-              <button id="btnLoad" class="inline-flex items-center gap-2 h-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors px-3">
+              <button id="btnLoad" class="hidden md:inline-flex items-center gap-2 h-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors px-3">
                 <span class="material-symbols-outlined text-[18px] shrink-0">folder_open</span>
                 <span class="hidden lg:inline text-sm font-medium whitespace-nowrap">Muat</span>
               </button>
               <button id="btnPrint" class="inline-flex items-center gap-2 h-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors px-3">
                 <span class="material-symbols-outlined text-[18px] shrink-0">print</span>
-                <span class="hidden lg:inline text-sm font-medium whitespace-nowrap">Cetak</span>
+                <span class="text-sm font-medium whitespace-nowrap">Cetak</span>
               </button>
             </div>
           </div>
