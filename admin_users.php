@@ -138,16 +138,34 @@ if ($isAjax) {
 }
 
 $users = [];
-$perPage = 20;
+$perPage = 10;
+$q = isset($_GET['q']) ? trim((string)$_GET['q']) : '';
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $offset = ($page - 1) * $perPage;
 
 // Hitung total data
 $total = 0;
-if ($rs = $mysqli->query("SELECT COUNT(*) AS c FROM users")) {
-  $row = $rs->fetch_assoc();
+if ($q !== '') {
+  $like = '%' . $q . '%';
+  if (ctype_digit($q)) {
+    $idQ = (int)$q;
+    $stmtCnt = $mysqli->prepare("SELECT COUNT(*) AS c FROM users WHERE username LIKE ? OR id=?");
+    $stmtCnt->bind_param('si', $like, $idQ);
+  } else {
+    $stmtCnt = $mysqli->prepare("SELECT COUNT(*) AS c FROM users WHERE username LIKE ?");
+    $stmtCnt->bind_param('s', $like);
+  }
+  $stmtCnt->execute();
+  $resCnt = $stmtCnt->get_result();
+  $row = $resCnt ? $resCnt->fetch_assoc() : null;
   $total = (int)($row['c'] ?? 0);
-  $rs->close();
+  $stmtCnt->close();
+} else {
+  if ($rs = $mysqli->query("SELECT COUNT(*) AS c FROM users")) {
+    $row = $rs->fetch_assoc();
+    $total = (int)($row['c'] ?? 0);
+    $rs->close();
+  }
 }
 $totalPages = max(1, (int)ceil($total / $perPage));
 if ($page > $totalPages) $page = $totalPages;
@@ -156,14 +174,37 @@ $offset = ($page - 1) * $perPage;
 // Ambil data per halaman
 $stmt = null;
 try {
-  $stmt = $hasAccessCols
-    ? $mysqli->prepare("SELECT id, username, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?")
-    : $mysqli->prepare("SELECT id, username, role, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?");
+  if ($q !== '') {
+    $like = '%' . $q . '%';
+    if (ctype_digit($q)) {
+      $stmt = $hasAccessCols
+        ? $mysqli->prepare("SELECT id, username, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? OR id=? ORDER BY id DESC LIMIT ? OFFSET ?")
+        : $mysqli->prepare("SELECT id, username, role, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? OR id=? ORDER BY id DESC LIMIT ? OFFSET ?");
+    } else {
+      $stmt = $hasAccessCols
+        ? $mysqli->prepare("SELECT id, username, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?")
+        : $mysqli->prepare("SELECT id, username, role, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?");
+    }
+  } else {
+    $stmt = $hasAccessCols
+      ? $mysqli->prepare("SELECT id, username, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?")
+      : $mysqli->prepare("SELECT id, username, role, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?");
+  }
 } catch (mysqli_sql_exception $e) {
   $stmt = null;
 }
 if ($stmt) {
-  $stmt->bind_param('ii', $perPage, $offset);
+  if ($q !== '') {
+    $like = '%' . $q . '%';
+    if (ctype_digit($q)) {
+      $idQ = (int)$q;
+      $stmt->bind_param('siii', $like, $idQ, $perPage, $offset);
+    } else {
+      $stmt->bind_param('sii', $like, $perPage, $offset);
+    }
+  } else {
+    $stmt->bind_param('ii', $perPage, $offset);
+  }
   $stmt->execute();
   $res = $stmt->get_result();
   while ($r = $res->fetch_assoc()) {
@@ -189,7 +230,7 @@ if ($stmt) {
   <style>body{font-family:"Lexend",system-ui,sans-serif}</style>
 </head>
 <body class="bg-gray-50 min-h-dvh">
-  <div class="max-w-5xl mx-auto p-6">
+  <div class="max-w-none mx-auto p-6">
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl font-semibold">Manajemen Pengguna</h1>
       <a href="index.php" class="px-4 py-2 rounded-lg border bg-white hover:bg-gray-50">Kembali ke Aplikasi</a>
@@ -202,7 +243,14 @@ if ($stmt) {
       <div class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-800"><?php echo htmlspecialchars($error); ?></div>
     <?php endif; ?>
 
-    <div class="mb-4 flex items-center justify-end">
+    <div class="mb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <form method="get" class="flex items-center gap-2">
+        <input name="q" value="<?php echo htmlspecialchars($q); ?>" placeholder="Cari username atau ID..." class="w-full md:w-72 h-10 rounded-lg border bg-white px-3">
+        <button class="px-4 h-10 rounded-lg border bg-white hover:bg-gray-50" type="submit">Cari</button>
+        <?php if ($q !== ''): ?>
+          <a class="px-4 h-10 inline-flex items-center rounded-lg border bg-white hover:bg-gray-50" href="admin_users.php">Reset</a>
+        <?php endif; ?>
+      </form>
       <button id="btnCreateUser" type="button" class="px-4 h-10 rounded-lg border bg-white hover:bg-gray-50">Tambah Pengguna</button>
     </div>
 
@@ -266,9 +314,11 @@ if ($stmt) {
         <div class="inline-flex items-center gap-1">
           <?php
             $base = strtok($_SERVER['REQUEST_URI'], '?');
-            $link = function($p) use ($base) {
+            $link = function($p) use ($base, $q) {
               $p = max(1, (int)$p);
-              return htmlspecialchars($base . '?page=' . $p);
+              $qs = 'page=' . $p;
+              if ($q !== '') $qs .= '&q=' . rawurlencode($q);
+              return htmlspecialchars($base . '?' . $qs);
             };
             $start = max(1, $page - 2);
             $end = min($totalPages, $page + 2);
