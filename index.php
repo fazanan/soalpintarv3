@@ -4021,15 +4021,15 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             ? "window.__sp.openIdentitasHelp()"
             : (state.previewTab === 'konfigurasi' ? "window.__sp.openKonfigurasiHelp()" : "window.__sp.openPreviewHelp()");
           const tabBar = `
-            <div class="mb-4 flex items-center justify-between gap-3 sticky top-0 z-30 bg-background-light/90 dark:bg-background-dark/80 backdrop-blur md:static md:bg-transparent md:dark:bg-transparent py-2">
-              <div class="hidden md:inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
+            <div class="hidden md:flex items-center justify-between gap-3 mb-2">
+              <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
                 ${["identitas","konfigurasi","naskah"].map(t=>{
                   const label = t==="identitas"?"1. Identitas":(t==="konfigurasi"?"2. Konfigurasi":"3. Naskah Soal");
                   const active = state.previewTab===t;
                   return `<button class="${active?'bg-primary text-white':'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setPreviewTab('${t}')">${label}</button>`;
                 }).join('')}
               </div>
-              <button class="hidden md:inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+              <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
                 onclick="${helpOnClick}" title="Petunjuk">
                 <span class="material-symbols-outlined text-[18px]">help</span>
                 <span class="ml-2">Petunjuk</span>
