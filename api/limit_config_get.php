@@ -27,6 +27,7 @@ function ensure_cost($db,$feat,$cost){
 }
 ensure_cost($mysqli,'publish_quiz',3);
 ensure_cost($mysqli,'modul_ajar',3);
+ensure_cost($mysqli,'rpp',2);
 ensure_cost($mysqli,'buat_soal',2);
 ensure_cost($mysqli,'rekap_nilai',0);
 $mysqli->query("INSERT IGNORE INTO app_settings (k,v) VALUES ('initial_limit','300')");
@@ -42,4 +43,3 @@ if ($row=$res->fetch_assoc()) $init = (int)$row['v'];
 $res->close();
 
 echo json_encode(['ok'=>true,'costs'=>$costs,'initial_limit'=>$init]); exit;
-

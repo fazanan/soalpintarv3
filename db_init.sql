@@ -188,6 +188,7 @@ INSERT INTO app_settings (k, v) VALUES ('initial_limit', '300')
 INSERT INTO feature_costs (feature, cost) VALUES
   ('publish_quiz', 3),
   ('modul_ajar',   3),
+  ('rpp',         2),
   ('buat_soal',    2),
   ('rekap_nilai',  0)
 ON DUPLICATE KEY UPDATE cost=VALUES(cost);

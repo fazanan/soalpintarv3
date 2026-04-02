@@ -16,7 +16,7 @@ $mysqli->query("CREATE TABLE IF NOT EXISTS app_settings (`k` VARCHAR(64) PRIMARY
 $mysqli->query("CREATE TABLE IF NOT EXISTS feature_costs (`feature` VARCHAR(64) PRIMARY KEY, `cost` INT NOT NULL DEFAULT 0) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
 $costs = isset($j['costs']) && is_array($j['costs']) ? $j['costs'] : [];
-foreach (['publish_quiz','modul_ajar','buat_soal','rekap_nilai'] as $feat) {
+foreach (['publish_quiz','modul_ajar','rpp','buat_soal','rekap_nilai'] as $feat) {
   $c = isset($costs[$feat]) ? (int)$costs[$feat] : null;
   if ($c !== null && $c >= 0 && $c <= 1000) {
     $stmt = $mysqli->prepare("INSERT INTO feature_costs (feature,cost) VALUES (?,?) ON DUPLICATE KEY UPDATE cost=VALUES(cost)");
@@ -32,4 +32,3 @@ if (isset($j['initial_limit'])) {
   $stmt->execute(); $stmt->close();
 }
 echo json_encode(['ok'=>true]); exit;
-
