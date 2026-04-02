@@ -182,8 +182,8 @@ if (!isset($_SESSION['user_id'])) {
               </button>
             </div>
           </div>
-          <div class="flex items-center justify-between gap-2 pb-3">
-            <div id="tabs" class="flex gap-2 overflow-x-auto no-scrollbar"></div>
+          <div class="flex items-center justify-start gap-2 pb-3">
+            <div id="tabs" class="hidden"></div>
             <div class="hidden md:flex items-center gap-2">
               <button id="btnSave" class="inline-flex items-center gap-2 h-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors px-3">
                 <span class="material-symbols-outlined text-[18px] shrink-0">save</span>
@@ -301,9 +301,7 @@ if (!isset($_SESSION['user_id'])) {
       const GEN_BATCH_SIZE = 10;
       const GEN_MAX_ATTEMPTS = 5;
       const VIEWS = [
-        { id: "identitas", label: "Identitas", icon: "badge" },
-        { id: "konfigurasi", label: "Konfigurasi", icon: "tune" },
-        { id: "preview", label: "Naskah Soal", icon: "description" },
+        { id: "preview", label: "Buat Soal", icon: "description" },
         { id: "modul_ajar", label: "Modul Ajar", icon: "menu_book" },
         { id: "rpp", label: "RPP", icon: "event_note" },
         { id: "quiz", label: "Quiz", icon: "quiz" },
@@ -456,7 +454,8 @@ if (!isset($_SESSION['user_id'])) {
 
       const DEFAULT_STATE = () => ({
         theme: "light",
-        activeView: "identitas",
+        activeView: "preview",
+        previewTab: "identitas",
         _isGenerating: false,
         lkpd: {
           sumber: "topik",
@@ -630,6 +629,11 @@ if (!isset($_SESSION['user_id'])) {
       const setView = (id) => {
         state.activeView = id;
         saveDebounced(true);
+        render();
+      };
+      const setPreviewTab = (tab) => {
+        state.previewTab = tab;
+        saveDebounced(false);
         render();
       };
       function logCreditUsage(kind, cost, detail) {
@@ -2054,13 +2058,6 @@ if (!isset($_SESSION['user_id'])) {
 
         return `
           <div class="space-y-3">
-          <div class="flex items-center justify-end">
-            <button class="inline-flex items-center gap-2 h-9 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm"
-              onclick="window.__sp.openPreviewHelp()">
-              <span class="material-symbols-outlined text-[16px]">help</span>
-              <span class="hidden md:inline">Petunjuk</span>
-            </button>
-          </div>
           <div id="paper" class="bg-white text-black p-10 shadow-paper min-h-[297mm] font-serif border border-gray-200 mx-auto print:border-none print:shadow-none print:p-0">
             <div class="border-b-2 border-black pb-6 mb-8 relative">
               ${state.identity.logo ? `<img src="${state.identity.logo}" class="absolute right-0 top-0 h-16 w-auto">` : ``}
@@ -2213,30 +2210,51 @@ if (!isset($_SESSION['user_id'])) {
       };
 
       const renderKisi = () => {
-        const rows = state.questions.map((q, i) => `
-          <tr>
-            <td class="border px-2 py-1 text-center">${i + 1}</td>
-            <td class="border px-2 py-1">${safeText(q.materi || '-')}</td>
-            <td class="border px-2 py-1">${safeText(q.indikator || '-')}</td>
-            <td class="border px-2 py-1">${safeText(q.bloom || '-')}</td>
-            <td class="border px-2 py-1">${q.type === 'pg' ? 'PG' : q.type}</td>
-          </tr>
-        `).join('');
+        const sections = [
+          { type: 'pg', title: 'PILIHAN GANDA', label: 'PG' },
+          { type: 'pg_kompleks', title: 'PILIHAN GANDA KOMPLEKS', label: 'PG Komp' },
+          { type: 'menjodohkan', title: 'MENJODOHKAN', label: 'Jodoh' },
+          { type: 'isian', title: 'ISIAN SINGKAT', label: 'Isian' },
+          { type: 'uraian', title: 'URAIAN', label: 'Uraian' },
+        ];
+        let letterIdx = 0;
+        const parts = [];
+        for (const sec of sections) {
+          const items = state.questions.filter(q => q && q.type === sec.type);
+          if (!items.length) continue;
+          const letter = String.fromCharCode(65 + letterIdx);
+          letterIdx++;
+          const rows = items.map((q, i) => `
+            <tr>
+              <td class="border px-2 py-1 text-center">${i + 1}</td>
+              <td class="border px-2 py-1">${safeText(q.materi || '-')}</td>
+              <td class="border px-2 py-1">${safeText(q.indikator || '-')}</td>
+              <td class="border px-2 py-1">${safeText(q.bloom || '-')}</td>
+              <td class="border px-2 py-1 text-center">${safeText(sec.label)}</td>
+            </tr>
+          `).join('');
+          parts.push(`
+            <div class="mt-6">
+              <div class="font-bold text-base mb-2">${letter}. ${sec.title}</div>
+              <table class="w-full text-sm border-collapse">
+                <thead>
+                  <tr>
+                    <th class="border px-2 py-1 w-14">No</th>
+                    <th class="border px-2 py-1">Materi</th>
+                    <th class="border px-2 py-1">Indikator</th>
+                    <th class="border px-2 py-1 w-20">Level</th>
+                    <th class="border px-2 py-1 w-24">Bentuk</th>
+                  </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+          `);
+        }
         return `
           <div class="bg-white p-10 shadow-paper font-serif border border-gray-200 mx-auto print:border-none print:shadow-none print:p-0">
             <div class="font-bold text-lg mb-3">KISI-KISI</div>
-            <table class="w-full text-sm border-collapse">
-              <thead>
-                <tr>
-                  <th class="border px-2 py-1">No</th>
-                  <th class="border px-2 py-1">Materi</th>
-                  <th class="border px-2 py-1">Indikator</th>
-                  <th class="border px-2 py-1">Level</th>
-                  <th class="border px-2 py-1">Bentuk</th>
-                </tr>
-              </thead>
-              <tbody>${rows}</tbody>
-            </table>
+            ${parts.length ? parts.join('') : `<div class="text-sm text-gray-500">Belum ada kisi-kisi.</div>`}
           </div>
         `;
       };
@@ -3990,14 +4008,30 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         </div>`;
 
       const computeView = () => {
-        if (state.activeView === "identitas") return renderIdentitas();
-        if (state.activeView === "konfigurasi") return renderKonfigurasi();
         if (state.activeView === "preview") {
-          if (state._isGenerating) return generatingPreviewHtml();
+          const tabBar = `
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark">
+                ${["identitas","konfigurasi","naskah"].map(t=>{
+                  const label = t==="identitas"?"1. Identitas":(t==="konfigurasi"?"2. Konfigurasi":"3. Naskah Soal");
+                  const active = state.previewTab===t;
+                  return `<button class="${active?'bg-primary text-white':'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold" onclick="window.__sp.setPreviewTab('${t}')">${label}</button>`;
+                }).join('')}
+              </div>
+              <button class="inline-flex items-center gap-2 h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                onclick="${state.previewTab === 'identitas' ? "window.__sp.openIdentitasHelp()" : (state.previewTab === 'konfigurasi' ? "window.__sp.openKonfigurasiHelp()" : "window.__sp.openPreviewHelp()")}">
+                <span class="material-symbols-outlined text-[18px]">help</span>
+                <span>Petunjuk</span>
+              </button>
+            </div>
+          `;
+          if (state.previewTab === "identitas") return tabBar + renderIdentitas();
+          if (state.previewTab === "konfigurasi") return tabBar + renderKonfigurasi();
+          if (state._isGenerating) return tabBar + generatingPreviewHtml();
           const parts = [renderNaskah()];
           if (state.previewFlags?.kunci) parts.push(`<div class="my-6 border-t border-dashed border-gray-300"></div><div style="break-before: page; page-break-before: always;"></div><div class="mt-10">${renderKunci()}</div>`);
           if (state.previewFlags?.kisi) parts.push(`<div class="my-6 border-t border-dashed border-gray-300"></div><div style="break-before: page; page-break-before: always;"></div><div class="mt-10">${renderKisi()}</div>`);
-          return parts.join("");
+          return tabBar + parts.join("");
         }
         if (state.activeView === "lkpd") return renderLKPD();
         if (state.activeView === "modul_ajar") return renderModulAjar();
@@ -4006,7 +4040,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         if (state.activeView === "rekap") return renderRekap();
         if (state.activeView === "limit") return renderLimit();
         if (state.activeView === "riwayat") return renderRiwayat();
-        return renderIdentitas();
+        return "";
       };
 
       const render = async () => {
@@ -4016,9 +4050,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         el("pageTitle").textContent = view.label;
         el("pageDesc").textContent =
           {
-            identitas: "Lengkapi identitas sebelum menyusun paket",
-            konfigurasi: "Atur bentuk, jumlah, kesulitan, dimensi, dan gambar per bagian",
-            preview: "Naskah soal, dilengkapi kunci jawaban dan kisi-kisi",
+            preview: "Buat soal, identitas, dan konfigurasi paket",
             lkpd: "Generator LKPD otomatis sesuai tema aplikasi",
             modul_ajar: "Generator Modul Ajar Kurikulum Merdeka 2025 · Deep Learning",
             rpp: "Generator RPP siap supervisi · Ringkas atau lengkap",
@@ -4083,7 +4115,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                     </button>
                     <button
                       class="hidden md:flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors"
-                      onclick="window.__sp.setView('konfigurasi')"
+                      onclick="window.__sp.setPreviewTab('konfigurasi')"
                     >
                       <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
                       Konfigurasi
@@ -4142,7 +4174,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 <div class="flex gap-2">
                   <button
                     class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors"
-                    onclick="window.__sp.setView('konfigurasi')"
+                    onclick="window.__sp.setPreviewTab('konfigurasi')"
                   >
                     <span class="material-symbols-outlined text-[18px]">tune</span>
                     Konfigurasi
@@ -6366,105 +6398,102 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               btn.disabled = true;
             }
   
-            const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun } = docx;
+            const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = docx;
   
-             let logoRun = state.identity.logo ? await makeImageRunFromDataUrl(state.identity.logo, 96, 96) : null;
-             const headerTitle = new Table({
-               width: { size: 100, type: WidthType.PERCENTAGE },
-               borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE } },
-               rows: [
-                 new TableRow({
-                   children: [
-                     new TableCell({
-                       width: { size: 80, type: WidthType.PERCENTAGE },
-                       borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                       children: [
-                         new Paragraph({
-                           children: [
-                             new TextRun({ text: (state.identity.namaSekolah || "NAMA SEKOLAH").toUpperCase(), bold: true, size: 28 }),
-                             new TextRun({ text: "\n", break: 1 }),
-                             new TextRun({ text: "KUNCI JAWABAN", bold: true, size: 24 }),
-                             new TextRun({ text: "\n", break: 1 }),
-                             new TextRun({ text: `Tahun Pelajaran ${state.paket.tahunAjaran}`, size: 20 }),
-                           ],
-                           alignment: AlignmentType.CENTER,
-                           spacing: { after: 300 },
-                         }),
-                       ],
-                     }),
-                     new TableCell({
-                       width: { size: 20, type: WidthType.PERCENTAGE },
-                       borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                       children: logoRun ? [new Paragraph({ children: [logoRun], alignment: AlignmentType.RIGHT })] : [new Paragraph({})],
-                     }),
-                   ],
-                 }),
-               ],
-             });
+            const makeHeader = (title) => {
+              const headerTitle = new Paragraph({
+                children: [
+                  new TextRun({ text: (state.identity.namaSekolah || "NAMA SEKOLAH").toUpperCase(), bold: true, size: 28 }),
+                  new TextRun({ text: "\n", break: 1 }),
+                  new TextRun({ text: title, bold: true, size: 24 }),
+                  new TextRun({ text: "\n", break: 1 }),
+                  new TextRun({ text: `Tahun Pelajaran ${state.paket.tahunAjaran}`, size: 20 }),
+                ],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 300 },
+              });
+              const leftInner = new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Mata Pelajaran", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: String(state.identity.mataPelajaran || "-") })] }),
+                    ],
+                  }),
+                  new TableRow({
+                    children: [
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Kelas / Fase", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: `${String(state.identity.kelas || "-")} / ${String(state.identity.fase || "-")}` })] }),
+                    ],
+                  }),
+                  ...(state.identity.jenisTopik === "spesifik"
+                    ? [
+                        new TableRow({
+                          children: [
+                            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Topik / Lingkup Materi", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                            new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                            new TableCell({ children: [new Paragraph({ text: String(state.identity.topik || "-") })] }),
+                          ],
+                        }),
+                      ]
+                    : []),
+                ],
+              });
+              const rightInner = new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Kurikulum", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: "Merdeka" })] }),
+                    ],
+                  }),
+                  new TableRow({
+                    children: [
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Jumlah Soal", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: String(state.questions.length) })] }),
+                    ],
+                  }),
+                ],
+              });
+              const headerTable = new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: {
+                  top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+                  left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [leftInner],
+                        width: { size: 50, type: WidthType.PERCENTAGE },
+                        margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                        borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+                      }),
+                      new TableCell({
+                        children: [rightInner],
+                        width: { size: 50, type: WidthType.PERCENTAGE },
+                        margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                        borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+                      }),
+                    ],
+                  }),
+                ],
+              });
+              return { headerTitle, headerTable };
+            };
   
-             const leftRows = [
-               new TableRow({
-                 children: [
-                   new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Mata Pelajaran", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
-                   new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
-                   new TableCell({ children: [new Paragraph({ text: String(state.identity.mataPelajaran || "-") })] }),
-                 ],
-               }),
-               new TableRow({
-                 children: [
-                   new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Kelas / Fase", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
-                   new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
-                   new TableCell({ children: [new Paragraph({ text: `${String(state.identity.kelas || "-")} / ${String(state.identity.fase || "-")}` })] }),
-                 ],
-               }),
-             ];
-             if (state.identity.jenisTopik === "spesifik") {
-               leftRows.push(
-                 new TableRow({
-                   children: [
-                     new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Topik / Lingkup Materi", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
-                     new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
-                     new TableCell({ children: [new Paragraph({ text: String(state.identity.topik || "-") })] }),
-                   ],
-                 })
-               );
-             }
-             const leftInner = new Table({
-               width: { size: 100, type: WidthType.PERCENTAGE },
-               borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
-               rows: leftRows,
-             });
-             const rightInner = new Table({
-               width: { size: 100, type: WidthType.PERCENTAGE },
-               borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
-               rows: [
-                 new TableRow({
-                   children: [
-                     new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Kurikulum", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
-                     new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
-                     new TableCell({ children: [new Paragraph({ text: "Merdeka" })] }),
-                   ],
-                 }),
-               ],
-             });
-             const headerTable = new Table({
-               width: { size: 100, type: WidthType.PERCENTAGE },
-               borders: {
-                 top: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                 bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                 left: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                 right: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                 insideVertical: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-               },
-               rows: [
-                 new TableRow({
-                   children: [
-                     new TableCell({ children: [leftInner], margins: { top: 100, bottom: 100, left: 100, right: 100 } }),
-                     new TableCell({ children: [rightInner], margins: { top: 100, bottom: 100, left: 100, right: 100 } }),
-                   ],
-                 }),
-               ],
-             });
+            const { headerTitle, headerTable } = makeHeader("KUNCI JAWABAN");
   
             const spacer = new Paragraph({ spacing: { after: 400 } });
             const content = [];
@@ -6576,160 +6605,147 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               btn.disabled = true;
             }
   
-            const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun } = docx;
+            const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = docx;
   
-            let logoRun = state.identity.logo ? await makeImageRunFromDataUrl(state.identity.logo, 96, 96) : null;
-            const headerTitle = new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE } },
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({
-                      width: { size: 80, type: WidthType.PERCENTAGE },
-                      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                      children: [
-                        new Paragraph({
+            const makeHeader = (title) => {
+              const headerTitle = new Paragraph({
+                children: [
+                  new TextRun({ text: (state.identity.namaSekolah || "NAMA SEKOLAH").toUpperCase(), bold: true, size: 28 }),
+                  new TextRun({ text: "\n", break: 1 }),
+                  new TextRun({ text: title, bold: true, size: 24 }),
+                  new TextRun({ text: "\n", break: 1 }),
+                  new TextRun({ text: `Tahun Pelajaran ${state.paket.tahunAjaran}`, size: 20 }),
+                ],
+                alignment: AlignmentType.CENTER,
+                spacing: { after: 300 },
+              });
+              const leftInner = new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Mata Pelajaran", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: String(state.identity.mataPelajaran || "-") })] }),
+                    ],
+                  }),
+                  new TableRow({
+                    children: [
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Kelas / Fase", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: `${String(state.identity.kelas || "-")} / ${String(state.identity.fase || "-")}` })] }),
+                    ],
+                  }),
+                  ...(state.identity.jenisTopik === "spesifik"
+                    ? [
+                        new TableRow({
                           children: [
-                            new TextRun({ text: (state.identity.namaSekolah || "NAMA SEKOLAH").toUpperCase(), bold: true, size: 28 }),
-                            new TextRun({ text: "\n", break: 1 }),
-                            new TextRun({ text: "KISI-KISI SOAL", bold: true, size: 24 }),
-                            new TextRun({ text: "\n", break: 1 }),
-                            new TextRun({ text: `Tahun Pelajaran ${state.paket.tahunAjaran}`, size: 20 }),
+                            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Topik / Lingkup Materi", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                            new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                            new TableCell({ children: [new Paragraph({ text: String(state.identity.topik || "-") })] }),
                           ],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 300 },
                         }),
-                      ],
-                    }),
-                    new TableCell({
-                      width: { size: 20, type: WidthType.PERCENTAGE },
-                      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                      children: logoRun ? [new Paragraph({ children: [logoRun], alignment: AlignmentType.RIGHT })] : [new Paragraph({})],
-                    }),
-                  ],
-                }),
-              ],
-            });
-  
-            const leftRows = [
-              new TableRow({
-                children: [
-                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Mata Pelajaran", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
-                  new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
-                  new TableCell({ children: [new Paragraph({ text: String(state.identity.mataPelajaran || "-") })] }),
+                      ]
+                    : []),
                 ],
-              }),
-              new TableRow({
-                children: [
-                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Kelas / Fase", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
-                  new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
-                  new TableCell({ children: [new Paragraph({ text: `${String(state.identity.kelas || "-")} / ${String(state.identity.fase || "-")}` })] }),
+              });
+              const rightInner = new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Kurikulum", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: "Merdeka" })] }),
+                    ],
+                  }),
+                  new TableRow({
+                    children: [
+                      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Jumlah Soal", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                      new TableCell({ children: [new Paragraph({ text: String(state.questions.length) })] }),
+                    ],
+                  }),
                 ],
-              }),
-            ];
-            if (state.identity.jenisTopik === "spesifik") {
-              leftRows.push(
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Topik / Lingkup Materi", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
-                    new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
-                    new TableCell({ children: [new Paragraph({ text: String(state.identity.topik || "-") })] }),
-                  ],
-                })
-              );
-            }
-            const leftInner = new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
-              rows: leftRows,
-            });
-            const rightInner = new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Kurikulum", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
-                    new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
-                    new TableCell({ children: [new Paragraph({ text: "Merdeka" })] }),
-                  ],
-                }),
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Jumlah Soal", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
-                    new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
-                    new TableCell({ children: [new Paragraph({ text: String(state.questions.length) })] }),
-                  ],
-                }),
-              ],
-            });
-            const headerTable = new Table({
-              width: { size: 100, type: WidthType.PERCENTAGE },
-              borders: {
-                top: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                left: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                right: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                insideVertical: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-              },
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({ children: [leftInner], margins: { top: 100, bottom: 100, left: 100, right: 100 } }),
-                    new TableCell({ children: [rightInner], margins: { top: 100, bottom: 100, left: 100, right: 100 } }),
-                  ],
-                }),
-              ],
-            });
-  
-            const spacer = new Paragraph({ spacing: { after: 400 } });
-            const tableHeader = new TableRow({
-                tableHeader: true,
-                children: ["No", "Materi", "Indikator Soal", "Level", "Bentuk", "No. Soal"].map(text => 
-                    new TableCell({
-                        children: [new Paragraph({ children: [new TextRun({ text, bold: true })], alignment: AlignmentType.CENTER })],
-                        verticalAlign: "center",
-                        shading: { fill: "E0E0E0" },
-                    })
-                ),
-            });
-  
-            const counters = { pg: 0, pg_kompleks: 0, menjodohkan: 0, isian: 0, uraian: 0 };
-            const typeLabels = {
-              pg: "PG",
-              pg_kompleks: "PG Komp",
-              menjodohkan: "Jodoh",
-              isian: "Isian",
-              uraian: "Uraian"
+              });
+              const headerTable = new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                borders: {
+                  top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+                  left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                  right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                },
+                rows: [
+                  new TableRow({
+                    children: [
+                      new TableCell({
+                        children: [leftInner],
+                        width: { size: 50, type: WidthType.PERCENTAGE },
+                        margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                        borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+                      }),
+                      new TableCell({
+                        children: [rightInner],
+                        width: { size: 50, type: WidthType.PERCENTAGE },
+                        margins: { top: 100, bottom: 100, left: 100, right: 100 },
+                        borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+                      }),
+                    ],
+                  }),
+                ],
+              });
+              return { headerTitle, headerTable };
             };
   
-            const rows = state.questions.map((q, i) => {
-                const t = q.type || 'pg';
-                if (counters[t] !== undefined) counters[t]++;
-                else counters[t] = 1;
+            const { headerTitle, headerTable } = makeHeader("KISI-KISI SOAL");
   
-                return new TableRow({
-                    children: [
-                        new TableCell({ children: [new Paragraph({ text: String(i + 1), alignment: AlignmentType.CENTER })] }),
-                        new TableCell({ children: [new Paragraph({ text: q.materi || "-" })] }),
-                        new TableCell({ children: [new Paragraph({ text: q.indikator || "-" })] }),
-                        new TableCell({ children: [new Paragraph({ text: q.bloom || "-", alignment: AlignmentType.CENTER })] }),
-                        new TableCell({ children: [new Paragraph({ text: typeLabels[t] || "Lainnya", alignment: AlignmentType.CENTER })] }),
-                        new TableCell({ children: [new Paragraph({ text: String(counters[t]), alignment: AlignmentType.CENTER })] }),
-                    ],
-                });
-            });
-  
-            const kisiTable = new Table({
-                width: { size: 100, type: WidthType.PERCENTAGE },
-                rows: [tableHeader, ...rows],
-            });
+            const spacer = new Paragraph({ spacing: { after: 400 } });
+            const content = [];
+            const sections = [
+              { type: 'pg', title: 'PILIHAN GANDA', label: 'PG' },
+              { type: 'pg_kompleks', title: 'PILIHAN GANDA KOMPLEKS', label: 'PG Komp' },
+              { type: 'menjodohkan', title: 'MENJODOHKAN', label: 'Jodoh' },
+              { type: 'isian', title: 'ISIAN SINGKAT', label: 'Isian' },
+              { type: 'uraian', title: 'URAIAN', label: 'Uraian' },
+            ];
+            let sectionIndex = 0;
+            for (const sec of sections) {
+              const items = state.questions.filter(q => q && q.type === sec.type);
+              if (!items.length) continue;
+              const letter = String.fromCharCode(65 + sectionIndex);
+              sectionIndex++;
+              content.push(new Paragraph({ children: [new TextRun({ text: `${letter}. ${sec.title}`, bold: true })], spacing: { before: 200, after: 120 } }));
+              const tableHeader = new TableRow({
+                tableHeader: true,
+                children: ["No", "Materi", "Indikator Soal", "Level", "Bentuk", "No. Soal"].map(text =>
+                  new TableCell({
+                    children: [new Paragraph({ children: [new TextRun({ text, bold: true })], alignment: AlignmentType.CENTER })],
+                    verticalAlign: "center",
+                    shading: { fill: "E0E0E0" },
+                  })
+                ),
+              });
+              const rows = items.map((q, i) => new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph({ text: String(i + 1), alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: q.materi || "-" })] }),
+                  new TableCell({ children: [new Paragraph({ text: q.indikator || "-" })] }),
+                  new TableCell({ children: [new Paragraph({ text: q.bloom || "-", alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: sec.label, alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: String(i + 1), alignment: AlignmentType.CENTER })] }),
+                ],
+              }));
+              content.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [tableHeader, ...rows] }));
+              content.push(new Paragraph({ children: [], spacing: { after: 240 } }));
+            }
   
             const doc = new Document({
                 sections: [{
                     properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } },
-                    children: [headerTitle, headerTable, spacer, kisiTable],
+                    children: [headerTitle, headerTable, spacer, ...content],
                 }],
             });
   
@@ -7247,6 +7263,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
 
       window.__sp = {
         setView,
+        setPreviewTab,
         setQuizTab,
         setQuizPublish,
         publishQuiz,
