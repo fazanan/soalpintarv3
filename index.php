@@ -4210,27 +4210,6 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                 </div>
                 
               </div>
-              <div class="bg-background-light/50 dark:bg-background-dark/30 p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <div class="text-xs text-text-sub-light dark:text-text-sub-dark">
-                  Setelah lengkap, atur Konfigurasi (multi-bagian), lalu klik Buat Paket Soal.
-                </div>
-                <div class="flex gap-2">
-                  <button
-                    class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors"
-                    onclick="window.__sp.setPreviewTab('konfigurasi')"
-                  >
-                    <span class="material-symbols-outlined text-[18px]">tune</span>
-                    Konfigurasi
-                  </button>
-                  <button id="btnBuild"
-                    class="flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors"
-                    onclick="window.__sp.buildPackage()"
-                  >
-                    <span class="material-symbols-outlined text-[18px]">bolt</span>
-                    Buat Paket Soal
-                  </button>
-                </div>
-              </div>
             </div>
             <div id="modalIdentitasHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
               <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-height-[85vh] overflow-auto">
