@@ -149,7 +149,7 @@ if (!isset($_SESSION['user_id'])) {
         <div
           class="no-print bg-surface-light dark:bg-surface-dark border-b border-border-light dark:border-border-dark px-4 md:px-8 pt-4 sticky top-0 z-40"
         >
-          <div class="flex items-start justify-between gap-4 mb-2">
+            <div class="flex items-start justify-between gap-4 mb-2">
             <div class="flex items-center gap-3">
               <button
                 id="btnToggleSidebar"
@@ -161,17 +161,17 @@ if (!isset($_SESSION['user_id'])) {
               </button>
               <div>
                 <div id="pageTitle" class="text-xl md:text-2xl font-semibold tracking-tight">Identitas Soal</div>
-                <div id="pageDesc" class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">
+                  <div id="pageDesc" class="hidden md:block text-sm text-text-sub-light dark:text-text-sub-dark mt-1">
                   Lengkapi identitas sebelum menyusun paket
                 </div>
               </div>
             </div>
             <div class="flex flex-col items-end">
               <div class="text-right">
-                <div class="text-3xl md:text-4xl font-bold tracking-tight">
+                  <div class="text-xl md:text-4xl font-bold tracking-tight">
                   <span class="text-primary">Guru</span><span class="text-text-main-light dark:text-text-main-dark">Pintar</span>
                 </div>
-                <div class="italic text-xs md:text-sm text-text-sub-light dark:text-text-sub-dark">Sahabat Pendidik Indonesia</div>
+                  <div class="hidden md:block italic text-xs md:text-sm text-text-sub-light dark:text-text-sub-dark">Sahabat Pendidik Indonesia</div>
               </div>
               <button
                 id="btnExportTop"
