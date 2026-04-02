@@ -4029,10 +4029,10 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                   return `<button class="${active?'bg-primary text-white':'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setPreviewTab('${t}')">${label}</button>`;
                 }).join('')}
               </div>
-              <button class="inline-flex items-center justify-center h-8 w-8 md:h-10 md:w-auto md:px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+              <button class="hidden md:inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
                 onclick="${helpOnClick}" title="Petunjuk">
                 <span class="material-symbols-outlined text-[18px]">help</span>
-                <span class="hidden md:inline ml-2">Petunjuk</span>
+                <span class="ml-2">Petunjuk</span>
               </button>
             </div>
           `;
