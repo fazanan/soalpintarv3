@@ -352,6 +352,7 @@ if (!isset($_SESSION['user_id'])) {
           "Seni Tari",
           "Bahasa Inggris",
           "Muatan Lokal",
+          "Bimbingan Konseling",
         ],
         "SMP/MTs": [
           "Pendidikan Agama Islam dan Budi Pekerti",
@@ -379,6 +380,7 @@ if (!isset($_SESSION['user_id'])) {
           "Seni Tari",
           "Prakarya",
           "Muatan Lokal",
+          "Bimbingan Konseling",
         ],
         "SMA/MA": [
           "Pendidikan Agama Islam dan Budi Pekerti",
@@ -413,6 +415,7 @@ if (!isset($_SESSION['user_id'])) {
           "Prakarya dan Kewirausahaan",
           "Bahasa Asing Lain",
           "Muatan Lokal",
+          "Bimbingan Konseling",
         ],
         "SMK": [
           "Pendidikan Agama Islam dan Budi Pekerti",
@@ -435,6 +438,7 @@ if (!isset($_SESSION['user_id'])) {
           "Konsentrasi Keahlian",
           "Projek Kreatif dan Kewirausahaan",
           "Muatan Lokal",
+          "Bimbingan Konseling",
         ],
       };
 
