@@ -41,18 +41,101 @@ function get_model_config(mysqli $db, string $model): ?array {
 }
 
 $page = max(1, (int)($_GET['page'] ?? 1));
-$perPage = 20;
+$perPage = 10;
 $offset = ($page - 1) * $perPage;
 
 $q = trim((string)($_GET['q'] ?? ''));
-$where = '';
+$from = trim((string)($_GET['from'] ?? ''));
+$to = trim((string)($_GET['to'] ?? ''));
+
+$whereParts = [];
 $params = [];
 $types = '';
 if ($q !== '') {
-  $where = "WHERE (su.title LIKE CONCAT('%', ?, '%') OR u.username LIKE CONCAT('%', ?, '%'))";
+  $whereParts[] = "(su.title LIKE CONCAT('%', ?, '%') OR u.username LIKE CONCAT('%', ?, '%'))";
   $params[] = $q;
   $params[] = $q;
   $types .= 'ss';
+}
+if ($from !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) {
+  $whereParts[] = "su.created_at >= CONCAT(?, ' 00:00:00')";
+  $params[] = $from;
+  $types .= 's';
+}
+if ($to !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
+  $whereParts[] = "su.created_at <= CONCAT(?, ' 23:59:59')";
+  $params[] = $to;
+  $types .= 's';
+}
+$where = $whereParts ? ('WHERE ' . implode(' AND ', $whereParts)) : '';
+
+// summary stats
+$summary = [
+  'active_users' => 0,
+  'all_devices_users' => 0,
+  'paket_soal' => 0,
+  'modul_ajar' => 0,
+  'rpp' => 0,
+  'token_input_total' => 0,
+  'token_output_total' => 0,
+  'total_cost_idr' => 0.0,
+];
+
+try {
+  $sqlSum = "
+    SELECT
+      COUNT(DISTINCT su.user_id) AS active_users,
+      SUM(CASE WHEN su.question_count > 0 THEN 1 ELSE 0 END) AS paket_soal,
+      SUM(CASE WHEN su.title LIKE 'Modul Ajar - %' THEN 1 ELSE 0 END) AS modul_ajar,
+      SUM(CASE WHEN su.title LIKE 'RPP - %' THEN 1 ELSE 0 END) AS rpp,
+      SUM(su.token_input) AS token_input_total,
+      SUM(su.token_output) AS token_output_total,
+      SUM(((su.token_input/1000) * su.token_input_price + (su.token_output/1000) * su.token_output_price) * su.currency_rate_to_idr) AS total_cost_idr
+    FROM soal_user su
+    JOIN users u ON u.id = su.user_id
+    $where
+  ";
+  $stmtSum = $mysqli->prepare($sqlSum);
+  if ($stmtSum) {
+    if ($types !== '') $stmtSum->bind_param($types, ...$params);
+    $stmtSum->execute();
+    $resSum = $stmtSum->get_result();
+    $rowSum = $resSum ? $resSum->fetch_assoc() : null;
+    $stmtSum->close();
+    if ($rowSum) {
+      $summary['active_users'] = (int)($rowSum['active_users'] ?? 0);
+      $summary['paket_soal'] = (int)($rowSum['paket_soal'] ?? 0);
+      $summary['modul_ajar'] = (int)($rowSum['modul_ajar'] ?? 0);
+      $summary['rpp'] = (int)($rowSum['rpp'] ?? 0);
+      $summary['token_input_total'] = (int)($rowSum['token_input_total'] ?? 0);
+      $summary['token_output_total'] = (int)($rowSum['token_output_total'] ?? 0);
+      $summary['total_cost_idr'] = (float)($rowSum['total_cost_idr'] ?? 0);
+    }
+  }
+
+  $sqlAll = "
+    SELECT COUNT(*) AS c FROM (
+      SELECT su.user_id,
+        MAX(CASE WHEN su.question_count > 0 THEN 1 ELSE 0 END) AS has_paket,
+        MAX(CASE WHEN su.title LIKE 'Modul Ajar - %' THEN 1 ELSE 0 END) AS has_modul,
+        MAX(CASE WHEN su.title LIKE 'RPP - %' THEN 1 ELSE 0 END) AS has_rpp
+      FROM soal_user su
+      JOIN users u ON u.id = su.user_id
+      $where
+      GROUP BY su.user_id
+      HAVING has_paket = 1 AND has_modul = 1 AND has_rpp = 1
+    ) x
+  ";
+  $stmtAll = $mysqli->prepare($sqlAll);
+  if ($stmtAll) {
+    if ($types !== '') $stmtAll->bind_param($types, ...$params);
+    $stmtAll->execute();
+    $resAll = $stmtAll->get_result();
+    $rowAll = $resAll ? $resAll->fetch_assoc() : null;
+    $stmtAll->close();
+    $summary['all_devices_users'] = (int)($rowAll['c'] ?? 0);
+  }
+} catch (mysqli_sql_exception $e) {
 }
 
 // count
@@ -102,11 +185,11 @@ $stmt->close();
   <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 </head>
 <body class="bg-gray-50">
-  <div class="max-w-6xl mx-auto p-6">
+  <div class="max-w-none mx-auto p-6">
     <div class="flex items-center justify-between mb-6">
       <div>
         <div class="text-2xl font-bold">Riwayat Token</div>
-        <div class="text-sm text-gray-600">Menampilkan konsumsi token untuk Soal, LKPD, dan Modul Ajar</div>
+        <div class="text-sm text-gray-600">Menampilkan konsumsi token untuk Paket Soal, Modul Ajar, dan RPP</div>
       </div>
       <a href="index.php" class="inline-flex items-center gap-2 h-10 px-4 rounded-lg border bg-white hover:bg-gray-50">
         <span class="material-symbols-outlined text-[18px]">arrow_back</span>
@@ -114,10 +197,65 @@ $stmt->close();
       </a>
     </div>
 
-    <form method="get" class="flex items-center gap-2 mb-4">
-      <input type="text" name="q" value="<?php echo htmlspecialchars($q); ?>" placeholder="Cari judul / user..." class="rounded-lg border h-10 px-3 w-72" />
-      <button class="h-10 px-4 rounded-lg border bg-white hover:bg-gray-50 font-semibold">Cari</button>
-    </form>
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-3 mb-5">
+      <div class="bg-white rounded-xl border shadow-sm p-4">
+        <div class="text-xs text-gray-500">User Aktif</div>
+        <div class="text-2xl font-bold mt-1"><?php echo (int)$summary['active_users']; ?></div>
+        <div class="text-xs text-gray-500 mt-1">User yang membuat minimal 1 output</div>
+      </div>
+      <div class="bg-white rounded-xl border shadow-sm p-4">
+        <div class="text-xs text-gray-500">User Semua Perangkat</div>
+        <div class="text-2xl font-bold mt-1"><?php echo (int)$summary['all_devices_users']; ?></div>
+        <div class="text-xs text-gray-500 mt-1">Paket + Modul + RPP</div>
+      </div>
+      <div class="bg-white rounded-xl border shadow-sm p-4">
+        <div class="text-xs text-gray-500">Paket Soal</div>
+        <div class="text-2xl font-bold mt-1"><?php echo (int)$summary['paket_soal']; ?></div>
+      </div>
+      <div class="bg-white rounded-xl border shadow-sm p-4">
+        <div class="text-xs text-gray-500">Modul Ajar</div>
+        <div class="text-2xl font-bold mt-1"><?php echo (int)$summary['modul_ajar']; ?></div>
+      </div>
+      <div class="bg-white rounded-xl border shadow-sm p-4">
+        <div class="text-xs text-gray-500">RPP</div>
+        <div class="text-2xl font-bold mt-1"><?php echo (int)$summary['rpp']; ?></div>
+      </div>
+      <div class="bg-white rounded-xl border shadow-sm p-4">
+        <div class="text-xs text-gray-500">Total Token Input</div>
+        <div class="text-2xl font-bold mt-1"><?php echo number_format((int)$summary['token_input_total'], 0, ',', '.'); ?></div>
+      </div>
+      <div class="bg-white rounded-xl border shadow-sm p-4">
+        <div class="text-xs text-gray-500">Total Token Output</div>
+        <div class="text-2xl font-bold mt-1"><?php echo number_format((int)$summary['token_output_total'], 0, ',', '.'); ?></div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-xl border shadow-sm p-4 mb-5">
+      <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+        <form method="get" class="flex flex-col md:flex-row md:items-end gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Cari</label>
+            <input type="text" name="q" value="<?php echo htmlspecialchars($q); ?>" placeholder="Judul / user..." class="rounded-lg border h-10 px-3 w-full md:w-80" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Dari</label>
+            <input type="date" name="from" value="<?php echo htmlspecialchars($from); ?>" class="rounded-lg border h-10 px-3" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1">Sampai</label>
+            <input type="date" name="to" value="<?php echo htmlspecialchars($to); ?>" class="rounded-lg border h-10 px-3" />
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="h-10 px-4 rounded-lg border bg-white hover:bg-gray-50 font-semibold">Terapkan</button>
+            <a href="admin_soal_history.php" class="h-10 px-4 rounded-lg border bg-white hover:bg-gray-50 font-semibold inline-flex items-center">Reset</a>
+          </div>
+        </form>
+        <div class="text-right">
+          <div class="text-xs text-gray-500">Total Biaya (Rp)</div>
+          <div class="text-2xl font-bold"><?php echo 'Rp' . number_format((float)$summary['total_cost_idr'], 0, ',', '.'); ?></div>
+        </div>
+      </div>
+    </div>
 
     <div class="bg-white rounded-xl border shadow-sm overflow-auto">
       <table class="min-w-full text-sm border whitespace-nowrap">
@@ -191,13 +329,13 @@ $stmt->close();
         </div>
         <div class="flex items-center gap-2">
           <?php if ($page > 1): ?>
-            <a class="h-8 px-3 rounded-lg border bg-white hover:bg-gray-50 text-xs font-semibold" href="?<?php echo http_build_query(['q'=>$q,'page'=>$page-1]); ?>">Sebelumnya</a>
+            <a class="h-8 px-3 rounded-lg border bg-white hover:bg-gray-50 text-xs font-semibold" href="?<?php echo http_build_query(['q'=>$q,'from'=>$from,'to'=>$to,'page'=>$page-1]); ?>">Sebelumnya</a>
           <?php else: ?>
             <span class="h-8 px-3 rounded-lg border bg-gray-100 text-xs font-semibold text-gray-400 inline-flex items-center">Sebelumnya</span>
           <?php endif; ?>
           <span class="text-xs">Halaman <?php echo $totalRows ? $page : 0; ?>/<?php echo $totalRows ? $totalPages : 0; ?></span>
           <?php if ($page < $totalPages): ?>
-            <a class="h-8 px-3 rounded-lg border bg-white hover:bg-gray-50 text-xs font-semibold" href="?<?php echo http_build_query(['q'=>$q,'page'=>$page+1]); ?>">Berikutnya</a>
+            <a class="h-8 px-3 rounded-lg border bg-white hover:bg-gray-50 text-xs font-semibold" href="?<?php echo http_build_query(['q'=>$q,'from'=>$from,'to'=>$to,'page'=>$page+1]); ?>">Berikutnya</a>
           <?php else: ?>
             <span class="h-8 px-3 rounded-lg border bg-gray-100 text-xs font-semibold text-gray-400 inline-flex items-center">Berikutnya</span>
           <?php endif; ?>
