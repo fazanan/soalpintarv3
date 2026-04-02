@@ -1513,6 +1513,25 @@ if (!isset($_SESSION['user_id'])) {
           t = t.replace(/^\s*[A-Ea-e]\s*-\s+/,'');
           return t.trim();
         };
+        const shuffleWithSeed = (arr, seed) => {
+          const out = arr.slice();
+          let s = seed >>> 0;
+          for (let i = out.length - 1; i > 0; i--) {
+            s = (s * 1664525 + 1013904223) >>> 0;
+            const j = s % (i + 1);
+            [out[i], out[j]] = [out[j], out[i]];
+          }
+          return out;
+        };
+        const stableSeed = (text) => {
+          const str = String(text || '');
+          let h = 2166136261 >>> 0;
+          for (let i=0;i<str.length;i++) {
+            h ^= str.charCodeAt(i);
+            h = Math.imul(h, 16777619) >>> 0;
+          }
+          return h >>> 0;
+        };
         const rawType = String(item?.type ?? "").toLowerCase();
         let type = "isian";
         if (rawType.includes("pg")) type = "pg";
@@ -1529,6 +1548,7 @@ if (!isset($_SESSION['user_id'])) {
         const materi = String(item?.materi ?? "").trim();
         const indikator = String(item?.indikator ?? "").trim();
         const imagePrompt = String(item?.imagePrompt ?? "").trim();
+        let invalidMenjodohkan = false;
         
         const options = Array.isArray(item?.options) ? item.options.map((x) => cleanOptionText(x)).filter(Boolean) : [];
         
@@ -1575,7 +1595,102 @@ if (!isset($_SESSION['user_id'])) {
              answer = toList(answer);
              answer = [...new Set(answer)].sort((a,b)=>a-b);
         } else if (type === "menjodohkan") {
-             if (!Array.isArray(answer)) answer = [];
+             const cleanList = (list) => (Array.isArray(list) ? list : [])
+               .map(x => cleanOptionText(x))
+               .filter(Boolean);
+             let leftList = cappedOptions;
+             let rightList = [];
+             const parseMappingPairs = (val) => {
+               const pairs = [];
+               const arr = Array.isArray(val) ? val : [];
+               for (const it of arr) {
+                 if (it == null) continue;
+                 if (typeof it === 'string') {
+                   const s = it.trim();
+                   const m = s.match(/^(\d+)\s*(?:,|;|:|->|—|–|-)\s*(\d+)$/);
+                   if (m) pairs.push([Number(m[1]), Number(m[2])]);
+                   continue;
+                 }
+                 if (typeof it === 'object') {
+                   const a = it?.a ?? it?.left ?? it?.l ?? null;
+                   const b = it?.b ?? it?.right ?? it?.r ?? null;
+                   if (a != null && b != null && Number.isFinite(Number(a)) && Number.isFinite(Number(b))) {
+                     pairs.push([Number(a), Number(b)]);
+                   }
+                   continue;
+                 }
+               }
+               return pairs;
+             };
+             const pairs = Array.isArray(item?.pairs) ? item.pairs : null;
+             if (pairs && pairs.length) {
+               leftList = pairs.map(p => cleanOptionText(p?.left)).filter(Boolean);
+               rightList = pairs.map(p => cleanOptionText(p?.right)).filter(Boolean);
+             } else {
+               const rightFrom = Array.isArray(item?.right_options) ? item.right_options
+                 : Array.isArray(item?.rightOptions) ? item.rightOptions
+                 : Array.isArray(item?.jawaban) ? item.jawaban
+                 : Array.isArray(answer) ? answer
+                 : null;
+               if (rightFrom) rightList = cleanList(rightFrom);
+               else if (typeof answer === 'string') rightList = cleanList(String(answer).split(/\r?\n|;|,/));
+             }
+             if ((!pairs || !pairs.length) && rightList.length) {
+               const looksNumeric = (t) => /^\d+(\s*(?:,|;|:|->|—|–|-)\s*\d+)?$/.test(String(t || '').trim());
+               if (rightList.every(looksNumeric)) {
+                 invalidMenjodohkan = true;
+               }
+             }
+             const n = Math.min(leftList.length, rightList.length);
+             leftList = leftList.slice(0, n);
+             rightList = rightList.slice(0, n);
+             if (n < 2) invalidMenjodohkan = true;
+             if (invalidMenjodohkan) {
+               cappedOptions = [];
+               answer = [];
+               item = { ...item, _matchKey: null };
+             } else {
+             const seed = stableSeed(question + '|' + leftList.join('|') + '|' + rightList.join('|'));
+             const idxs = shuffleWithSeed([...Array(n).keys()], seed);
+             const rightShuffled = idxs.map(i => rightList[i]);
+             const matchKey = [];
+             const mappingPairs = parseMappingPairs(answer);
+             if (mappingPairs.length && n > 0) {
+               const leftHasZero = mappingPairs.some(([a]) => a === 0);
+               const rightHasZero = mappingPairs.some(([,b]) => b === 0);
+               const leftBase = leftHasZero ? 0 : 1;
+               const rightBase = rightHasZero ? 0 : 1;
+               const origToShuf = new Map();
+               for (let shufPos=0; shufPos<idxs.length; shufPos++) origToShuf.set(idxs[shufPos], shufPos);
+               const byLeft = new Map();
+               for (const [a,b] of mappingPairs) {
+                 const li = a - leftBase;
+                 const ri = b - rightBase;
+                 if (li >= 0 && li < n && ri >= 0 && ri < n && !byLeft.has(li)) byLeft.set(li, ri);
+               }
+               for (let li=0; li<n; li++) {
+                 const ri = byLeft.has(li) ? byLeft.get(li) : 0;
+                 const pos = origToShuf.has(ri) ? origToShuf.get(ri) : 0;
+                 matchKey.push(Number(pos) || 0);
+               }
+             } else {
+               const buckets = new Map();
+               for (let i=0;i<rightShuffled.length;i++) {
+                 const k = String(rightShuffled[i] ?? '');
+                 if (!buckets.has(k)) buckets.set(k, []);
+                 buckets.get(k).push(i);
+               }
+               for (let i=0;i<n;i++) {
+                 const k = String(rightList[i] ?? '');
+                 const b = buckets.get(k);
+                 const pos = b && b.length ? b.shift() : 0;
+                 matchKey.push(Number(pos) || 0);
+               }
+             }
+             cappedOptions = leftList;
+             answer = rightShuffled;
+             item = { ...item, _matchKey: matchKey };
+             }
         } else {
              answer = String(answer ?? "").trim();
         }
@@ -1585,9 +1700,10 @@ if (!isset($_SESSION['user_id'])) {
           sectionId: sec?.id,
           pakaiGambar: Boolean(sec?.pakaiGambar),
           type,
-          question,
+          question: invalidMenjodohkan ? '' : question,
           options: cappedOptions,
           answer,
+          matchKey: Array.isArray(item?._matchKey) ? item._matchKey : null,
           explanation,
           difficulty,
           bloom,
@@ -1793,10 +1909,20 @@ if (!isset($_SESSION['user_id'])) {
 
       async function makeImageRunFromDataUrl(dataUrl, width, height) {
         try {
-          const resp = await fetch(String(dataUrl));
-          const blob = await resp.blob();
-          let outBlob = blob;
-          if (!["image/png", "image/jpeg"].includes(blob.type)) {
+          const s = String(dataUrl || '');
+          let outBlob = null;
+          if (/^data:image\/(png|jpeg);base64,/i.test(s)) {
+            const base64 = s.split(',')[1] || '';
+            const bin = atob(base64);
+            const len = bin.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+            outBlob = new Blob([bytes], { type: s.includes('jpeg') ? 'image/jpeg' : 'image/png' });
+          } else {
+            const resp = await fetch(s);
+            outBlob = await resp.blob();
+          }
+          if (!outBlob || !["image/png", "image/jpeg"].includes(outBlob.type)) {
             await new Promise((resolve) => {
               const img = new Image();
               img.onload = () => {
@@ -1806,16 +1932,16 @@ if (!isset($_SESSION['user_id'])) {
                 const ctx = canvas.getContext("2d");
                 if (ctx) ctx.drawImage(img, 0, 0);
                 canvas.toBlob((pngBlob) => {
-                  outBlob = pngBlob || blob;
+                  outBlob = pngBlob || outBlob;
                   resolve();
                 }, "image/png", 0.92);
               };
               img.onerror = () => resolve();
-              img.src = String(dataUrl);
+              img.src = s;
             });
           }
           const buffer = await outBlob.arrayBuffer();
-          return new docx.ImageRun({ data: buffer, transformation: { width, height } });
+          return new docx.ImageRun({ data: new Uint8Array(buffer), transformation: { width, height } });
         } catch {
           return null;
         }
@@ -1906,7 +2032,7 @@ if (!isset($_SESSION['user_id'])) {
                               `).join("")}
                            </div>
                            <div class="space-y-3">
-                              ${(Array.isArray(q.answer) ? [...q.answer].sort() : []).map((ans, ai) => `
+                              ${(Array.isArray(q.answer) ? q.answer : []).map((ans, ai) => `
                                  <div class="flex items-center gap-2">
                                     <span class="font-bold text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">${String.fromCharCode(65 + ai)}</span>
                                     <div class="p-2 border rounded bg-white dark:bg-gray-800 w-full">${safeText(ans)}</div>
@@ -2032,21 +2158,56 @@ if (!isset($_SESSION['user_id'])) {
       };
 
       const renderKunci = () => {
-        const rows = state.questions.map((q, i) => {
-          let ans = '';
-          if (q.type === 'pg') ans = typeof q.answer === 'number' ? String.fromCharCode(65 + q.answer) : '';
-          else if (q.type === 'pg_kompleks') ans = Array.isArray(q.answer) ? q.answer.map(n => String.fromCharCode(65 + n)).join(', ') : '';
-          else if (q.type === 'menjodohkan') ans = Array.isArray(q.answer) ? q.answer.map((t, idx) => `${idx + 1}–${String.fromCharCode(65 + idx)}`).join(', ') : '';
-          else ans = String(q.answer || '');
-          return `<tr><td class="border px-2 py-1 text-center">${i + 1}</td><td class="border px-2 py-1">${ans}</td></tr>`;
-        }).join('');
+        const sections = [
+          { type: 'pg', title: 'PILIHAN GANDA' },
+          { type: 'pg_kompleks', title: 'PILIHAN GANDA KOMPLEKS' },
+          { type: 'menjodohkan', title: 'MENJODOHKAN' },
+          { type: 'isian', title: 'ISIAN SINGKAT' },
+          { type: 'uraian', title: 'URAIAN' },
+        ];
+        let letterIdx = 0;
+        const parts = [];
+        for (const sec of sections) {
+          const items = state.questions.filter(q => q && q.type === sec.type);
+          if (!items.length) continue;
+          const letter = String.fromCharCode(65 + letterIdx);
+          letterIdx++;
+          const rows = items.map((q, i) => {
+            let ans = '';
+            if (sec.type === 'pg') {
+              ans = typeof q.answer === 'number' ? String.fromCharCode(65 + q.answer) : String(q.answer ?? '');
+            } else if (sec.type === 'pg_kompleks') {
+              if (Array.isArray(q.answer)) ans = q.answer.map(n => String.fromCharCode(65 + Number(n))).join(', ');
+              else ans = String(q.answer ?? '');
+            } else if (sec.type === 'menjodohkan') {
+              if (Array.isArray(q.answer)) {
+                if (Array.isArray(q.matchKey)) {
+                  ans = q.matchKey.map((pos, idx) => `${idx + 1}–${String.fromCharCode(65 + Number(pos || 0))}`).join(', ');
+                } else {
+                  ans = '';
+                }
+              } else {
+                ans = String(q.answer ?? '');
+              }
+            } else {
+              ans = String(q.answer || '');
+            }
+            return `<tr><td class="border px-2 py-1 text-center">${i + 1}</td><td class="border px-2 py-1">${safeText(ans || '-')}</td></tr>`;
+          }).join('');
+          parts.push(`
+            <div class="mt-6">
+              <div class="font-bold text-base mb-2">${letter}. ${sec.title}</div>
+              <table class="w-full text-sm border-collapse">
+                <thead><tr><th class="border px-2 py-1 w-14">No</th><th class="border px-2 py-1">Kunci</th></tr></thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+          `);
+        }
         return `
           <div class="bg-white p-10 shadow-paper font-serif border border-gray-200 mx-auto print:border-none print:shadow-none print:p-0">
             <div class="font-bold text-lg mb-3">KUNCI JAWABAN</div>
-            <table class="w-full text-sm border-collapse">
-              <thead><tr><th class="border px-2 py-1">No</th><th class="border px-2 py-1">Kunci</th></tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
+            ${parts.length ? parts.join('') : `<div class="text-sm text-gray-500">Belum ada kunci.</div>`}
           </div>
         `;
       };
@@ -5133,6 +5294,63 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
             ? `berbagai tema/topik yang sesuai untuk ${state.identity.mataPelajaran} tingkat ${state.identity.jenjang} kelas ${state.identity.kelas}`
             : `topik ${state.identity.topik || '-'} untuk ${state.identity.mataPelajaran} tingkat ${state.identity.jenjang} kelas ${state.identity.kelas}`;
 
+          const outputSchema = sec.bentuk === "menjodohkan"
+            ? `OUTPUT JSON (Array of Objects):
+[
+  {
+    "type": "menjodohkan",
+    "question": "...",
+    "pairs": [
+      { "left": "...", "right": "..." }
+    ],
+    "explanation": "...",
+    "difficulty": "...",
+    "bloom": "...",
+    "materi": "...",
+    "indikator": "...",
+    "asciiDiagram": "...",
+    "svgSource": "...",
+    "imagePrompt": "..."
+  }
+]
+Kembalikan JSON persis: {"items": [...]}`
+            : (sec.bentuk === "pg" || sec.bentuk === "pg_kompleks")
+              ? `OUTPUT JSON (Array of Objects):
+[
+  {
+    "type": "${sec.bentuk}",
+    "question": "...",
+    "options": ["..."],
+    "answer": ...,
+    "explanation": "...",
+    "difficulty": "...",
+    "bloom": "...",
+    "materi": "...",
+    "indikator": "...",
+    "asciiDiagram": "...",
+    "svgSource": "...",
+    "imagePrompt": "..."
+  }
+]
+Kembalikan JSON persis: {"items": [...]}`
+              : `OUTPUT JSON (Array of Objects):
+[
+  {
+    "type": "${sec.bentuk}",
+    "question": "...",
+    "answer": "...",
+    "explanation": "...",
+    "difficulty": "...",
+    "bloom": "...",
+    "materi": "...",
+    "indikator": "...",
+    "asciiDiagram": "...",
+    "svgSource": "...",
+    "imagePrompt": "..."
+  }
+]
+Kembalikan JSON persis: {"items": [...]}`;
+
           const promptBase = `Bertindaklah sebagai Guru Profesional.
 Buatlah daftar soal untuk BAGIAN: ${bagianLabel}.
 
@@ -5151,7 +5369,7 @@ PARAMETER:
 ATURAN JAWABAN (WAJIB):
 - Jika tipe "pg": field "answer" harus 1 angka index 0-based (0=A, 1=B, dst).
 - Jika tipe "pg_kompleks": field "answer" harus ARRAY angka index 0-based, MINIMAL 2 jawaban benar. Contoh: [0,2] berarti A dan C benar.
-- Jika tipe "menjodohkan": field "answer" harus ARRAY pasangan yang konsisten dengan opsi.
+- Jika tipe "menjodohkan": field "pairs" HARUS ada dan berisi ARRAY object { "left": "...", "right": "..." } (teks, bukan angka). Panjang pairs 4–8. Jangan output pasangan angka seperti "1-3" atau "0,3".
 
 INSTRUKSI FORMAT MATEMATIKA (WAJIB PATUH):
 1. JANGAN GUNAKAN FORMAT LATEX ($..$).
@@ -5163,25 +5381,7 @@ Jika soal membutuhkan gambar/diagram:
 1. Prioritas 1: Buat diagram ASCII sederhana di field "asciiDiagram".
 2. Prioritas 2: Buat kode SVG sederhana (hitam putih, viewBox minimal, tanpa width/height fixed) di field "svgSource".
 3. Prioritas 3: Jika sangat kompleks, kosongkan ascii/svg dan isi "imagePrompt" untuk digenerate AI Image.
-
-OUTPUT JSON (Array of Objects):
-[
-  {
-    "type": "${sec.bentuk}",
-    "question": "...",
-    "options": ["..."],
-    "answer": ... (sesuai tipe),
-    "explanation": "...",
-    "difficulty": "...",
-    "bloom": "...",
-    "materi": "...",
-    "indikator": "...",
-    "asciiDiagram": "...",
-    "svgSource": "...",
-    "imagePrompt": "..."
-  }
-]
-Kembalikan JSON persis: {"items": [...]}`;
+${outputSchema}`;
 
           let needed = totalSec;
           let attempts = 0;
@@ -5264,19 +5464,26 @@ Kembalikan JSON persis: {"items": [...]}`;
         if (!q) return;
         updateQuestionData(qId, { _loadingText: true });
         try {
-          const prompt = `Buat ulang 1 butir soal sesuai detail berikut:
-Jenis: ${q.type}
-Tingkat Kesulitan: sedang
-Bloom: ${q.bloom || 'C2'}
-Materi: ${q.materi || '-'}
-Instruksi:
-1. Gunakan Bahasa Indonesia.
-2. Jika tipe "pg" atau "pg_kompleks", buat ${clamp(Number(state.sections.find(s=>s.id===q.sectionId)?.opsiPG || 4), 3, 5)} opsi.
-3. Pastikan jawaban benar dan disertai penjelasan singkat.
-4. Jika butuh gambar: Prioritas 1: "asciiDiagram", Prioritas 2: "svgSource", Prioritas 3: "imagePrompt".
-5. Jika tipe "pg_kompleks", field "answer" HARUS array minimal 2 jawaban benar (contoh: [0,2]).
-
-OUTPUT JSON:
+          const out = q.type === 'menjodohkan'
+            ? `OUTPUT JSON:
+{
+  "items": [
+    {
+      "type": "menjodohkan",
+      "question": "...",
+      "pairs": [{"left":"...","right":"..."}],
+      "explanation": "...",
+      "difficulty": "...",
+      "bloom": "...",
+      "materi": "...",
+      "indikator": "...",
+      "asciiDiagram": "...",
+      "svgSource": "...",
+      "imagePrompt": "..."
+    }
+  ]
+}`
+            : `OUTPUT JSON:
 {
   "items": [
     {
@@ -5295,6 +5502,19 @@ OUTPUT JSON:
     }
   ]
 }`;
+          const prompt = `Buat ulang 1 butir soal sesuai detail berikut:
+Jenis: ${q.type}
+Tingkat Kesulitan: sedang
+Bloom: ${q.bloom || 'C2'}
+Materi: ${q.materi || '-'}
+Instruksi:
+1. Gunakan Bahasa Indonesia.
+2. Jika tipe "pg" atau "pg_kompleks", buat ${clamp(Number(state.sections.find(s=>s.id===q.sectionId)?.opsiPG || 4), 3, 5)} opsi.
+3. Pastikan jawaban benar dan disertai penjelasan singkat.
+4. Jika butuh gambar: Prioritas 1: "asciiDiagram", Prioritas 2: "svgSource", Prioritas 3: "imagePrompt".
+5. Jika tipe "pg_kompleks", field "answer" HARUS array minimal 2 jawaban benar (contoh: [0,2]).
+6. Jika tipe "menjodohkan", field "pairs" HARUS ada: [{"left":"...","right":"..."}, ...] (teks, bukan angka). Jangan output "0,3" atau "1-4".
+${out}`;
         const res = await callOpenAI(prompt);
         const item = Array.isArray(res?.items) ? res.items[0] : null;
         if (!item) return updateQuestionData(qId, { _loadingText: false });
@@ -5815,124 +6035,176 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         if (state.questions.length === 0) return alert("Belum ada soal!");
         
         const btnExport = el("btnExport");
-        const originalText = btnExport.innerHTML;
-        const originalDisabled = btnExport.disabled;
+        const originalText = btnExport ? btnExport.innerHTML : "";
+        const originalDisabled = btnExport ? btnExport.disabled : false;
   
         try {
+          if (btnExport) {
             btnExport.innerHTML = `<span class="animate-spin material-symbols-outlined text-[18px]">progress_activity</span> Proses...`;
             btnExport.disabled = true;
+          }
   
-            const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun } = docx;
+          const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun } = docx;
   
-            const processedQuestions = await Promise.all(state.questions.map(async (q) => {
-              let imgData = null;
-              if (q.image) {
-                try {
-                  const resp = await fetch(q.image);
-                  const blob = await resp.blob();
-                  const buffer = await blob.arrayBuffer();
-                  const dimensions = await new Promise((resolve) => {
-                    const img = new Image();
-                    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-                    img.onerror = () => resolve({ width: 300, height: 300 });
-                    img.src = URL.createObjectURL(blob);
-                  });
-                  const maxWidth = 100;
-                  const ratio = dimensions.width / dimensions.height;
-                  const width = Math.min(maxWidth, dimensions.width);
-                  const height = width / ratio;
-                  imgData = { buffer, width, height };
-                } catch (e) {
-                  console.error("Failed to load image for docx", e);
-                }
-              }
-              return { ...q, _img: imgData };
-            }));
-  
-            let logoRun = state.identity.logo ? await makeImageRunFromDataUrl(state.identity.logo, 96, 96) : null;
-            const headerTitle = new Table({
+          const makeHeader = (title, kind) => {
+            const headerTitle = new Paragraph({
+              children: [
+                new TextRun({ text: (state.identity.namaSekolah || "NAMA SEKOLAH").toUpperCase(), bold: true, size: 28 }),
+                new TextRun({ text: "\n", break: 1 }),
+                new TextRun({ text: title, bold: true, size: 24 }),
+                new TextRun({ text: "\n", break: 1 }),
+                new TextRun({ text: `Tahun Pelajaran ${state.paket.tahunAjaran}`, size: 20 }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 300 },
+            });
+            const leftInner = new Table({
               width: { size: 100, type: WidthType.PERCENTAGE },
-              borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE } },
+              borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
               rows: [
                 new TableRow({
                   children: [
-                    new TableCell({
-                      width: { size: 80, type: WidthType.PERCENTAGE },
-                      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                      children: [
-                        new Paragraph({
-                          children: [
-                            new TextRun({ text: (state.identity.namaSekolah || "NAMA SEKOLAH").toUpperCase(), bold: true, size: 28 }),
-                            new TextRun({ text: "\n", break: 1 }),
-                            new TextRun({ text: (state.paket.judul || "PENILAIAN AKHIR SEMESTER").toUpperCase(), bold: true, size: 24 }),
-                            new TextRun({ text: "\n", break: 1 }),
-                            new TextRun({ text: `Tahun Pelajaran ${state.paket.tahunAjaran}`, size: 20 }),
-                          ],
-                          alignment: AlignmentType.CENTER,
-                          spacing: { after: 300 },
-                        }),
-                      ],
-                    }),
-                    new TableCell({
-                      width: { size: 20, type: WidthType.PERCENTAGE },
-                      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                      children: logoRun ? [new Paragraph({ children: [logoRun], alignment: AlignmentType.RIGHT })] : [new Paragraph({})],
-                    }),
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Mata Pelajaran", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                    new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                    new TableCell({ children: [new Paragraph({ text: String(state.identity.mataPelajaran || "-") })] }),
                   ],
                 }),
+                new TableRow({
+                  children: [
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Kelas / Fase", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                    new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                    new TableCell({ children: [new Paragraph({ text: `${String(state.identity.kelas || "-")} / ${String(state.identity.fase || "-")}` })] }),
+                  ],
+                }),
+                ...(kind === "naskah"
+                  ? [
+                      new TableRow({
+                        children: [
+                          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Hari / Tanggal", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: "______________________________" })] }),
+                        ],
+                      }),
+                    ]
+                  : state.identity.jenisTopik === "spesifik"
+                  ? [
+                      new TableRow({
+                        children: [
+                          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Topik / Lingkup Materi", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: String(state.identity.topik || "-") })] }),
+                        ],
+                      }),
+                    ]
+                  : []),
               ],
             });
-  
+            const rightInner = new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
+              rows: [
+                ...(kind === "naskah"
+                  ? [
+                      new TableRow({
+                        children: [
+                          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Waktu", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: "______________________________" })] }),
+                        ],
+                      }),
+                      new TableRow({
+                        children: [
+                          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Nama Siswa", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: "______________________________" })] }),
+                        ],
+                      }),
+                      new TableRow({
+                        children: [
+                          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "No. Absen / Ruang", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: "______________________________" })] }),
+                        ],
+                      }),
+                    ]
+                  : [
+                      new TableRow({
+                        children: [
+                          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Kurikulum", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: "Merdeka" })] }),
+                        ],
+                      }),
+                      new TableRow({
+                        children: [
+                          new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Jumlah Soal", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
+                          new TableCell({ children: [new Paragraph({ text: String(state.questions.length) })] }),
+                        ],
+                      }),
+                    ]),
+              ],
+            });
             const headerTable = new Table({
               width: { size: 100, type: WidthType.PERCENTAGE },
               borders: {
-                top: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+                top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
                 bottom: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                left: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                right: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
-                insideVertical: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+                left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
               },
               rows: [
                 new TableRow({
                   children: [
                     new TableCell({
-                      children: [
-                        new Table({
-                            width: { size: 100, type: WidthType.PERCENTAGE },
-                            borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
-                            rows: [
-                                new TableRow({ children: [ new TableCell({ children: [new Paragraph({ text: "Mata Pelajaran" })], width: { size: 35, type: WidthType.PERCENTAGE } }), new TableCell({ children: [new Paragraph({ text: ": " + (state.identity.mataPelajaran || "-") })], width: { size: 65, type: WidthType.PERCENTAGE } }) ] }),
-                                new TableRow({ children: [ new TableCell({ children: [new Paragraph({ text: "Kelas / Fase" })], width: { size: 35, type: WidthType.PERCENTAGE } }), new TableCell({ children: [new Paragraph({ text: ": " + (state.identity.kelas || "-") + " / " + (state.identity.fase || "-") })], width: { size: 65, type: WidthType.PERCENTAGE } }) ] }),
-                                new TableRow({ children: [ new TableCell({ children: [new Paragraph({ text: "Hari / Tanggal" })], width: { size: 35, type: WidthType.PERCENTAGE } }), new TableCell({ children: [new Paragraph({ text: ": _______________________" })], width: { size: 65, type: WidthType.PERCENTAGE } }) ] }),
-                            ]
-                        })
-                      ],
+                      children: [leftInner],
                       width: { size: 50, type: WidthType.PERCENTAGE },
+                      margins: { top: 100, bottom: 100, left: 100, right: 100 },
                       borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                      margins: { top: 100, bottom: 100, left: 100, right: 100 }
                     }),
                     new TableCell({
-                      children: [
-                        new Table({
-                            width: { size: 100, type: WidthType.PERCENTAGE },
-                            borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
-                            rows: [
-                                new TableRow({ children: [ new TableCell({ children: [new Paragraph({ text: "Waktu" })], width: { size: 35, type: WidthType.PERCENTAGE } }), new TableCell({ children: [new Paragraph({ text: ": _______________________" })], width: { size: 65, type: WidthType.PERCENTAGE } }) ] }),
-                                new TableRow({ children: [ new TableCell({ children: [new Paragraph({ text: "Nama Siswa" })], width: { size: 35, type: WidthType.PERCENTAGE } }), new TableCell({ children: [new Paragraph({ text: ": _______________________" })], width: { size: 65, type: WidthType.PERCENTAGE } }) ] }),
-                                new TableRow({ children: [ new TableCell({ children: [new Paragraph({ text: "No. Absen" })], width: { size: 35, type: WidthType.PERCENTAGE } }), new TableCell({ children: [new Paragraph({ text: ": _______________________" })], width: { size: 65, type: WidthType.PERCENTAGE } }) ] }),
-                            ]
-                        })
-                      ],
+                      children: [rightInner],
                       width: { size: 50, type: WidthType.PERCENTAGE },
+                      margins: { top: 100, bottom: 100, left: 100, right: 100 },
                       borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                      margins: { top: 100, bottom: 100, left: 100, right: 100 }
                     }),
                   ],
                 }),
               ],
             });
+            return { headerTitle, headerTable };
+          };
   
-            const spacer = new Paragraph({ spacing: { after: 400 } });
+          const spacer = new Paragraph({ spacing: { after: 400 } });
+  
+          const processedQuestions = await Promise.all(state.questions.map(async (q) => {
+            let imgData = null;
+            if (q.image) {
+              try {
+                const resp = await fetch(q.image);
+                const blob = await resp.blob();
+                const buffer = new Uint8Array(await blob.arrayBuffer());
+                const dimensions = await new Promise((resolve) => {
+                  const img = new Image();
+                  const u = URL.createObjectURL(blob);
+                  img.onload = () => { URL.revokeObjectURL(u); resolve({ width: img.naturalWidth, height: img.naturalHeight }); };
+                  img.onerror = () => { URL.revokeObjectURL(u); resolve({ width: 300, height: 300 }); };
+                  img.src = u;
+                });
+                const maxWidth = 100;
+                const dw = Math.max(1, Number(dimensions.width || 300));
+                const dh = Math.max(1, Number(dimensions.height || 300));
+                const ratio = dw / dh;
+                const width = Math.max(1, Math.round(Math.min(maxWidth, dw)));
+                const height = Math.max(1, Math.round(width / ratio));
+                imgData = { buffer, width, height };
+              } catch {}
+            }
+            return { ...q, _img: imgData };
+          }));
+  
+          const buildNaskahSection = () => {
+            const { headerTitle, headerTable } = makeHeader(String(state.paket.judul || "NASKAH SOAL").toUpperCase(), "naskah");
             const questionParagraphs = [];
             const sections = [
               { type: 'pg', title: 'PILIHAN GANDA', subtitle: 'Pilihlah salah satu jawaban yang paling tepat!' },
@@ -5988,32 +6260,49 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                     );
                   });
                 } else if (sec.type === 'menjodohkan') {
-                  const rows = [];
-                  rows.push(new TableRow({
-                    children: [
-                      new TableCell({ children: [new Paragraph({text: "No", bold: true, alignment: AlignmentType.CENTER})], width: { size: 10, type: WidthType.PERCENTAGE } }),
-                      new TableCell({ children: [new Paragraph({text: "Pernyataan", bold: true})], width: { size: 45, type: WidthType.PERCENTAGE } }),
-                      new TableCell({ children: [new Paragraph({text: "Jawaban", bold: true})], width: { size: 45, type: WidthType.PERCENTAGE } }),
-                    ]
-                  }));
-                  const rightList = Array.isArray(q.answer) ? [...q.answer].sort() : [];
-                  q.options.forEach((opt, idx) => {
-                    const left = opt;
-                    const rightText = rightList[idx] || "";
-                    const rightLabel = rightText ? `${String.fromCharCode(65 + idx)}. ${rightText}` : "";
-                    rows.push(new TableRow({
-                      children: [
-                        new TableCell({ children: [new Paragraph({text: String(idx + 1), alignment: AlignmentType.CENTER})] }),
-                        new TableCell({ children: [new Paragraph({text: left})] }),
-                        new TableCell({ children: [new Paragraph({text: rightLabel})] }),
-                      ]
-                    }));
-                  });
-                  questionParagraphs.push(new Table({
-                    rows: rows,
-                    width: { size: 100, type: WidthType.PERCENTAGE },
-                    indent: { left: 400 },
-                  }));
+                  const leftList = Array.isArray(q.options) ? q.options : [];
+                  const rightList = Array.isArray(q.answer) ? q.answer : [];
+                  const leftParas = [
+                    new Paragraph({ children: [new TextRun({ text: "Lajur A (Pernyataan)", bold: true })], spacing: { after: 80 } }),
+                    ...leftList.map((opt, idx) =>
+                      new Paragraph({ children: [new TextRun({ text: `${idx + 1}. ${String(opt ?? "")}` })], spacing: { after: 40 } })
+                    ),
+                  ];
+                  const rightParas = [
+                    new Paragraph({ children: [new TextRun({ text: "Lajur B (Jawaban)", bold: true })], spacing: { after: 80 } }),
+                    ...rightList.map((opt, idx) =>
+                      new Paragraph({ children: [new TextRun({ text: `${String.fromCharCode(65 + idx)}. ${String(opt ?? "")}` })], spacing: { after: 40 } })
+                    ),
+                  ];
+                  questionParagraphs.push(
+                    new Table({
+                      width: { size: 100, type: WidthType.PERCENTAGE },
+                      borders: {
+                        top: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        bottom: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        left: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        right: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "FFFFFF" },
+                        insideVertical: { style: BorderStyle.SINGLE, size: 6, color: "000000" },
+                      },
+                      rows: [
+                        new TableRow({
+                          children: [
+                            new TableCell({
+                              width: { size: 50, type: WidthType.PERCENTAGE },
+                              margins: { top: 80, bottom: 80, left: 140, right: 140 },
+                              children: leftParas,
+                            }),
+                            new TableCell({
+                              width: { size: 50, type: WidthType.PERCENTAGE },
+                              margins: { top: 80, bottom: 80, left: 140, right: 140 },
+                              children: rightParas,
+                            }),
+                          ],
+                        }),
+                      ],
+                    })
+                  );
                   questionParagraphs.push(new Paragraph({ spacing: { after: 200 } }));
                 } else if (sec.type === 'isian' || sec.type === 'uraian') {
                   if (sec.type === 'uraian') {
@@ -6038,26 +6327,29 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                 questionParagraphs.push(new Paragraph({ spacing: { after: 200 } }));
               });
             }
+            return { headerTitle, headerTable, spacer, questionParagraphs };
+          };
   
-            const doc = new Document({
-              sections: [{
-                properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } },
-                children: [headerTitle, headerTable, spacer, ...questionParagraphs],
-              }],
-            });
-  
-            const blob = await Packer.toBlob(doc);
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            const safeMapel = (state.identity.mataPelajaran || "Soal").replace(/[^a-z0-9]/gi, '_');
-            link.download = `GuruPintar_${safeMapel}.docx`;
-            link.click();
+          const naskah = buildNaskahSection();
+          const doc = new Document({
+            sections: [
+              { properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: [naskah.headerTitle, naskah.headerTable, naskah.spacer, ...naskah.questionParagraphs] },
+            ],
+          });
+          const blob = await Packer.toBlob(doc);
+          const link = document.createElement("a");
+          link.href = URL.createObjectURL(blob);
+          const safeMapel = (state.identity.mataPelajaran || "Soal").replace(/[^a-z0-9]/gi, '_');
+          link.download = `GuruPintar_${safeMapel}.docx`;
+          link.click();
         } catch (e) {
-            console.error(e);
-            alert("Gagal export docx: " + e.message);
+          console.error(e);
+          alert("Gagal export docx: " + e.message);
         } finally {
+          if (btnExport) {
             btnExport.innerHTML = originalText;
             btnExport.disabled = originalDisabled;
+          }
         }
       };
 
@@ -6065,12 +6357,14 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
          if (state.questions.length === 0) return alert("Belum ada soal!");
         
         const btn = el("btnExportKunci");
-        const originalText = btn.innerHTML;
-        const originalDisabled = btn.disabled;
+        const originalText = btn ? btn.innerHTML : "";
+        const originalDisabled = btn ? btn.disabled : false;
   
         try {
-            btn.innerHTML = `<span class="animate-spin material-symbols-outlined text-[18px]">progress_activity</span> Proses...`;
-            btn.disabled = true;
+            if (btn) {
+              btn.innerHTML = `<span class="animate-spin material-symbols-outlined text-[18px]">progress_activity</span> Proses...`;
+              btn.disabled = true;
+            }
   
             const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun } = docx;
   
@@ -6224,10 +6518,10 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                                 ansText = String(q.answer);
                             }
                         } else if (sec.type === 'menjodohkan') {
-                            if (Array.isArray(q.answer)) {
-                                ansText = q.answer.map((a, ai) => `${ai+1}->${a}`).join("; ");
+                            if (Array.isArray(q.matchKey)) {
+                                ansText = q.matchKey.map((pos, idx) => `${idx + 1}–${String.fromCharCode(65 + Number(pos || 0))}`).join(", ");
                             } else {
-                                ansText = String(q.answer);
+                                ansText = '';
                             }
                         } else {
                             ansText = q.answer || "(Belum ada kunci)";
@@ -6262,8 +6556,10 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
             console.error(e);
             alert("Gagal export kunci: " + e.message);
         } finally {
-            btn.innerHTML = originalText;
-            btn.disabled = originalDisabled;
+            if (btn) {
+              btn.innerHTML = originalText;
+              btn.disabled = originalDisabled;
+            }
         }
       };
 
@@ -6271,12 +6567,14 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         if (state.questions.length === 0) return alert("Belum ada soal!");
         
         const btn = el("btnExportKisi");
-        const originalText = btn.innerHTML;
-        const originalDisabled = btn.disabled;
+        const originalText = btn ? btn.innerHTML : "";
+        const originalDisabled = btn ? btn.disabled : false;
   
         try {
-            btn.innerHTML = `<span class="animate-spin material-symbols-outlined text-[18px]">progress_activity</span> Proses...`;
-            btn.disabled = true;
+            if (btn) {
+              btn.innerHTML = `<span class="animate-spin material-symbols-outlined text-[18px]">progress_activity</span> Proses...`;
+              btn.disabled = true;
+            }
   
             const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, ImageRun } = docx;
   
@@ -6446,8 +6744,10 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
             console.error(e);
             alert("Gagal export kisi-kisi: " + e.message);
         } finally {
-            btn.innerHTML = originalText;
-            btn.disabled = originalDisabled;
+            if (btn) {
+              btn.innerHTML = originalText;
+              btn.disabled = originalDisabled;
+            }
         }
       };
 
@@ -6596,17 +6896,20 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               try {
                 const resp = await fetch(q.image);
                 const blob = await resp.blob();
-                const buffer = await blob.arrayBuffer();
+                const buffer = new Uint8Array(await blob.arrayBuffer());
                 const dimensions = await new Promise((resolve) => {
                   const img = new Image();
-                  img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-                  img.onerror = () => resolve({ width: 300, height: 300 });
-                  img.src = URL.createObjectURL(blob);
+                  const u = URL.createObjectURL(blob);
+                  img.onload = () => { URL.revokeObjectURL(u); resolve({ width: img.naturalWidth, height: img.naturalHeight }); };
+                  img.onerror = () => { URL.revokeObjectURL(u); resolve({ width: 300, height: 300 }); };
+                  img.src = u;
                 });
                 const maxWidth = 100;
-                const ratio = dimensions.width / dimensions.height;
-                const width = Math.min(maxWidth, dimensions.width);
-                const height = width / ratio;
+                const dw = Math.max(1, Number(dimensions.width || 300));
+                const dh = Math.max(1, Number(dimensions.height || 300));
+                const ratio = dw / dh;
+                const width = Math.max(1, Math.round(Math.min(maxWidth, dw)));
+                const height = Math.max(1, Math.round(width / ratio));
                 imgData = { buffer, width, height };
               } catch {}
             }
@@ -6899,11 +7202,17 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
           const naskah = buildNaskahSection();
           const kunci = buildKunciSection();
           const kisi = buildKisiSection();
+          const pageBreak = () => new Paragraph({ children: [], pageBreakBefore: true });
+          const children = [
+            naskah.headerTitle, naskah.headerTable, naskah.spacer, ...naskah.questionParagraphs,
+            pageBreak(),
+            kunci.headerTitle, kunci.headerTable, kunci.spacer, ...kunci.content,
+            pageBreak(),
+            kisi.headerTitle, kisi.headerTable, kisi.spacer, kisi.kisiTable,
+          ];
           const doc = new Document({
             sections: [
-              { properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: [naskah.headerTitle, naskah.headerTable, naskah.spacer, ...naskah.questionParagraphs] },
-              { properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: [kunci.headerTitle, kunci.headerTable, kunci.spacer, ...kunci.content] },
-              { properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: [kisi.headerTitle, kisi.headerTable, kisi.spacer, kisi.kisiTable] },
+              { properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children },
             ],
           });
           const blob = await Packer.toBlob(doc);
@@ -7028,8 +7337,20 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       
       const btnPrint = el("btnPrint");
       if (btnPrint) {
-        btnPrint.addEventListener("click", () => {
-          exportAllDocx();
+        btnPrint.addEventListener("click", async () => {
+          try {
+            btnPrint.innerHTML = `<span class="animate-spin material-symbols-outlined text-[18px]">progress_activity</span> Mengunduh...`;
+            btnPrint.disabled = true;
+          } catch {}
+          try { await exportDocx(); } catch {}
+          await new Promise(r=>setTimeout(r,300));
+          try { await exportKunciDocx(); } catch {}
+          await new Promise(r=>setTimeout(r,300));
+          try { await exportKisiDocx(); } catch {}
+          try {
+            btnPrint.innerHTML = "Cetak";
+            btnPrint.disabled = false;
+          } catch {}
         });
       }
 
