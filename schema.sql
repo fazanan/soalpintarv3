@@ -7,6 +7,7 @@ USE soalpintar;
 CREATE TABLE IF NOT EXISTS users (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(100) NOT NULL UNIQUE,
+  no_hp VARCHAR(32) NULL,
   password VARCHAR(255) NOT NULL,
   role ENUM('admin','user') NOT NULL DEFAULT 'user',
   access_quiz TINYINT(1) NOT NULL DEFAULT 1,
@@ -19,6 +20,18 @@ CREATE TABLE IF NOT EXISTS users (
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
+
+SET @col_nohp := (
+  SELECT COUNT(*)
+  FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'users'
+    AND COLUMN_NAME = 'no_hp'
+);
+SET @sql_nohp := IF(@col_nohp = 0, 'ALTER TABLE users ADD COLUMN no_hp VARCHAR(32) NULL AFTER username', 'SELECT 1');
+PREPARE stmt_nohp FROM @sql_nohp;
+EXECUTE stmt_nohp;
+DEALLOCATE PREPARE stmt_nohp;
 
 CREATE TABLE IF NOT EXISTS audit_logs (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

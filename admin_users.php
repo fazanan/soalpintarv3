@@ -9,14 +9,17 @@ require_once __DIR__ . '/db.php';
 $message = '';
 $error = '';
 $hasAccessCols = false;
+$hasNoHpCol = false;
 try {
   $ok1 = false;
   $ok2 = false;
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_quiz'")) { $ok1 = $rs->num_rows > 0; $rs->close(); }
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_rekap_nilai'")) { $ok2 = $rs->num_rows > 0; $rs->close(); }
   $hasAccessCols = $ok1 && $ok2;
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'no_hp'")) { $hasNoHpCol = $rs->num_rows > 0; $rs->close(); }
 } catch (mysqli_sql_exception $e) {
   $hasAccessCols = false;
+  $hasNoHpCol = false;
 }
 
 function post($k, $default = '') {
@@ -27,6 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = post('action');
   if ($action === 'create_user') {
     $username = post('username', '');
+    $noHp = post('no_hp', '');
+    $noHp = trim((string)preg_replace('/[^0-9+()\\-\\s]/', '', $noHp));
     $password = post('password', '');
     $role = post('role', 'user') === 'admin' ? 'admin' : 'user';
     $lpRaw = post('limitpaket', '');
@@ -39,21 +44,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($username === '' || $password === '') {
       $error = 'Username dan password wajib diisi.';
+    } elseif (strlen($noHp) > 32) {
+      $error = 'No HP terlalu panjang.';
     } elseif (strlen($username) > 100) {
       $error = 'Username terlalu panjang.';
     } else {
       $hash = password_hash($password, PASSWORD_BCRYPT);
       $stmt = null;
       try {
-        $stmt = $hasAccessCols
-          ? $mysqli->prepare("INSERT INTO users (username, password, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?, ?, ?)")
-          : $mysqli->prepare("INSERT INTO users (username, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?)");
+        if ($hasAccessCols) {
+          $stmt = $hasNoHpCol
+            ? $mysqli->prepare("INSERT INTO users (username, no_hp, password, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+            : $mysqli->prepare("INSERT INTO users (username, password, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        } else {
+          $stmt = $hasNoHpCol
+            ? $mysqli->prepare("INSERT INTO users (username, no_hp, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?, ?)")
+            : $mysqli->prepare("INSERT INTO users (username, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?)");
+        }
       } catch (mysqli_sql_exception $e) {
         $stmt = null;
       }
       if ($stmt) {
-        if ($hasAccessCols) $stmt->bind_param('sssiiii', $username, $hash, $role, $accessQuiz, $accessRekap, $lp, $lg);
-        else $stmt->bind_param('sssii', $username, $hash, $role, $lp, $lg);
+        if ($hasAccessCols) {
+          if ($hasNoHpCol) $stmt->bind_param('ssssiiii', $username, $noHp, $hash, $role, $accessQuiz, $accessRekap, $lp, $lg);
+          else $stmt->bind_param('sssiiii', $username, $hash, $role, $accessQuiz, $accessRekap, $lp, $lg);
+        } else {
+          if ($hasNoHpCol) $stmt->bind_param('ssssii', $username, $noHp, $hash, $role, $lp, $lg);
+          else $stmt->bind_param('sssii', $username, $hash, $role, $lp, $lg);
+        }
         if ($stmt->execute()) $message = 'Pengguna berhasil dibuat.';
         else {
           $code = (int)($stmt->errno ?: $mysqli->errno);
@@ -77,26 +95,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
   if ($action === 'update_limits') {
     $id = (int)post('id', '0');
+    $noHp = post('no_hp', '');
+    $noHp = trim((string)preg_replace('/[^0-9+()\\-\\s]/', '', $noHp));
     $lp = (int)max(0, (int)post('limitpaket', '0'));
     $lg = (int)max(0, (int)post('limitgambar', '0'));
     $accessQuiz = isset($_POST['access_quiz']) ? 1 : 0;
     $accessRekap = isset($_POST['access_rekap_nilai']) ? 1 : 0;
+    if (strlen($noHp) > 32) {
+      $error = 'No HP terlalu panjang.';
+    } else {
     $stmt = null;
     try {
-      $stmt = $hasAccessCols
-        ? $mysqli->prepare("UPDATE users SET limitpaket=?, limitgambar=?, access_quiz=?, access_rekap_nilai=? WHERE id=?")
-        : $mysqli->prepare("UPDATE users SET limitpaket=?, limitgambar=? WHERE id=?");
+      if ($hasAccessCols) {
+        $stmt = $hasNoHpCol
+          ? $mysqli->prepare("UPDATE users SET no_hp=?, limitpaket=?, limitgambar=?, access_quiz=?, access_rekap_nilai=? WHERE id=?")
+          : $mysqli->prepare("UPDATE users SET limitpaket=?, limitgambar=?, access_quiz=?, access_rekap_nilai=? WHERE id=?");
+      } else {
+        $stmt = $hasNoHpCol
+          ? $mysqli->prepare("UPDATE users SET no_hp=?, limitpaket=?, limitgambar=? WHERE id=?")
+          : $mysqli->prepare("UPDATE users SET limitpaket=?, limitgambar=? WHERE id=?");
+      }
     } catch (mysqli_sql_exception $e) {
       $stmt = null;
     }
     if ($stmt) {
-      if ($hasAccessCols) $stmt->bind_param('iiiii', $lp, $lg, $accessQuiz, $accessRekap, $id);
-      else $stmt->bind_param('iii', $lp, $lg, $id);
+      if ($hasAccessCols) {
+        if ($hasNoHpCol) $stmt->bind_param('siiiii', $noHp, $lp, $lg, $accessQuiz, $accessRekap, $id);
+        else $stmt->bind_param('iiiii', $lp, $lg, $accessQuiz, $accessRekap, $id);
+      } else {
+        if ($hasNoHpCol) $stmt->bind_param('siii', $noHp, $lp, $lg, $id);
+        else $stmt->bind_param('iii', $lp, $lg, $id);
+      }
       if ($stmt->execute()) $message = 'Pengaturan pengguna diperbarui.';
       else $error = 'Gagal memperbarui pengaturan pengguna.';
       $stmt->close();
     } else {
       $error = 'Gagal menyiapkan pembaruan batas.';
+    }
     }
   }
   if ($action === 'reset_password') {
@@ -178,17 +213,29 @@ try {
     $like = '%' . $q . '%';
     if (ctype_digit($q)) {
       $stmt = $hasAccessCols
-        ? $mysqli->prepare("SELECT id, username, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? OR id=? ORDER BY id DESC LIMIT ? OFFSET ?")
-        : $mysqli->prepare("SELECT id, username, role, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? OR id=? ORDER BY id DESC LIMIT ? OFFSET ?");
+        ? $mysqli->prepare($hasNoHpCol
+            ? "SELECT id, username, no_hp, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? OR id=? ORDER BY id DESC LIMIT ? OFFSET ?"
+            : "SELECT id, username, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? OR id=? ORDER BY id DESC LIMIT ? OFFSET ?")
+        : $mysqli->prepare($hasNoHpCol
+            ? "SELECT id, username, no_hp, role, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? OR id=? ORDER BY id DESC LIMIT ? OFFSET ?"
+            : "SELECT id, username, role, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? OR id=? ORDER BY id DESC LIMIT ? OFFSET ?");
     } else {
       $stmt = $hasAccessCols
-        ? $mysqli->prepare("SELECT id, username, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?")
-        : $mysqli->prepare("SELECT id, username, role, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?");
+        ? $mysqli->prepare($hasNoHpCol
+            ? "SELECT id, username, no_hp, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?"
+            : "SELECT id, username, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?")
+        : $mysqli->prepare($hasNoHpCol
+            ? "SELECT id, username, no_hp, role, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?"
+            : "SELECT id, username, role, limitpaket, limitgambar, created_at FROM users WHERE username LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?");
     }
   } else {
     $stmt = $hasAccessCols
-      ? $mysqli->prepare("SELECT id, username, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?")
-      : $mysqli->prepare("SELECT id, username, role, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?");
+      ? $mysqli->prepare($hasNoHpCol
+          ? "SELECT id, username, no_hp, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?"
+          : "SELECT id, username, role, access_quiz, access_rekap_nilai, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?")
+      : $mysqli->prepare($hasNoHpCol
+          ? "SELECT id, username, no_hp, role, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?"
+          : "SELECT id, username, role, limitpaket, limitgambar, created_at FROM users ORDER BY id DESC LIMIT ? OFFSET ?");
   }
 } catch (mysqli_sql_exception $e) {
   $stmt = null;
@@ -211,6 +258,9 @@ if ($stmt) {
     if (!$hasAccessCols) {
       $r['access_quiz'] = 1;
       $r['access_rekap_nilai'] = 1;
+    }
+    if (!$hasNoHpCol) {
+      $r['no_hp'] = '';
     }
     $users[] = $r;
   }
@@ -261,6 +311,7 @@ if ($stmt) {
             <tr>
               <th class="border px-3 py-2 text-left">ID</th>
               <th class="border px-3 py-2 text-left">Username</th>
+              <th class="border px-3 py-2 text-left">No HP</th>
               <th class="border px-3 py-2 text-left">Role</th>
               <th class="border px-3 py-2 text-left">Akses Quiz</th>
               <th class="border px-3 py-2 text-left">Akses Rekap</th>
@@ -272,9 +323,10 @@ if ($stmt) {
           </thead>
           <tbody>
             <?php foreach ($users as $u): ?>
-              <tr data-row="<?php echo (int)$u['id']; ?>" data-u="<?php echo htmlspecialchars($u['username']); ?>" data-lp="<?php echo (int)($u['limitpaket'] ?? 0); ?>" data-lg="<?php echo (int)($u['limitgambar'] ?? 0); ?>" data-aq="<?php echo (int)($u['access_quiz'] ?? 1); ?>" data-ar="<?php echo (int)($u['access_rekap_nilai'] ?? 1); ?>">
+              <tr data-row="<?php echo (int)$u['id']; ?>" data-u="<?php echo htmlspecialchars($u['username']); ?>" data-hp="<?php echo htmlspecialchars($u['no_hp'] ?? ''); ?>" data-lp="<?php echo (int)($u['limitpaket'] ?? 0); ?>" data-lg="<?php echo (int)($u['limitgambar'] ?? 0); ?>" data-aq="<?php echo (int)($u['access_quiz'] ?? 1); ?>" data-ar="<?php echo (int)($u['access_rekap_nilai'] ?? 1); ?>">
                 <td class="border px-3 py-2"><?php echo (int)$u['id']; ?></td>
                 <td class="border px-3 py-2"><?php echo htmlspecialchars($u['username']); ?></td>
+                <td class="border px-3 py-2"><?php echo htmlspecialchars($u['no_hp'] ?? ''); ?></td>
                 <td class="border px-3 py-2"><?php echo htmlspecialchars($u['role'] ?: 'user'); ?></td>
                 <td class="border px-3 py-2"><?php echo ((int)($u['access_quiz'] ?? 1) === 1) ? 'Aktif' : 'Nonaktif'; ?></td>
                 <td class="border px-3 py-2"><?php echo ((int)($u['access_rekap_nilai'] ?? 1) === 1) ? 'Aktif' : 'Nonaktif'; ?></td>
@@ -302,7 +354,7 @@ if ($stmt) {
               </tr>
             <?php endforeach; ?>
             <?php if (empty($users)): ?>
-              <tr><td colspan="9" class="border px-3 py-6 text-center text-gray-500">Belum ada pengguna.</td></tr>
+              <tr><td colspan="10" class="border px-3 py-6 text-center text-gray-500">Belum ada pengguna.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
@@ -343,6 +395,10 @@ if ($stmt) {
         <div>
           <label class="block text-sm font-medium mb-1">Username</label>
           <input id="modalUsername" type="text" class="w-full rounded border h-10 px-3 bg-gray-50" readonly>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">No HP</label>
+          <input id="modalNoHp" name="no_hp" type="text" class="w-full rounded border h-10 px-3" placeholder="Contoh: 0812xxxxxxx">
         </div>
         <div class="grid grid-cols-1 gap-2">
           <label class="inline-flex items-center gap-2 text-sm">
@@ -426,6 +482,10 @@ if ($stmt) {
           <input id="createUsername" name="username" type="text" class="w-full rounded border h-10 px-3" required>
         </div>
         <div>
+          <label class="block text-sm font-medium mb-1">No HP</label>
+          <input id="createNoHp" name="no_hp" type="text" class="w-full rounded border h-10 px-3" placeholder="Contoh: 0812xxxxxxx">
+        </div>
+        <div>
           <label class="block text-sm font-medium mb-1">Password</label>
           <input id="createPassword" name="password" type="password" class="w-full rounded border h-10 px-3" required>
         </div>
@@ -468,6 +528,7 @@ if ($stmt) {
     const form = document.getElementById('modalForm');
     const inputId = document.getElementById('modalUserId');
     const inputUsername = document.getElementById('modalUsername');
+    const inputNoHp = document.getElementById('modalNoHp');
     const inputLP = document.getElementById('modalLimitPaket');
     const inputLG = document.getElementById('modalLimitGambar');
     const inputAQ = document.getElementById('modalAccessQuiz');
@@ -487,6 +548,7 @@ if ($stmt) {
     const createForm = document.getElementById('createForm');
     const btnCreateUser = document.getElementById('btnCreateUser');
     const createUsername = document.getElementById('createUsername');
+    const createNoHp = document.getElementById('createNoHp');
     const createPassword = document.getElementById('createPassword');
     const createRole = document.getElementById('createRole');
     const createLimitPaket = document.getElementById('createLimitPaket');
@@ -497,6 +559,7 @@ if ($stmt) {
     function openModalFromRow(row) {
       inputId.value = row.getAttribute('data-row');
       inputUsername.value = row.getAttribute('data-u') || '';
+      inputNoHp.value = row.getAttribute('data-hp') || '';
       inputLP.value = row.getAttribute('data-lp') || '0';
       inputLG.value = row.getAttribute('data-lg') || '0';
       inputAQ.checked = (row.getAttribute('data-aq') || '1') === '1';
@@ -532,6 +595,7 @@ if ($stmt) {
     }
     function openCreateModal() {
       createUsername.value = '';
+      createNoHp.value = '';
       createPassword.value = '';
       createRole.value = 'user';
       createLimitPaket.value = '';

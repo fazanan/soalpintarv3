@@ -753,299 +753,366 @@ if (!isset($_SESSION['user_id'])) {
         if (!Array.isArray(state.questions) || state.questions.length === 0) return;
         await ensureJsPDF();
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF("p", "pt", "a4");
-        const pageW = doc.internal.pageSize.getWidth();
-        const pageH = doc.internal.pageSize.getHeight();
-        const margin = 40;
-        const footerY = pageH - 22;
-        const maxW = pageW - margin * 2;
-        let y = margin;
 
         const safe = `${String(state.identity.mataPelajaran || "Mapel").replace(/\s+/g, "_")}_${String(state.identity.kelas || "Kelas").replace(/\s+/g, "_")}_${String(state.paket.judul || "Paket").replace(/[\s/]+/g, "_")}`;
-        const filename = `PaketSoal_${safe}.pdf`;
+        const fileSoal = `Soal_${safe}.pdf`;
+        const fileKunci = `Kunci_${safe}.pdf`;
+        const fileKisi = `KisiKisi_${safe}.pdf`;
 
-        const newPage = () => { doc.addPage(); y = margin; };
-        const newPageIfNeeded = (h) => { if (y + h > footerY - 10) newPage(); };
+        const makeDoc = () => {
+          const doc = new jsPDF("p", "pt", "a4");
+          const pageW = doc.internal.pageSize.getWidth();
+          const pageH = doc.internal.pageSize.getHeight();
+          const margin = 40;
+          const footerY = pageH - 22;
+          const maxW = pageW - margin * 2;
+          let y = margin;
+          const newPage = () => { doc.addPage(); y = margin; };
+          const newPageIfNeeded = (h) => { if (y + h > footerY - 10) newPage(); };
+          const setFont = (style = "normal", size = 11) => { doc.setFont("times", style); doc.setFontSize(size); };
+          const addCenter = (text, size = 14, style = "bold", after = 6) => {
+            setFont(style, size);
+            const t = String(text || "");
+            const lines = doc.splitTextToSize(t, maxW);
+            const lineH = size + 4;
+            newPageIfNeeded(lines.length * lineH + after);
+            doc.text(lines, pageW / 2, y, { align: "center" });
+            y += lines.length * lineH + after;
+          };
+          const addPara = (text, size = 11, style = "normal", indent = 0, after = 6) => {
+            setFont(style, size);
+            const t = String(text || "");
+            const lines = doc.splitTextToSize(t, maxW - indent);
+            const lineH = size + 4;
+            newPageIfNeeded(lines.length * lineH + after);
+            doc.text(lines, margin + indent, y);
+            y += lines.length * lineH + after;
+          };
+          const addHanging = (prefix, text, size = 12, style = "normal", indent = 0, after = 6) => {
+            setFont(style, size);
+            const p = String(prefix || "");
+            const t = String(text || "");
+            const px = margin + indent;
+            const pw = doc.getTextWidth(p + " ");
+            const avail = Math.max(40, maxW - indent - pw);
+            const lines = doc.splitTextToSize(t, avail);
+            const lineH = size + 4;
+            newPageIfNeeded(lines.length * lineH + after);
+            doc.text(p, px, y);
+            doc.text(lines[0] || "", px + pw, y);
+            for (let i = 1; i < lines.length; i++) doc.text(lines[i], px + pw, y + lineH * i);
+            y += lines.length * lineH + after;
+          };
+          const drawDottedLine = (x1, x2, yy) => {
+            doc.setDrawColor(0);
+            doc.setLineWidth(0.8);
+            try { doc.setLineDashPattern([1.2, 2.2], 0); } catch {}
+            doc.line(x1, yy, x2, yy);
+            try { doc.setLineDashPattern([], 0); } catch {}
+          };
+          const drawHeader = (title, kind) => {
+            y = margin;
+            addCenter(String(state.identity.namaSekolah || "NAMA SEKOLAH").toUpperCase(), 16, "bold", 4);
+            addCenter(String(title || "").toUpperCase(), 13, "bold", 6);
+            addCenter(`Tahun Pelajaran ${String(state.paket.tahunAjaran || "-")}`, 11, "normal", 16);
 
-        const setFont = (style = "normal", size = 11) => {
-          doc.setFont("times", style);
-          doc.setFontSize(size);
-        };
-        const addCenter = (text, size = 14, style = "bold", after = 6) => {
-          setFont(style, size);
-          const t = String(text || "");
-          const lines = doc.splitTextToSize(t, maxW);
-          const lineH = size + 4;
-          newPageIfNeeded(lines.length * lineH + after);
-          doc.text(lines, pageW / 2, y, { align: "center" });
-          y += lines.length * lineH + after;
-        };
-        const addPara = (text, size = 11, style = "normal", indent = 0, after = 6) => {
-          setFont(style, size);
-          const t = String(text || "");
-          const lines = doc.splitTextToSize(t, maxW - indent);
-          const lineH = size + 4;
-          newPageIfNeeded(lines.length * lineH + after);
-          doc.text(lines, margin + indent, y);
-          y += lines.length * lineH + after;
-        };
-        const addHanging = (prefix, text, size = 12, style = "normal", indent = 0, after = 6) => {
-          setFont(style, size);
-          const p = String(prefix || "");
-          const t = String(text || "");
-          const px = margin + indent;
-          const pw = doc.getTextWidth(p + " ");
-          const avail = Math.max(40, maxW - indent - pw);
-          const lines = doc.splitTextToSize(t, avail);
-          const lineH = size + 4;
-          newPageIfNeeded(lines.length * lineH + after);
-          doc.text(p, px, y);
-          doc.text(lines[0] || "", px + pw, y);
-          for (let i = 1; i < lines.length; i++) doc.text(lines[i], px + pw, y + lineH * i);
-          y += lines.length * lineH + after;
-        };
-
-        const drawHeader = (title, kind) => {
-          y = margin;
-          addCenter(String(state.identity.namaSekolah || "NAMA SEKOLAH").toUpperCase(), 16, "bold", 4);
-          addCenter(String(title || "").toUpperCase(), 13, "bold", 2);
-          addCenter(`Tahun Pelajaran ${String(state.paket.tahunAjaran || "-")}`, 11, "normal", 10);
-
-          const logo = state.identity.logo || "";
-          if (logo) {
-            try {
-              const imgType = String(logo).toLowerCase().includes("jpeg") ? "JPEG" : "PNG";
-              const w = 80, h = 40;
-              doc.addImage(String(logo), imgType, pageW - margin - w, margin - 10, w, h);
-            } catch {}
-          }
-
-          const isSpesifik = String(state.identity.jenisTopik || "spesifik") === "spesifik";
-          const leftLines = [
-            `Mata Pelajaran : ${String(state.identity.mataPelajaran || "-")}`,
-            `Kelas / Fase  : ${String(state.identity.kelas || "-")} / ${String(state.identity.fase || "-")}`,
-            ...(isSpesifik ? [`Topik / Lingkup Materi : ${String(state.identity.topik || "-")}`] : []),
-            ...(kind === "naskah" ? [`Hari / Tanggal : ______________________________`] : []),
-          ];
-          const rightLines = kind === "naskah"
-            ? [
-                `Waktu : ______________________________`,
-                `Nama  : ______________________________`,
-                `No. Absen : __________________________`,
-              ]
-            : [
-                `Kurikulum : Merdeka`,
-                `Jumlah Soal : ${String((state.questions || []).length)}`,
-              ];
-
-          const startY = y;
-          doc.autoTable({
-            startY,
-            margin: { left: margin, right: margin },
-            body: [[leftLines.join("\n"), rightLines.join("\n")]],
-            theme: "plain",
-            styles: { font: "times", fontSize: 10, cellPadding: 0, lineWidth: 0, overflow: "linebreak", valign: "top" },
-            columnStyles: { 0: { cellWidth: maxW / 2 }, 1: { cellWidth: maxW / 2 } },
-          });
-          y = (doc.lastAutoTable?.finalY || y) + 6;
-          doc.setDrawColor(0);
-          doc.setLineWidth(1);
-          doc.line(margin, y, pageW - margin, y);
-          y += 12;
-        };
-
-        const sections = [
-          { type: "pg", title: "PILIHAN GANDA", subtitle: "Pilihlah salah satu jawaban yang paling tepat!" },
-          { type: "pg_kompleks", title: "PILIHAN GANDA KOMPLEKS", subtitle: "Pilihlah jawaban yang benar (bisa lebih dari satu)!" },
-          { type: "menjodohkan", title: "MENJODOHKAN", subtitle: "Jodohkanlah pernyataan pada lajur kiri dengan jawaban pada lajur kanan!" },
-          { type: "isian", title: "ISIAN SINGKAT", subtitle: "Jawablah pertanyaan berikut dengan singkat dan tepat!" },
-          { type: "uraian", title: "URAIAN", subtitle: "Jawablah pertanyaan-pertanyaan berikut dengan jelas dan benar!" },
-        ];
-
-        const items = Array.isArray(state.questions) ? state.questions : [];
-
-        drawHeader(String(state.paket.judul || "NASKAH SOAL"), "naskah");
-
-        let sectionIndex = 0;
-        for (const sec of sections) {
-          const qs = items.filter((q) => q && q.type === sec.type);
-          if (!qs.length) continue;
-          const letter = String.fromCharCode(65 + sectionIndex++);
-          addPara(`${letter}. ${sec.title}`, 12, "bold", 0, 2);
-          addPara(sec.subtitle, 11, "italic", 0, 10);
-
-          for (let i = 0; i < qs.length; i++) {
-            const q = qs[i] || {};
-            const soal = String(q.question || "").trim();
-            addHanging(`${i + 1}.`, soal, 12, "normal", 0, 4);
-
-            if (q.image) {
+            const logo = state.identity.logo || "";
+            if (logo) {
               try {
-                const imgType = String(q.image || "").toLowerCase().includes("jpeg") ? "JPEG" : "PNG";
-                const imgW = Math.min(220, maxW - 30);
-                const imgH = imgW;
-                newPageIfNeeded(imgH + 12);
-                doc.addImage(String(q.image), imgType, margin + 30, y, imgW, imgH);
-                y += imgH + 10;
+                const imgType = String(logo).toLowerCase().includes("jpeg") ? "JPEG" : "PNG";
+                const w = 80, h = 40;
+                doc.addImage(String(logo), imgType, pageW - margin - w, margin - 6, w, h);
               } catch {}
             }
 
-            if (sec.type === "pg" || sec.type === "pg_kompleks") {
-              const opts = Array.isArray(q.options) ? q.options : [];
-              for (let oi = 0; oi < opts.length; oi++) {
-                addHanging(`${String.fromCharCode(65 + oi)}.`, String(opts[oi] || ""), 11, "normal", 30, 2);
+            const labelW = 140;
+            const colGap = 40;
+            const colW = (maxW - colGap) / 2;
+            const leftX = margin;
+            const rightX = margin + colW + colGap;
+            const colonX = labelW;
+            const valX = colonX + 12;
+            const rowH = 18;
+            const isSpesifik = String(state.identity.jenisTopik || "spesifik") === "spesifik";
+
+            const leftRows = [
+              ["Mata Pelajaran", String(state.identity.mataPelajaran || "-"), "text"],
+              ["Kelas / Fase", `${String(state.identity.kelas || "-")} / ${String(state.identity.fase || "-")}`, "text"],
+              ...(isSpesifik ? [["Topik / Lingkup Materi", String(state.identity.topik || "-"), "text"]] : []),
+              ...(kind === "soal" ? [["Hari / Tanggal", "", "line"]] : []),
+            ];
+            const rightRows = kind === "soal"
+              ? [
+                  ["Waktu", "", "line"],
+                  ["Nama", "", "line"],
+                  ["No. Absen", "", "line"],
+                ]
+              : [
+                  ["Kurikulum", "Merdeka", "text"],
+                  ["Jumlah Soal", String((state.questions || []).length), "text"],
+                ];
+
+            const rowCount = Math.max(leftRows.length, rightRows.length);
+            for (let i = 0; i < rowCount; i++) {
+              const l = leftRows[i] || ["", "", "text"];
+              const r = rightRows[i] || ["", "", "text"];
+              newPageIfNeeded(80);
+              setFont("normal", 11);
+
+              const drawCol = (baseX, row) => {
+                const [label, value, mode] = row;
+                if (!label) return 1;
+                doc.text(String(label), baseX, y);
+                doc.text(":", baseX + colonX, y);
+                if (mode === "line") {
+                  drawDottedLine(baseX + valX, baseX + colW, y + 3);
+                  return 1;
+                }
+                const lines = doc.splitTextToSize(String(value || ""), colW - valX);
+                doc.text(lines, baseX + valX, y);
+                return Math.max(1, lines.length);
+              };
+
+              const lLines = drawCol(leftX, l);
+              const rLines = drawCol(rightX, r);
+              y += rowH * Math.max(lLines, rLines);
+            }
+
+            y += 6;
+            doc.setDrawColor(0);
+            doc.setLineWidth(1.2);
+            doc.line(margin, y, pageW - margin, y);
+            y += 22;
+          };
+          return { doc, pageW, pageH, margin, footerY, maxW, getY: () => y, setY: (v) => { y = v; }, newPage, newPageIfNeeded, addCenter, addPara, addHanging, drawHeader };
+        };
+
+        const items = Array.isArray(state.questions) ? state.questions : [];
+        const order = ["pg", "pg_kompleks", "menjodohkan", "isian", "uraian"];
+        const titleMap = { pg: "PILIHAN GANDA", pg_kompleks: "PILIHAN GANDA KOMPLEKS", menjodohkan: "MENJODOHKAN", isian: "ISIAN SINGKAT", uraian: "URAIAN" };
+        const subtitleMap = {
+          pg: "Pilihlah salah satu jawaban yang paling tepat!",
+          pg_kompleks: "Pilihlah jawaban yang benar (bisa lebih dari satu)!",
+          menjodohkan: "Jodohkanlah pernyataan pada lajur kiri dengan jawaban pada lajur kanan!",
+          isian: "Jawablah pertanyaan berikut dengan singkat dan tepat!",
+          uraian: "Jawablah pertanyaan-pertanyaan berikut dengan jelas dan benar!",
+        };
+
+        const buildSoalPdf = () => {
+          const ctx = makeDoc();
+          ctx.drawHeader(String(state.paket.judul || "NASKAH SOAL"), "soal");
+
+          let firstTypeRendered = false;
+          for (const t of order) {
+            const qs = items.filter((q) => q && q.type === t);
+            if (!qs.length) continue;
+
+            const chunks = [];
+            for (let i = 0; i < qs.length; i += 10) chunks.push(qs.slice(i, i + 10));
+            chunks.forEach((chunk, chunkIdx) => {
+              const needPageBreak = firstTypeRendered || chunkIdx > 0;
+              if (needPageBreak) ctx.newPage();
+
+              if (chunkIdx === 0) {
+                ctx.addPara(`${titleMap[t]}`, 12, "bold", 0, 4);
+                ctx.addPara(subtitleMap[t], 11, "italic", 0, 14);
               }
-              y += 6;
-              continue;
-            }
 
-            if (sec.type === "menjodohkan") {
-              const leftList = Array.isArray(q.options) ? q.options : [];
-              const rightList = Array.isArray(q.answer) ? q.answer : [];
-              const leftText = ["Lajur A (Pernyataan)", ...leftList.map((t, idx) => `${idx + 1}. ${String(t ?? "")}`)].join("\n");
-              const rightText = ["Lajur B (Jawaban)", ...rightList.map((t, idx) => `${String.fromCharCode(65 + idx)}. ${String(t ?? "")}`)].join("\n");
-              newPageIfNeeded(140);
-              doc.autoTable({
-                startY: y,
-                margin: { left: margin, right: margin },
-                body: [[leftText, rightText]],
-                theme: "plain",
-                styles: { font: "times", fontSize: 10, cellPadding: 6, lineWidth: 0.5, lineColor: [0, 0, 0], overflow: "linebreak", valign: "top" },
-                columnStyles: { 0: { cellWidth: maxW / 2 }, 1: { cellWidth: maxW / 2 } },
-              });
-              y = (doc.lastAutoTable?.finalY || y) + 10;
-              continue;
-            }
+              const startIndex = chunkIdx * 10;
+              for (let i = 0; i < chunk.length; i++) {
+                const q = chunk[i] || {};
+                ctx.addHanging(`${startIndex + i + 1}.`, String(q.question || "").trim(), 12, "normal", 0, 8);
 
-            if (sec.type === "isian") {
-              addPara("Jawaban: ___________________________________", 11, "normal", 30, 10);
-              continue;
-            }
+                if (q.type === "pg" || q.type === "pg_kompleks") {
+                  const opts = Array.isArray(q.options) ? q.options : [];
+                  for (let oi = 0; oi < opts.length; oi++) {
+                    ctx.addHanging(`${String.fromCharCode(65 + oi)}.`, String(opts[oi] || ""), 11, "normal", 30, 4);
+                  }
+                  ctx.setY(ctx.getY() + 6);
+                } else if (q.type === "menjodohkan") {
+                  const leftList = Array.isArray(q.options) ? q.options : [];
+                  const rightList = Array.isArray(q.answer) ? q.answer : [];
+                  const leftText = ["Lajur A (Pernyataan)", ...leftList.map((x, idx) => `${idx + 1}. ${String(x ?? "")}`)].join("\n");
+                  const rightText = ["Lajur B (Jawaban)", ...rightList.map((x, idx) => `${String.fromCharCode(65 + idx)}. ${String(x ?? "")}`)].join("\n");
+                  ctx.newPageIfNeeded(180);
+                  ctx.doc.autoTable({
+                    startY: ctx.getY(),
+                    margin: { left: ctx.margin, right: ctx.margin },
+                    body: [[leftText, rightText]],
+                    theme: "grid",
+                    styles: { font: "times", fontSize: 10, textColor: [0, 0, 0], cellPadding: 6, lineWidth: 0.6, lineColor: [0, 0, 0], overflow: "linebreak", valign: "top" },
+                    columnStyles: { 0: { cellWidth: ctx.maxW / 2 }, 1: { cellWidth: ctx.maxW / 2 } },
+                  });
+                  ctx.setY((ctx.doc.lastAutoTable?.finalY || ctx.getY()) + 26);
+                } else if (q.type === "isian") {
+                  ctx.addPara("Jawaban:", 11, "normal", 30, 2);
+                  ctx.doc.setDrawColor(0);
+                  ctx.doc.setLineWidth(0.8);
+                  try { ctx.doc.setLineDashPattern([1.2, 2.2], 0); } catch {}
+                  const y0 = ctx.getY() + 6;
+                  ctx.doc.line(ctx.margin + 90, y0, ctx.pageW - ctx.margin, y0);
+                  try { ctx.doc.setLineDashPattern([], 0); } catch {}
+                  ctx.setY(ctx.getY() + 16);
+                } else if (q.type === "uraian") {
+                  for (let k = 0; k < 4; k++) {
+                    ctx.newPageIfNeeded(18);
+                    ctx.doc.setDrawColor(0);
+                    ctx.doc.setLineWidth(0.8);
+                    try { ctx.doc.setLineDashPattern([1.2, 2.2], 0); } catch {}
+                    const yy = ctx.getY() + 10;
+                    ctx.doc.line(ctx.margin + 30, yy, ctx.pageW - ctx.margin, yy);
+                    try { ctx.doc.setLineDashPattern([], 0); } catch {}
+                    ctx.setY(ctx.getY() + 18);
+                  }
+                  ctx.setY(ctx.getY() + 8);
+                }
+              }
 
-            if (sec.type === "uraian") {
-              addPara("__________________________________________________________________________", 11, "normal", 30, 10);
-              continue;
-            }
+              firstTypeRendered = true;
+            });
           }
 
-          y += 8;
-        }
+          const totalPages = ctx.doc.getNumberOfPages();
+          for (let p = 1; p <= totalPages; p++) {
+            ctx.doc.setPage(p);
+            ctx.doc.setFont("times", "normal");
+            ctx.doc.setFontSize(9);
+            ctx.doc.setTextColor(0, 0, 0);
+            const footer = `${String(state.identity.mataPelajaran || "")} — ${String(state.identity.namaSekolah || "")} | Halaman ${p}`;
+            ctx.doc.text(footer, ctx.pageW / 2, ctx.footerY, { align: "center" });
+          }
+          ctx.doc.setTextColor(0, 0, 0);
+          return ctx.doc;
+        };
 
-        newPage();
-        drawHeader("KUNCI JAWABAN", "meta");
+        const buildKunciPdf = () => {
+          const ctx = makeDoc();
+          ctx.drawHeader("KUNCI JAWABAN", "meta");
 
-        sectionIndex = 0;
-        for (const sec of sections) {
-          const qs = items.filter((q) => q && q.type === sec.type);
-          if (!qs.length) continue;
-          const letter = String.fromCharCode(65 + sectionIndex++);
-          addPara(`${letter}. ${sec.title}`, 12, "bold", 0, 8);
+          const sections = [
+            { type: "pg", title: "PILIHAN GANDA" },
+            { type: "pg_kompleks", title: "PILIHAN GANDA KOMPLEKS" },
+            { type: "menjodohkan", title: "MENJODOHKAN" },
+            { type: "isian", title: "ISIAN SINGKAT" },
+            { type: "uraian", title: "URAIAN" },
+          ];
+          let sectionIndex = 0;
+          for (const sec of sections) {
+            const qs = items.filter((q) => q && q.type === sec.type);
+            if (!qs.length) continue;
+            const letter = String.fromCharCode(65 + sectionIndex++);
+            ctx.addPara(`${letter}. ${sec.title}`, 12, "bold", 0, 10);
 
-          if (sec.type === "pg") {
-            const cols = 5;
-            const body = [];
-            for (let i = 0; i < qs.length; i += cols) {
-              const row = [];
-              for (let j = 0; j < cols; j++) {
-                const q = qs[i + j];
-                if (!q) { row.push(""); continue; }
-                let ansChar = "-";
-                if (typeof q.answer === "number") ansChar = String.fromCharCode(65 + q.answer);
-                else if (typeof q.answer === "string") ansChar = q.answer;
-                row.push(`${i + j + 1}. ${ansChar}`);
+            if (sec.type === "pg") {
+              const cols = 5;
+              const body = [];
+              for (let i = 0; i < qs.length; i += cols) {
+                const row = [];
+                for (let j = 0; j < cols; j++) {
+                  const q = qs[i + j];
+                  if (!q) { row.push(""); continue; }
+                  let ansChar = "-";
+                  if (typeof q.answer === "number") ansChar = String.fromCharCode(65 + q.answer);
+                  else if (typeof q.answer === "string") ansChar = q.answer;
+                  row.push(`${i + j + 1}. ${ansChar}`);
+                }
+                body.push(row);
               }
-              body.push(row);
+              ctx.doc.autoTable({
+                startY: ctx.getY(),
+                margin: { left: ctx.margin, right: ctx.margin },
+                body,
+                theme: "plain",
+                styles: { font: "times", fontSize: 11, textColor: [0, 0, 0], cellPadding: 2, lineWidth: 0 },
+                columnStyles: { 0: { cellWidth: ctx.maxW / 5 }, 1: { cellWidth: ctx.maxW / 5 }, 2: { cellWidth: ctx.maxW / 5 }, 3: { cellWidth: ctx.maxW / 5 }, 4: { cellWidth: ctx.maxW / 5 } },
+              });
+              ctx.setY((ctx.doc.lastAutoTable?.finalY || ctx.getY()) + 14);
+              continue;
             }
-            doc.autoTable({
-              startY: y,
-              margin: { left: margin, right: margin },
-              body,
-              theme: "plain",
-              styles: { font: "times", fontSize: 11, cellPadding: 2, lineWidth: 0, overflow: "linebreak" },
+
+            for (let i = 0; i < qs.length; i++) {
+              const q = qs[i] || {};
+              let ansText = "";
+              if (sec.type === "pg_kompleks") ansText = Array.isArray(q.answer) ? q.answer.map((idx) => String.fromCharCode(65 + Number(idx))).join(", ") : String(q.answer ?? "");
+              else if (sec.type === "menjodohkan") ansText = Array.isArray(q.matchKey) ? q.matchKey.map((pos, idx) => `${idx + 1}–${String.fromCharCode(65 + Number(pos || 0))}`).join(", ") : "";
+              else ansText = String(q.answer || "(Belum ada kunci)");
+              ctx.addHanging(`${i + 1}.`, ansText, 11, "normal", 0, 4);
+            }
+            ctx.setY(ctx.getY() + 14);
+          }
+
+          const totalPages = ctx.doc.getNumberOfPages();
+          for (let p = 1; p <= totalPages; p++) {
+            ctx.doc.setPage(p);
+            ctx.doc.setFont("times", "normal");
+            ctx.doc.setFontSize(9);
+            ctx.doc.setTextColor(0, 0, 0);
+            const footer = `${String(state.identity.mataPelajaran || "")} — ${String(state.identity.namaSekolah || "")} | Halaman ${p}`;
+            ctx.doc.text(footer, ctx.pageW / 2, ctx.footerY, { align: "center" });
+          }
+          ctx.doc.setTextColor(0, 0, 0);
+          return ctx.doc;
+        };
+
+        const buildKisiPdf = () => {
+          const ctx = makeDoc();
+          ctx.drawHeader("KISI-KISI SOAL", "meta");
+
+          const kisiSections = [
+            { type: "pg", title: "PILIHAN GANDA", label: "PG" },
+            { type: "pg_kompleks", title: "PILIHAN GANDA KOMPLEKS", label: "PG Komp" },
+            { type: "menjodohkan", title: "MENJODOHKAN", label: "Jodoh" },
+            { type: "isian", title: "ISIAN SINGKAT", label: "Isian" },
+            { type: "uraian", title: "URAIAN", label: "Uraian" },
+          ];
+          let sectionIndex = 0;
+          for (const sec of kisiSections) {
+            const qs = items.filter((q) => q && q.type === sec.type);
+            if (!qs.length) continue;
+            const letter = String.fromCharCode(65 + sectionIndex++);
+            ctx.addPara(`${letter}. ${sec.title}`, 12, "bold", 0, 14);
+            const rows = qs.map((q, idx) => [String(idx + 1), String(q.materi || "-"), String(q.indikator || "-"), String(q.bloom || "-"), String(sec.label), String(idx + 1)]);
+            ctx.doc.autoTable({
+              startY: ctx.getY(),
+              margin: { left: ctx.margin, right: ctx.margin },
+              head: [["No", "Materi", "Indikator Soal", "Level", "Bentuk", "No. Soal"]],
+              body: rows,
+              styles: { font: "times", fontSize: 10, textColor: [0, 0, 0], cellPadding: 4, lineWidth: 0.6, lineColor: [0, 0, 0], overflow: "linebreak" },
+              headStyles: { fillColor: [224, 224, 224], textColor: [0, 0, 0], fontStyle: "bold", halign: "center" },
+              bodyStyles: { fontStyle: "bold" },
               columnStyles: {
-                0: { cellWidth: maxW / 5 },
-                1: { cellWidth: maxW / 5 },
-                2: { cellWidth: maxW / 5 },
-                3: { cellWidth: maxW / 5 },
-                4: { cellWidth: maxW / 5 },
+                0: { cellWidth: 34, halign: "center" },
+                1: { cellWidth: 110 },
+                2: { cellWidth: ctx.maxW - 34 - 110 - 60 - 60 - 60 },
+                3: { cellWidth: 60, halign: "center" },
+                4: { cellWidth: 60, halign: "center" },
+                5: { cellWidth: 60, halign: "center" },
               },
             });
-            y = (doc.lastAutoTable?.finalY || y) + 12;
-            continue;
+            ctx.setY((ctx.doc.lastAutoTable?.finalY || ctx.getY()) + 26);
           }
 
-          for (let i = 0; i < qs.length; i++) {
-            const q = qs[i] || {};
-            let ansText = "";
-            if (sec.type === "pg_kompleks") {
-              ansText = Array.isArray(q.answer) ? q.answer.map((idx) => String.fromCharCode(65 + Number(idx))).join(", ") : String(q.answer ?? "");
-            } else if (sec.type === "menjodohkan") {
-              ansText = Array.isArray(q.matchKey) ? q.matchKey.map((pos, idx) => `${idx + 1}–${String.fromCharCode(65 + Number(pos || 0))}`).join(", ") : "";
-            } else {
-              ansText = String(q.answer || "(Belum ada kunci)");
-            }
-            addHanging(`${i + 1}.`, ansText, 11, "normal", 0, 4);
+          const totalPages = ctx.doc.getNumberOfPages();
+          for (let p = 1; p <= totalPages; p++) {
+            ctx.doc.setPage(p);
+            ctx.doc.setFont("times", "normal");
+            ctx.doc.setFontSize(9);
+            ctx.doc.setTextColor(0, 0, 0);
+            const footer = `${String(state.identity.mataPelajaran || "")} — ${String(state.identity.namaSekolah || "")} | Halaman ${p}`;
+            ctx.doc.text(footer, ctx.pageW / 2, ctx.footerY, { align: "center" });
           }
-          y += 10;
-        }
+          ctx.doc.setTextColor(0, 0, 0);
+          return ctx.doc;
+        };
 
-        newPage();
-        drawHeader("KISI-KISI SOAL", "meta");
-
-        const kisiSections = [
-          { type: "pg", title: "PILIHAN GANDA", label: "PG" },
-          { type: "pg_kompleks", title: "PILIHAN GANDA KOMPLEKS", label: "PG Komp" },
-          { type: "menjodohkan", title: "MENJODOHKAN", label: "Jodoh" },
-          { type: "isian", title: "ISIAN SINGKAT", label: "Isian" },
-          { type: "uraian", title: "URAIAN", label: "Uraian" },
-        ];
-
-        sectionIndex = 0;
-        for (const sec of kisiSections) {
-          const qs = items.filter((q) => q && q.type === sec.type);
-          if (!qs.length) continue;
-          const letter = String.fromCharCode(65 + sectionIndex++);
-          addPara(`${letter}. ${sec.title}`, 12, "bold", 0, 8);
-
-          const rows = qs.map((q, idx) => [
-            String(idx + 1),
-            String(q.materi || "-"),
-            String(q.indikator || "-"),
-            String(q.bloom || "-"),
-            String(sec.label),
-            String(idx + 1),
-          ]);
-
-          doc.autoTable({
-            startY: y,
-            margin: { left: margin, right: margin },
-            head: [["No", "Materi", "Indikator Soal", "Level", "Bentuk", "No. Soal"]],
-            body: rows,
-            styles: { font: "times", fontSize: 9, cellPadding: 4, lineWidth: 0.5, lineColor: [0, 0, 0], overflow: "linebreak" },
-            headStyles: { fillColor: [224, 224, 224], textColor: [0, 0, 0], fontStyle: "bold", halign: "center" },
-            columnStyles: {
-              0: { cellWidth: 34, halign: "center" },
-              1: { cellWidth: 110 },
-              2: { cellWidth: maxW - 34 - 110 - 60 - 60 - 60 },
-              3: { cellWidth: 60, halign: "center" },
-              4: { cellWidth: 60, halign: "center" },
-              5: { cellWidth: 60, halign: "center" },
-            },
-          });
-          y = (doc.lastAutoTable?.finalY || y) + 14;
-        }
-
-        const totalPages = doc.getNumberOfPages();
-        for (let p = 1; p <= totalPages; p++) {
-          doc.setPage(p);
-          doc.setFont("times", "normal");
-          doc.setFontSize(9);
-          doc.setTextColor(136, 136, 136);
-          const footer = `${String(state.identity.mataPelajaran || "")} — ${String(state.identity.namaSekolah || "")} | Halaman ${p}`;
-          doc.text(footer, pageW / 2, footerY, { align: "center" });
-        }
-        doc.setTextColor(0, 0, 0);
-        doc.save(filename);
+        const docSoal = buildSoalPdf();
+        docSoal.save(fileSoal);
+        await new Promise((r) => setTimeout(r, 300));
+        const docKunci = buildKunciPdf();
+        docKunci.save(fileKunci);
+        await new Promise((r) => setTimeout(r, 300));
+        const docKisi = buildKisiPdf();
+        docKisi.save(fileKisi);
       }
       const setModulAjarTab = (tab) => {
         state.modulAjarTab = tab;
@@ -2517,6 +2584,7 @@ if (!isset($_SESSION['user_id'])) {
                 <div class="space-y-1.5">
                   <div class="flex items-start"><span class="w-36 font-semibold shrink-0">Mata Pelajaran</span><span class="mr-2">:</span><span>${safeText(state.identity.mataPelajaran)}</span></div>
                   <div class="flex items-start"><span class="w-36 font-semibold shrink-0">Kelas / Fase</span><span class="mr-2">:</span><span>${safeText(state.identity.kelas)} / ${safeText(state.identity.fase)}</span></div>
+                  ${String(state.identity.jenisTopik || "spesifik") === "spesifik" ? `<div class="flex items-start"><span class="w-36 font-semibold shrink-0">Topik / Lingkup Materi</span><span class="mr-2">:</span><span>${safeText(state.identity.topik || "-")}</span></div>` : ``}
                   <div class="flex items-center"><span class="w-36 font-semibold shrink-0">Hari / Tanggal</span><span class="mr-2">:</span><div class="border-b border-black border-dotted flex-1 h-4"></div></div>
                 </div>
                 <div class="space-y-1.5">
