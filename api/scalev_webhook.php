@@ -16,6 +16,18 @@ function table_exists(mysqli $db, string $table): bool {
   return false;
 }
 
+function column_exists(mysqli $db, string $table, string $column): bool {
+  $table = $db->real_escape_string($table);
+  $column = $db->real_escape_string($column);
+  $sql = "SHOW COLUMNS FROM `$table` LIKE '$column'";
+  if ($res = $db->query($sql)) {
+    $ok = $res->num_rows > 0;
+    $res->close();
+    return $ok;
+  }
+  return false;
+}
+
 function log_audit(mysqli $db, string $level, string $category, string $message, ?int $http_status = null, array $context = []): void {
   if (!table_exists($db, 'audit_logs')) return;
   $endpoint = $_SERVER['REQUEST_URI'] ?? '';
@@ -48,6 +60,37 @@ function extract_customer_email(array $data): string {
     if (str_ends_with($email, '@scalev.id')) continue;
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) continue;
     return $email;
+  }
+  return '';
+}
+
+function extract_customer_phone(array $data): string {
+  $candidates = [];
+  if (isset($data['destination_address']) && is_array($data['destination_address'])) {
+    $da = $data['destination_address'];
+    $candidates[] = (string)($da['phone'] ?? '');
+    $candidates[] = (string)($da['phone_number'] ?? '');
+    $candidates[] = (string)($da['mobile'] ?? '');
+  }
+  if (isset($data['customer']) && is_array($data['customer'])) {
+    $candidates[] = (string)($data['customer']['phone'] ?? '');
+    $candidates[] = (string)($data['customer']['phone_number'] ?? '');
+    $candidates[] = (string)($data['customer']['mobile'] ?? '');
+  }
+  $candidates[] = (string)($data['customer_phone'] ?? '');
+  $candidates[] = (string)($data['phone'] ?? '');
+  $candidates[] = (string)($data['phone_number'] ?? '');
+  $candidates[] = (string)($data['mobile'] ?? '');
+  $candidates[] = (string)($data['destination_phone'] ?? '');
+  $candidates[] = (string)($data['destination_phone_number'] ?? '');
+  foreach ($candidates as $raw) {
+    $s = trim((string)$raw);
+    if ($s === '') continue;
+    $s = (string)preg_replace('/[^0-9+()\\-\\s]/', '', $s);
+    $s = trim(preg_replace('/\\s+/', ' ', $s) ?? '');
+    if ($s === '') continue;
+    if (strlen($s) > 32) $s = substr($s, 0, 32);
+    return $s;
   }
   return '';
 }
@@ -180,9 +223,14 @@ if (!$exists) {
   $hash = password_hash('GuruPintar123!', PASSWORD_BCRYPT);
   $role = 'user';
   $limitGambar = 5;
-  $stmt = $mysqli->prepare("INSERT INTO users (username, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?)");
+  $noHp = extract_customer_phone($data);
+  $hasNoHp = column_exists($mysqli, 'users', 'no_hp');
+  $stmt = $hasNoHp
+    ? $mysqli->prepare("INSERT INTO users (username, no_hp, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?, ?)")
+    : $mysqli->prepare("INSERT INTO users (username, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?)");
   if ($stmt) {
-    $stmt->bind_param('sssii', $email, $hash, $role, $initLimit, $limitGambar);
+    if ($hasNoHp) $stmt->bind_param('ssssii', $email, $noHp, $hash, $role, $initLimit, $limitGambar);
+    else $stmt->bind_param('sssii', $email, $hash, $role, $initLimit, $limitGambar);
     if ($stmt->execute()) $createdUserId = (int)$stmt->insert_id;
     $stmt->close();
   }

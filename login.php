@@ -28,8 +28,8 @@ $err = isset($_GET['e']) ? 'Login gagal' : '';
     <?php endif; ?>
     <form method="post" action="login_handle.php" class="space-y-4">
       <div>
-        <label class="block text-sm font-medium mb-1">Username</label>
-        <input name="username" required class="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-500" />
+        <label class="block text-sm font-medium mb-1">Email / No HP</label>
+        <input name="username" required placeholder="contoh: guru@email.com atau 08xxxx / 62xxxx" class="w-full border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-sky-500" />
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Password</label>
