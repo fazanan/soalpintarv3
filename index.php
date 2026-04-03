@@ -4416,6 +4416,10 @@ PENTING:
 
         const formHtml = `
           <div class="space-y-6">
+            <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-6 py-4 text-amber-900 dark:text-amber-200">
+              <div class="font-bold">Bonus Fitur RPP</div>
+              <div class="text-sm mt-1">Fitur ini masih dalam pengembangan. Mohon maaf jika hasilnya belum sepenuhnya rapi—kami akan segera melakukan pembaruan.</div>
+            </div>
             <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
               <div class="p-6 space-y-5">
                 <div>
