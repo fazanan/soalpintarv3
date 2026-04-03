@@ -16,20 +16,20 @@ $uEmail = $isEmail ? trim(strtolower($u)) : '';
 $digits = preg_replace('/\D+/', '', $u);
 $candPhones = [];
 if (!$isEmail && $digits !== '') {
-  if (str_starts_with($digits, '0')) {
+  if (substr($digits, 0, 1) === '0') {
     $candPhones[] = $digits;
     $candPhones[] = '62' . substr($digits, 1);
-  } elseif (str_starts_with($digits, '62')) {
+  } elseif (substr($digits, 0, 2) === '62') {
     $candPhones[] = $digits;
     $candPhones[] = '0' . substr($digits, 2);
-  } elseif (str_starts_with($digits, '8')) {
+  } elseif (substr($digits, 0, 1) === '8') {
     $candPhones[] = '0' . $digits;
     $candPhones[] = '62' . $digits;
     $candPhones[] = $digits;
   } else {
     $candPhones[] = $digits;
   }
-  $candPhones = array_values(array_unique(array_filter($candPhones, fn($x) => $x !== '')));
+  $candPhones = array_values(array_unique(array_filter($candPhones, function ($x) { return $x !== ''; })));
   $candPhones = array_slice($candPhones, 0, 4);
 }
 
