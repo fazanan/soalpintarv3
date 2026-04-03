@@ -721,6 +721,17 @@ if (!isset($_SESSION['user_id'])) {
         saveDebounced(false);
         buildPackage();
       };
+      const openNaskahSoalFromKonfigurasi = () => {
+        const hasSoal = Array.isArray(state.questions) && state.questions.length > 0;
+        if (hasSoal) {
+          state.soalError = null;
+          state.previewTab = "naskah";
+          saveDebounced(false);
+          render();
+          return;
+        }
+        startBuildSoal();
+      };
       const downloadSoalDocx = async () => {
         if (!Array.isArray(state.questions) || state.questions.length === 0) return;
         const btn = document.getElementById("btnSoalDocxTop");
@@ -1118,6 +1129,19 @@ if (!isset($_SESSION['user_id'])) {
         state.modulAjarTab = tab;
         saveDebounced(false);
         render();
+      };
+      const openModulAjarFromDetail = () => {
+        if (!state.modulAjar) state.modulAjar = {};
+        const M = state.modulAjar || {};
+        const hasilAda = !!M.hasil;
+        if (hasilAda || M.isGenerating) {
+          state.modulAjarError = null;
+          state.modulAjarTab = "modul";
+          saveDebounced(false);
+          render();
+          return;
+        }
+        buildModulAjar();
       };
       function logCreditUsage(kind, cost, detail) {
         const rec = { ts: new Date().toISOString(), kind, cost: Number(cost)||0, detail: String(detail||'') };
@@ -3205,10 +3229,13 @@ if (!isset($_SESSION['user_id'])) {
           const prev = cur === 'detail' ? 'informasi' : (cur === 'modul' ? 'detail' : null);
           const next = cur === 'informasi' ? 'detail' : (cur === 'detail' ? 'modul' : null);
           const rightLabel = cur === 'informasi' ? 'Detail Pembelajaran' : (cur === 'detail' ? 'Modul Ajar' : '');
+          const rightOnClick = cur === 'detail'
+            ? `onclick="window.__sp.openModulAjarFromDetail()"`
+            : (next ? `onclick="window.__sp.setModulAjarTab('${next}')"` : '');
           return `
             <div class="md:hidden mt-6 flex items-center gap-3">
               <button class="flex-1 h-12 rounded-xl border bg-white dark:bg-surface-dark font-bold" ${prev ? `onclick="window.__sp.setModulAjarTab('${prev}')"` : 'disabled'}>Kembali</button>
-              <button class="flex-1 h-12 rounded-xl ${next ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'} font-bold" ${next ? `onclick="window.__sp.setModulAjarTab('${next}')"` : 'disabled'}>${rightLabel || 'Lanjut'}</button>
+              <button class="flex-1 h-12 rounded-xl ${next ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'} font-bold" ${next ? rightOnClick : 'disabled'}>${rightLabel || 'Lanjut'}</button>
             </div>
           `;
         };
@@ -3279,8 +3306,8 @@ if (!isset($_SESSION['user_id'])) {
                   </div>
                   <button
                     class="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold shadow-sm transition-colors"
-                    onclick="window.__sp.buildModulAjar()"
-                    title="Buka tab Modul Ajar dan buat dokumen"
+                    onclick="window.__sp.openModulAjarFromDetail()"
+                    title="Buka tab Modul Ajar (generate jika belum ada)"
                   >
                     <span class="hidden sm:inline">Modul Ajar</span>
                     <span class="sm:hidden">Modul</span>
@@ -4884,7 +4911,7 @@ PENTING:
             const next = tab === 'identitas' ? 'konfigurasi' : (tab === 'konfigurasi' ? 'naskah' : null);
             const rightLabel = tab === 'identitas' ? 'Konfigurasi' : (tab === 'konfigurasi' ? 'Naskah Soal' : '');
             const rightOnClick = tab === 'konfigurasi'
-              ? `onclick="window.__sp.startBuildSoal()"`
+              ? `onclick="window.__sp.openNaskahSoalFromKonfigurasi()"`
               : (next ? `onclick="window.__sp.setPreviewTab('${next}')"` : '');
             return `
               <div class="md:hidden mt-6 flex items-center gap-3">
@@ -5105,7 +5132,7 @@ PENTING:
               </button>
               <button id="btnBuild"
                 class="hidden md:flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors"
-                onclick="window.__sp.startBuildSoal()"
+                onclick="window.__sp.openNaskahSoalFromKonfigurasi()"
               >
                 <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
                 Naskah Soal
@@ -8117,6 +8144,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         setView,
         setPreviewTab,
         startBuildSoal,
+        openNaskahSoalFromKonfigurasi,
         downloadSoalDocx,
         downloadSoalPDF,
         setModulAjarTab,
@@ -8203,6 +8231,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
           saveDebounced(false);
           render();
         },
+        openModulAjarFromDetail,
         buildModulAjar,
         exportModulAjarDocx,
       };
