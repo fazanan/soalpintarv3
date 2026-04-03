@@ -3628,6 +3628,51 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
       const renderRPP = () => {
         const R = state.rpp || {};
         const hasilAda = !!R.hasil;
+        const rppBuildPreviewHtml = (R) => {
+          const mapel = String(R.mata_pelajaran || '').trim();
+          const materi = String(R.materi || '').trim();
+          const kelas = String(R.kelas || '').trim();
+          const jenjang = String(R.jenjang || '').trim();
+          const kurikulum = String(R.kurikulum || '').trim();
+          const pendekatan = String(R.pendekatan || '').trim();
+          const format = String(R.format || '').trim();
+          const alokasi = String(R.alokasi_waktu || '').trim();
+          const namaSekolah = String(R.nama_sekolah || '').trim();
+          const namaGuru = String(R.nama_guru || '').trim();
+          const title = 'RPP (Rencana Pelaksanaan Pembelajaran)';
+          const sub = [mapel, kelas, materi].filter(Boolean).join(' · ');
+          const rows = [
+            ['Jenjang', jenjang || '-'],
+            ['Kelas', kelas || '-'],
+            ['Mata Pelajaran', mapel || '-'],
+            ['Materi / Topik', materi || '-'],
+            ['Kurikulum', kurikulum || '-'],
+            ['Pendekatan', pendekatan || '-'],
+            ['Format', format || '-'],
+            ['Alokasi Waktu', alokasi || '-'],
+            ['Nama Sekolah', namaSekolah || '-'],
+            ['Nama Guru', namaGuru || '-'],
+          ];
+          const table = `
+            <table class="ma-tbl">
+              <thead>
+                <tr><th>Komponen</th><th>Keterangan</th></tr>
+              </thead>
+              <tbody>
+                ${rows.map(([k,v])=>`<tr><td>${safeText(k)}</td><td>${safeText(v)}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          `;
+          const body = maMarkdownToHtml(String(R.hasil || ''));
+          return `
+            <div class="text-center">
+              <div class="font-bold text-[20px] tracking-wide">${safeText(title)}</div>
+              ${sub ? `<div class="italic text-[16px] mt-2">${safeText(sub)}</div>` : ``}
+            </div>
+            <div class="mt-8">${table}</div>
+            <div class="mt-10">${body}</div>
+          `;
+        };
         const mkSel = (lbl, key, val, opts) => `
           <div class="flex flex-col gap-2">
             <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">${safeText(lbl)}</label>
@@ -3751,9 +3796,15 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                   [&_h1]:text-[18px] [&_h1]:font-bold [&_h1]:mt-8 [&_h1]:mb-3
                   [&_h2]:text-[16px] [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-2
                   [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:mt-5 [&_h3]:mb-2
-                  [&_p]:mb-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6
-                  [&_table]:w-full [&_table]:border-collapse [&_table_th]:border [&_table_td]:border [&_table_th]:bg-gray-100 [&_table_th]:px-2 [&_table_td]:px-2 [&_table_th]:py-1 [&_table_td]:py-1">
-                  ${maMarkdownToHtml(String(R.hasil||''))}
+                  [&_table]:w-full [&_table]:border-collapse [&_table]:my-3 [&_table]:text-[14px]
+                  [&_td]:border [&_td]:border-gray-300 dark:[&_td]:border-gray-600 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top
+                  [&_th]:border [&_th]:border-gray-300 dark:[&_th]:border-gray-600 [&_th]:px-3 [&_th]:py-2 [&_th]:bg-gray-100 dark:[&_th]:bg-gray-800 [&_th]:font-bold
+                  [&_.ma-tbl>tbody>tr:nth-child(even)>td]:bg-gray-50 dark:[&_.ma-tbl>tbody>tr:nth-child(even)>td]:bg-gray-900/20
+                  [&_ul]:pl-6 [&_ul]:my-2 [&_li]:mb-1.5
+                  [&_ol]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol>li]:mb-1.5
+                  [&_em]:italic [&_strong]:font-bold
+                  [&_p]:mb-3 [&_p]:text-justify">
+                  ${rppBuildPreviewHtml(R)}
                 </div>
               </div>
             </div>
@@ -3899,26 +3950,134 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
         const origHTML = btn?.innerHTML;
         if (btn) { btn.disabled=true; btn.textContent='Membuat file...'; }
         try {
-          const { Document, Packer, Paragraph, TextRun } = docx;
-          const FONT='Times New Roman', SZ=24;
-          const lines = String(R.hasil || '').split('\n');
-          const paras = [];
-          for (const raw of lines) {
-            const line = String(raw || '').replace(/\r/g,'');
-            if (line.trim() === '') { paras.push(new Paragraph({ children: [new TextRun({ text: '', font: FONT, size: SZ })] })); continue; }
-            const m = line.match(/^\s*(#{1,6})\s*(.+)$/);
-            if (m) {
-              paras.push(new Paragraph({ children: [new TextRun({ text: m[2].trim(), bold: true, font: FONT, size: SZ })] }));
-              continue;
+          const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, AlignmentType, BorderStyle, WidthType, ShadingType } = docx;
+          const FONT='Times New Roman', SZ=24, CW=9360;
+          const bdr={style:BorderStyle.SINGLE,size:4,color:'999999'};
+          const borders={top:bdr,bottom:bdr,left:bdr,right:bdr};
+          const sp=(b=60,a=60)=>({spacing:{before:b,after:a}});
+
+          function parseContent(raw) {
+            const lines = String(raw || '').split('\n');
+            const out = [];
+            let tblRows=[], inTbl=false;
+
+            const flushTbl = () => {
+              if (!tblRows.length) return;
+              const nc = Math.max(...tblRows.map(r=>r.length));
+              const cw = Math.floor(CW/nc);
+              out.push(new Table({
+                width:{size:CW,type:WidthType.DXA},
+                columnWidths:Array(nc).fill(cw),
+                rows: tblRows.map((row,ri)=>new TableRow({
+                  children: Array.from({length:nc},(_,ci)=>{
+                    const txt=(row[ci]||'').trim().replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1').replace(/\s+/g,' ').trim();
+                    return new TableCell({
+                      borders, width:{size:cw,type:WidthType.DXA},
+                      shading: ri===0?{fill:'D9D9D9',type:ShadingType.CLEAR}:{fill:'FFFFFF',type:ShadingType.CLEAR},
+                      margins:{top:80,bottom:80,left:100,right:100},
+                      children:[new Paragraph({children:[new TextRun({text:txt,font:FONT,size:20,bold:ri===0})]})]
+                    });
+                  })
+                }))
+              }));
+              tblRows=[]; inTbl=false;
+            };
+
+            for (let i=0;i<lines.length;i++) {
+              const line=String(lines[i]||'').replace(/\r/g,'');
+              if (line.match(/^\|[-|: ]+\|?$/)) continue;
+              if (line.trim().startsWith('|')) {
+                inTbl=true;
+                tblRows.push(line.split('|').slice(1,-1).map(c=>c.trim()));
+                continue;
+              }
+              if (inTbl) flushTbl();
+              if (!line.trim()) { out.push(new Paragraph({...sp()})); continue; }
+              if (/^####\s*/.test(line)) {
+                out.push(new Paragraph({...sp(140,60),children:[new TextRun({text:line.replace(/^####\s*/,''),font:FONT,size:24,bold:true})]}));
+              } else if (/^###\s*/.test(line)) {
+                out.push(new Paragraph({...sp(180,80),children:[new TextRun({text:line.replace(/^###\s*/,''),font:FONT,size:26,bold:true})]}));
+              } else if (/^##\s*/.test(line)) {
+                out.push(new Paragraph({...sp(240,100),children:[new TextRun({text:line.replace(/^##\s*/,''),font:FONT,size:28,bold:true})]}));
+              } else if (/^#\s*/.test(line)) {
+                out.push(new Paragraph({...sp(280,120),children:[new TextRun({text:line.replace(/^#\s*/,''),font:FONT,size:32,bold:true})]}));
+              } else if (line.match(/^[-•] /)) {
+                out.push(new Paragraph({...sp(40,40),indent:{left:400,hanging:200},children:[new TextRun({text:'• '+line.replace(/^[-•] /,'').replace(/\*\*(.+?)\*\*/g,'$1'),font:FONT,size:SZ})]}));
+              } else if (line.match(/^\d+\. /)) {
+                const m=line.match(/^(\d+)\. (.*)/);
+                out.push(new Paragraph({...sp(40,40),indent:{left:400,hanging:200},children:[new TextRun({text:`${m[1]}. ${m[2].replace(/\*\*(.+?)\*\*/g,'$1')}`,font:FONT,size:SZ})]}));
+              } else {
+                const txt=line.replace(/\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1');
+                out.push(new Paragraph({...sp(60,60),children:[new TextRun({text:txt,font:FONT,size:SZ})]}));
+              }
             }
-            const bullet = line.match(/^\s*[-*]\s+(.+)$/);
-            if (bullet) {
-              paras.push(new Paragraph({ children: [new TextRun({ text: bullet[1].trim(), font: FONT, size: SZ })], bullet: { level: 0 } }));
-              continue;
-            }
-            paras.push(new Paragraph({ children: [new TextRun({ text: line, font: FONT, size: SZ })] }));
+            if (inTbl) flushTbl();
+            return out;
           }
-          const doc = new Document({ sections: [{ properties: {}, children: paras }] });
+
+          const mapel = String(R.mata_pelajaran || '').trim();
+          const materi = String(R.materi || '').trim();
+          const kelas = String(R.kelas || '').trim();
+          const jenjang = String(R.jenjang || '').trim();
+          const kurikulum = String(R.kurikulum || '').trim();
+          const pendekatan = String(R.pendekatan || '').trim();
+          const format = String(R.format || '').trim();
+          const alokasi = String(R.alokasi_waktu || '').trim();
+          const namaSekolah = String(R.nama_sekolah || '').trim();
+          const namaGuru = String(R.nama_guru || '').trim();
+
+          const metaRows = [
+            ['Jenjang', jenjang || '-'],
+            ['Kelas', kelas || '-'],
+            ['Mata Pelajaran', mapel || '-'],
+            ['Materi / Topik', materi || '-'],
+            ['Kurikulum', kurikulum || '-'],
+            ['Pendekatan', pendekatan || '-'],
+            ['Format', format || '-'],
+            ['Alokasi Waktu', alokasi || '-'],
+            ['Nama Sekolah', namaSekolah || '-'],
+            ['Nama Guru', namaGuru || '-'],
+          ];
+
+          const cw = Math.floor(CW/2);
+          const metaTable = new Table({
+            width:{size:CW,type:WidthType.DXA},
+            columnWidths:[cw,cw],
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({ borders, width:{size:cw,type:WidthType.DXA}, shading:{fill:'D9D9D9',type:ShadingType.CLEAR}, margins:{top:80,bottom:80,left:100,right:100}, children:[new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:'Komponen',font:FONT,size:20,bold:true})]})]}),
+                  new TableCell({ borders, width:{size:cw,type:WidthType.DXA}, shading:{fill:'D9D9D9',type:ShadingType.CLEAR}, margins:{top:80,bottom:80,left:100,right:100}, children:[new Paragraph({alignment:AlignmentType.CENTER,children:[new TextRun({text:'Keterangan',font:FONT,size:20,bold:true})]})]}),
+                ]
+              }),
+              ...metaRows.map(([k,v]) => new TableRow({
+                children: [
+                  new TableCell({ borders, width:{size:cw,type:WidthType.DXA}, margins:{top:80,bottom:80,left:100,right:100}, children:[new Paragraph({children:[new TextRun({text:String(k),font:FONT,size:SZ,bold:true})]})]}),
+                  new TableCell({ borders, width:{size:cw,type:WidthType.DXA}, margins:{top:80,bottom:80,left:100,right:100}, children:[new Paragraph({children:[new TextRun({text:String(v),font:FONT,size:SZ})]})]}),
+                ]
+              }))
+            ]
+          });
+
+          let bodyText = String(R.hasil || '');
+          bodyText = bodyText.replace(/^\s*#{1,3}\s*RPP\b[^\n]*\n?/i, '');
+          bodyText = bodyText.trim();
+
+          const children = [
+            new Paragraph({alignment:AlignmentType.CENTER,...sp(200,60),children:[new TextRun({text:'RPP (Rencana Pelaksanaan Pembelajaran)',font:FONT,size:32,bold:true})]}),
+            ...(mapel || materi || kelas ? [new Paragraph({alignment:AlignmentType.CENTER,...sp(0,240),children:[new TextRun({text:[mapel,kelas,materi].filter(Boolean).join(' · '),font:FONT,size:24,italics:true})]})] : [new Paragraph({...sp(0,240)})]),
+            metaTable,
+            new Paragraph({...sp(200,120)}),
+            ...parseContent(bodyText),
+          ];
+
+          const doc = new Document({
+            styles:{default:{document:{run:{font:FONT,size:SZ}}}},
+            sections:[{
+              properties:{page:{size:{width:12240,height:15840},margin:{top:1440,right:1440,bottom:1440,left:1440}}},
+              children
+            }]
+          });
           const blob = await Packer.toBlob(doc);
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
