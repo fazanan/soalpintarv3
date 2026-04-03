@@ -456,6 +456,9 @@ if (!isset($_SESSION['user_id'])) {
         theme: "light",
         activeView: "preview",
         previewTab: "identitas",
+        modulAjarTab: "informasi",
+        soalError: null,
+        modulAjarError: null,
         _isGenerating: false,
         lkpd: {
           sumber: "topik",
@@ -476,6 +479,7 @@ if (!isset($_SESSION['user_id'])) {
           judulModul: "", jumlahPertemuan: "2",
           durasi: "50", jumlahSiswa: "30",
           modelPembelajaran: "Project Based Learning (PjBL)",
+          supervisi: false,
           dimensi: [], hasil: "", isGenerating: false,
         },
         rpp: {
@@ -566,6 +570,64 @@ if (!isset($_SESSION['user_id'])) {
           .replaceAll(">", "&gt;");
       const sectionLetter = (idx) => String.fromCharCode("A".charCodeAt(0) + idx);
 
+      const focusByPath = (path) => {
+        const p = String(path || "");
+        if (!p) return;
+        const esc = (v) => (window.CSS && typeof window.CSS.escape === "function" ? window.CSS.escape(v) : v.replace(/"/g, '\\"'));
+        const node = document.querySelector(`[data-path="${esc(p)}"]`);
+        if (!node) return;
+        try { node.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {}
+        try { node.focus({ preventScroll: true }); } catch { try { node.focus(); } catch {} }
+      };
+
+      const focusMAKey = (key) => {
+        const k = String(key || "");
+        if (!k) return;
+        if (k === "dimensi") {
+          const wrap = document.getElementById("maDimensiWrap");
+          if (wrap) {
+            try { wrap.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {}
+            const first = wrap.querySelector("input[type='checkbox']");
+            if (first) { try { first.focus({ preventScroll: true }); } catch { try { first.focus(); } catch {} } }
+          }
+          return;
+        }
+        const esc = (v) => (window.CSS && typeof window.CSS.escape === "function" ? window.CSS.escape(v) : v.replace(/"/g, '\\"'));
+        const node = document.querySelector(`[data-ma-key="${esc(k)}"]`);
+        if (!node) return;
+        try { node.scrollIntoView({ behavior: "smooth", block: "center" }); } catch {}
+        try { node.focus({ preventScroll: true }); } catch { try { node.focus(); } catch {} }
+      };
+
+      const validateBuatSoal = () => {
+        const I = state.identity || {};
+        const P = state.paket || {};
+        const isSpesifik = String(I.jenisTopik || "spesifik") === "spesifik";
+        const miss = (msg, tab, path) => ({ ok: false, msg, tab, path: path || "" });
+
+        if (!String(I.namaSekolah || "").trim()) return miss("Langkah 1 belum lengkap: isi Nama Sekolah dulu ya.", "identitas", "identity.namaSekolah");
+        if (!String(I.jenjang || "").trim()) return miss("Langkah 1 belum lengkap: pilih Jenjang dulu ya.", "identitas", "identity.jenjang");
+        if (!String(I.fase || "").trim()) return miss("Langkah 1 belum lengkap: pilih Fase dulu ya.", "identitas", "identity.fase");
+        if (!String(I.kelas || "").trim()) return miss("Langkah 1 belum lengkap: isi Kelas dulu ya.", "identitas", "identity.kelas");
+        if (!String(I.mataPelajaran || "").trim()) return miss("Langkah 1 belum lengkap: pilih Mata Pelajaran dulu ya.", "identitas", "identity.mataPelajaran");
+        if (isSpesifik && !String(I.topik || "").trim()) return miss("Langkah 1 belum lengkap: isi Topik / Lingkup Materi dulu ya.", "identitas", "identity.topik");
+        if (!String(P.judul || "").trim()) return miss("Langkah 1 belum lengkap: isi Judul Paket dulu ya.", "identitas", "paket.judul");
+        if (!String(P.tahunAjaran || "").trim()) return miss("Langkah 1 belum lengkap: isi Tahun Ajaran dulu ya.", "identitas", "paket.tahunAjaran");
+
+        const sections = Array.isArray(state.sections) ? state.sections : [];
+        if (!sections.length) return miss("Langkah 2 belum lengkap: tambah minimal 1 Bagian di Konfigurasi dulu ya.", "konfigurasi", "");
+        const total = sections.reduce((acc, s) => {
+          const bentuk = String(s?.bentuk || "");
+          const isObjective = ["pg", "pg_kompleks", "menjodohkan"].includes(bentuk);
+          const isEssay = ["isian", "uraian"].includes(bentuk);
+          const jumlah = isObjective ? Number(s?.jumlahPG || 0) : isEssay ? Number(s?.jumlahIsian || 0) : 0;
+          return acc + (Number.isFinite(jumlah) ? jumlah : 0);
+        }, 0);
+        if (total <= 0) return miss("Langkah 2 belum lengkap: atur Jumlah Soal dulu ya (minimal 1).", "konfigurasi", "");
+
+        return { ok: true, msg: "", tab: "", path: "" };
+      };
+
       const inputText = (label, path, value, placeholder) => `
         <div class="flex flex-col gap-2">
           <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">${safeText(label)}</label>
@@ -641,6 +703,352 @@ if (!isset($_SESSION['user_id'])) {
       };
       const setPreviewTab = (tab) => {
         state.previewTab = tab;
+        saveDebounced(false);
+        render();
+      };
+      const startBuildSoal = () => {
+        const chk = validateBuatSoal();
+        if (!chk.ok) {
+          state.soalError = { tab: chk.tab, msg: chk.msg, path: chk.path };
+          state.previewTab = chk.tab;
+          saveDebounced(false);
+          render();
+          setTimeout(() => { try { focusByPath(chk.path); } catch {} }, 50);
+          return;
+        }
+        state.soalError = null;
+        state.previewTab = "naskah";
+        saveDebounced(false);
+        buildPackage();
+      };
+      const downloadSoalDocx = async () => {
+        if (!Array.isArray(state.questions) || state.questions.length === 0) return;
+        const btn = document.getElementById("btnSoalDocxTop");
+        const orig = btn?.innerHTML;
+        try { if (btn) { btn.disabled = true; btn.innerHTML = `<span class="animate-spin material-symbols-outlined text-[18px]">progress_activity</span>`; } } catch {}
+        try { await exportDocx(); } catch {}
+        await new Promise((r) => setTimeout(r, 300));
+        try { await exportKunciDocx(); } catch {}
+        await new Promise((r) => setTimeout(r, 300));
+        try { await exportKisiDocx(); } catch {}
+        try { if (btn) { btn.disabled = false; btn.innerHTML = orig || "Download .docx"; } } catch {}
+      };
+      const downloadSoalPDF = () => {
+        if (!Array.isArray(state.questions) || state.questions.length === 0) return;
+        (async () => {
+          const btn = document.getElementById("btnSoalPdfTop");
+          const orig = btn?.innerHTML;
+          try { if (btn) { btn.disabled = true; btn.innerHTML = `<span class="animate-spin material-symbols-outlined text-[18px]">progress_activity</span>`; } } catch {}
+          try {
+            await exportSoalPDF();
+          } catch {
+            alert("Gagal mengunduh PDF. Silakan coba lagi.");
+          } finally {
+            try { if (btn) { btn.disabled = false; btn.innerHTML = orig || "Download PDF"; } } catch {}
+          }
+        })();
+      };
+
+      async function exportSoalPDF() {
+        if (!Array.isArray(state.questions) || state.questions.length === 0) return;
+        await ensureJsPDF();
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF("p", "pt", "a4");
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        const margin = 40;
+        const footerY = pageH - 22;
+        const maxW = pageW - margin * 2;
+        let y = margin;
+
+        const safe = `${String(state.identity.mataPelajaran || "Mapel").replace(/\s+/g, "_")}_${String(state.identity.kelas || "Kelas").replace(/\s+/g, "_")}_${String(state.paket.judul || "Paket").replace(/[\s/]+/g, "_")}`;
+        const filename = `PaketSoal_${safe}.pdf`;
+
+        const newPage = () => { doc.addPage(); y = margin; };
+        const newPageIfNeeded = (h) => { if (y + h > footerY - 10) newPage(); };
+
+        const setFont = (style = "normal", size = 11) => {
+          doc.setFont("times", style);
+          doc.setFontSize(size);
+        };
+        const addCenter = (text, size = 14, style = "bold", after = 6) => {
+          setFont(style, size);
+          const t = String(text || "");
+          const lines = doc.splitTextToSize(t, maxW);
+          const lineH = size + 4;
+          newPageIfNeeded(lines.length * lineH + after);
+          doc.text(lines, pageW / 2, y, { align: "center" });
+          y += lines.length * lineH + after;
+        };
+        const addPara = (text, size = 11, style = "normal", indent = 0, after = 6) => {
+          setFont(style, size);
+          const t = String(text || "");
+          const lines = doc.splitTextToSize(t, maxW - indent);
+          const lineH = size + 4;
+          newPageIfNeeded(lines.length * lineH + after);
+          doc.text(lines, margin + indent, y);
+          y += lines.length * lineH + after;
+        };
+        const addHanging = (prefix, text, size = 12, style = "normal", indent = 0, after = 6) => {
+          setFont(style, size);
+          const p = String(prefix || "");
+          const t = String(text || "");
+          const px = margin + indent;
+          const pw = doc.getTextWidth(p + " ");
+          const avail = Math.max(40, maxW - indent - pw);
+          const lines = doc.splitTextToSize(t, avail);
+          const lineH = size + 4;
+          newPageIfNeeded(lines.length * lineH + after);
+          doc.text(p, px, y);
+          doc.text(lines[0] || "", px + pw, y);
+          for (let i = 1; i < lines.length; i++) doc.text(lines[i], px + pw, y + lineH * i);
+          y += lines.length * lineH + after;
+        };
+
+        const drawHeader = (title, kind) => {
+          y = margin;
+          addCenter(String(state.identity.namaSekolah || "NAMA SEKOLAH").toUpperCase(), 16, "bold", 4);
+          addCenter(String(title || "").toUpperCase(), 13, "bold", 2);
+          addCenter(`Tahun Pelajaran ${String(state.paket.tahunAjaran || "-")}`, 11, "normal", 10);
+
+          const logo = state.identity.logo || "";
+          if (logo) {
+            try {
+              const imgType = String(logo).toLowerCase().includes("jpeg") ? "JPEG" : "PNG";
+              const w = 80, h = 40;
+              doc.addImage(String(logo), imgType, pageW - margin - w, margin - 10, w, h);
+            } catch {}
+          }
+
+          const isSpesifik = String(state.identity.jenisTopik || "spesifik") === "spesifik";
+          const leftLines = [
+            `Mata Pelajaran : ${String(state.identity.mataPelajaran || "-")}`,
+            `Kelas / Fase  : ${String(state.identity.kelas || "-")} / ${String(state.identity.fase || "-")}`,
+            ...(isSpesifik ? [`Topik / Lingkup Materi : ${String(state.identity.topik || "-")}`] : []),
+            ...(kind === "naskah" ? [`Hari / Tanggal : ______________________________`] : []),
+          ];
+          const rightLines = kind === "naskah"
+            ? [
+                `Waktu : ______________________________`,
+                `Nama  : ______________________________`,
+                `No. Absen : __________________________`,
+              ]
+            : [
+                `Kurikulum : Merdeka`,
+                `Jumlah Soal : ${String((state.questions || []).length)}`,
+              ];
+
+          const startY = y;
+          doc.autoTable({
+            startY,
+            margin: { left: margin, right: margin },
+            body: [[leftLines.join("\n"), rightLines.join("\n")]],
+            theme: "plain",
+            styles: { font: "times", fontSize: 10, cellPadding: 0, lineWidth: 0, overflow: "linebreak", valign: "top" },
+            columnStyles: { 0: { cellWidth: maxW / 2 }, 1: { cellWidth: maxW / 2 } },
+          });
+          y = (doc.lastAutoTable?.finalY || y) + 6;
+          doc.setDrawColor(0);
+          doc.setLineWidth(1);
+          doc.line(margin, y, pageW - margin, y);
+          y += 12;
+        };
+
+        const sections = [
+          { type: "pg", title: "PILIHAN GANDA", subtitle: "Pilihlah salah satu jawaban yang paling tepat!" },
+          { type: "pg_kompleks", title: "PILIHAN GANDA KOMPLEKS", subtitle: "Pilihlah jawaban yang benar (bisa lebih dari satu)!" },
+          { type: "menjodohkan", title: "MENJODOHKAN", subtitle: "Jodohkanlah pernyataan pada lajur kiri dengan jawaban pada lajur kanan!" },
+          { type: "isian", title: "ISIAN SINGKAT", subtitle: "Jawablah pertanyaan berikut dengan singkat dan tepat!" },
+          { type: "uraian", title: "URAIAN", subtitle: "Jawablah pertanyaan-pertanyaan berikut dengan jelas dan benar!" },
+        ];
+
+        const items = Array.isArray(state.questions) ? state.questions : [];
+
+        drawHeader(String(state.paket.judul || "NASKAH SOAL"), "naskah");
+
+        let sectionIndex = 0;
+        for (const sec of sections) {
+          const qs = items.filter((q) => q && q.type === sec.type);
+          if (!qs.length) continue;
+          const letter = String.fromCharCode(65 + sectionIndex++);
+          addPara(`${letter}. ${sec.title}`, 12, "bold", 0, 2);
+          addPara(sec.subtitle, 11, "italic", 0, 10);
+
+          for (let i = 0; i < qs.length; i++) {
+            const q = qs[i] || {};
+            const soal = String(q.question || "").trim();
+            addHanging(`${i + 1}.`, soal, 12, "normal", 0, 4);
+
+            if (q.image) {
+              try {
+                const imgType = String(q.image || "").toLowerCase().includes("jpeg") ? "JPEG" : "PNG";
+                const imgW = Math.min(220, maxW - 30);
+                const imgH = imgW;
+                newPageIfNeeded(imgH + 12);
+                doc.addImage(String(q.image), imgType, margin + 30, y, imgW, imgH);
+                y += imgH + 10;
+              } catch {}
+            }
+
+            if (sec.type === "pg" || sec.type === "pg_kompleks") {
+              const opts = Array.isArray(q.options) ? q.options : [];
+              for (let oi = 0; oi < opts.length; oi++) {
+                addHanging(`${String.fromCharCode(65 + oi)}.`, String(opts[oi] || ""), 11, "normal", 30, 2);
+              }
+              y += 6;
+              continue;
+            }
+
+            if (sec.type === "menjodohkan") {
+              const leftList = Array.isArray(q.options) ? q.options : [];
+              const rightList = Array.isArray(q.answer) ? q.answer : [];
+              const leftText = ["Lajur A (Pernyataan)", ...leftList.map((t, idx) => `${idx + 1}. ${String(t ?? "")}`)].join("\n");
+              const rightText = ["Lajur B (Jawaban)", ...rightList.map((t, idx) => `${String.fromCharCode(65 + idx)}. ${String(t ?? "")}`)].join("\n");
+              newPageIfNeeded(140);
+              doc.autoTable({
+                startY: y,
+                margin: { left: margin, right: margin },
+                body: [[leftText, rightText]],
+                theme: "plain",
+                styles: { font: "times", fontSize: 10, cellPadding: 6, lineWidth: 0.5, lineColor: [0, 0, 0], overflow: "linebreak", valign: "top" },
+                columnStyles: { 0: { cellWidth: maxW / 2 }, 1: { cellWidth: maxW / 2 } },
+              });
+              y = (doc.lastAutoTable?.finalY || y) + 10;
+              continue;
+            }
+
+            if (sec.type === "isian") {
+              addPara("Jawaban: ___________________________________", 11, "normal", 30, 10);
+              continue;
+            }
+
+            if (sec.type === "uraian") {
+              addPara("__________________________________________________________________________", 11, "normal", 30, 10);
+              continue;
+            }
+          }
+
+          y += 8;
+        }
+
+        newPage();
+        drawHeader("KUNCI JAWABAN", "meta");
+
+        sectionIndex = 0;
+        for (const sec of sections) {
+          const qs = items.filter((q) => q && q.type === sec.type);
+          if (!qs.length) continue;
+          const letter = String.fromCharCode(65 + sectionIndex++);
+          addPara(`${letter}. ${sec.title}`, 12, "bold", 0, 8);
+
+          if (sec.type === "pg") {
+            const cols = 5;
+            const body = [];
+            for (let i = 0; i < qs.length; i += cols) {
+              const row = [];
+              for (let j = 0; j < cols; j++) {
+                const q = qs[i + j];
+                if (!q) { row.push(""); continue; }
+                let ansChar = "-";
+                if (typeof q.answer === "number") ansChar = String.fromCharCode(65 + q.answer);
+                else if (typeof q.answer === "string") ansChar = q.answer;
+                row.push(`${i + j + 1}. ${ansChar}`);
+              }
+              body.push(row);
+            }
+            doc.autoTable({
+              startY: y,
+              margin: { left: margin, right: margin },
+              body,
+              theme: "plain",
+              styles: { font: "times", fontSize: 11, cellPadding: 2, lineWidth: 0, overflow: "linebreak" },
+              columnStyles: {
+                0: { cellWidth: maxW / 5 },
+                1: { cellWidth: maxW / 5 },
+                2: { cellWidth: maxW / 5 },
+                3: { cellWidth: maxW / 5 },
+                4: { cellWidth: maxW / 5 },
+              },
+            });
+            y = (doc.lastAutoTable?.finalY || y) + 12;
+            continue;
+          }
+
+          for (let i = 0; i < qs.length; i++) {
+            const q = qs[i] || {};
+            let ansText = "";
+            if (sec.type === "pg_kompleks") {
+              ansText = Array.isArray(q.answer) ? q.answer.map((idx) => String.fromCharCode(65 + Number(idx))).join(", ") : String(q.answer ?? "");
+            } else if (sec.type === "menjodohkan") {
+              ansText = Array.isArray(q.matchKey) ? q.matchKey.map((pos, idx) => `${idx + 1}–${String.fromCharCode(65 + Number(pos || 0))}`).join(", ") : "";
+            } else {
+              ansText = String(q.answer || "(Belum ada kunci)");
+            }
+            addHanging(`${i + 1}.`, ansText, 11, "normal", 0, 4);
+          }
+          y += 10;
+        }
+
+        newPage();
+        drawHeader("KISI-KISI SOAL", "meta");
+
+        const kisiSections = [
+          { type: "pg", title: "PILIHAN GANDA", label: "PG" },
+          { type: "pg_kompleks", title: "PILIHAN GANDA KOMPLEKS", label: "PG Komp" },
+          { type: "menjodohkan", title: "MENJODOHKAN", label: "Jodoh" },
+          { type: "isian", title: "ISIAN SINGKAT", label: "Isian" },
+          { type: "uraian", title: "URAIAN", label: "Uraian" },
+        ];
+
+        sectionIndex = 0;
+        for (const sec of kisiSections) {
+          const qs = items.filter((q) => q && q.type === sec.type);
+          if (!qs.length) continue;
+          const letter = String.fromCharCode(65 + sectionIndex++);
+          addPara(`${letter}. ${sec.title}`, 12, "bold", 0, 8);
+
+          const rows = qs.map((q, idx) => [
+            String(idx + 1),
+            String(q.materi || "-"),
+            String(q.indikator || "-"),
+            String(q.bloom || "-"),
+            String(sec.label),
+            String(idx + 1),
+          ]);
+
+          doc.autoTable({
+            startY: y,
+            margin: { left: margin, right: margin },
+            head: [["No", "Materi", "Indikator Soal", "Level", "Bentuk", "No. Soal"]],
+            body: rows,
+            styles: { font: "times", fontSize: 9, cellPadding: 4, lineWidth: 0.5, lineColor: [0, 0, 0], overflow: "linebreak" },
+            headStyles: { fillColor: [224, 224, 224], textColor: [0, 0, 0], fontStyle: "bold", halign: "center" },
+            columnStyles: {
+              0: { cellWidth: 34, halign: "center" },
+              1: { cellWidth: 110 },
+              2: { cellWidth: maxW - 34 - 110 - 60 - 60 - 60 },
+              3: { cellWidth: 60, halign: "center" },
+              4: { cellWidth: 60, halign: "center" },
+              5: { cellWidth: 60, halign: "center" },
+            },
+          });
+          y = (doc.lastAutoTable?.finalY || y) + 14;
+        }
+
+        const totalPages = doc.getNumberOfPages();
+        for (let p = 1; p <= totalPages; p++) {
+          doc.setPage(p);
+          doc.setFont("times", "normal");
+          doc.setFontSize(9);
+          doc.setTextColor(136, 136, 136);
+          const footer = `${String(state.identity.mataPelajaran || "")} — ${String(state.identity.namaSekolah || "")} | Halaman ${p}`;
+          doc.text(footer, pageW / 2, footerY, { align: "center" });
+        }
+        doc.setTextColor(0, 0, 0);
+        doc.save(filename);
+      }
+      const setModulAjarTab = (tab) => {
+        state.modulAjarTab = tab;
         saveDebounced(false);
         render();
       };
@@ -1158,6 +1566,7 @@ if (!isset($_SESSION['user_id'])) {
               }
               if (b.t === 'sp') { sp(3, 3)(); continue; }
               if (b.t === 'h') {
+                newPageIfNeeded(60);
                 const fs = b.l === 1 ? 14 : b.l === 2 ? 13 : b.l === 3 ? 12 : 11;
                 const after = sp(b.l === 1 ? 14 : 12, 6);
                 addWrapped(b.v, fs, true, false, 'left', 0, 16);
@@ -1444,6 +1853,7 @@ if (!isset($_SESSION['user_id'])) {
         const s = state.sections.find((x) => x.id === id);
         if (!s) return;
         s[key] = value;
+        if (state.soalError) state.soalError = null;
         if (key === "bentuk") {
           const isObjective = ["pg", "pg_kompleks", "menjodohkan"].includes(value);
           const isEssay = ["isian", "uraian"].includes(value);
@@ -1968,7 +2378,35 @@ if (!isset($_SESSION['user_id'])) {
       }
 
       const renderNaskah = () => {
-        if (state.questions.length === 0) return `<div class="p-10 text-center">Belum ada soal. Klik "Buat Paket Soal" di samping.</div>`;
+        const canDownload = Array.isArray(state.questions) && state.questions.length > 0 && !state._isGenerating;
+        const buildNow = `
+          <div class="no-print bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
+            <div class="p-6 flex items-center justify-between gap-3">
+              <div>
+                <div class="text-xl font-bold">Naskah Soal</div>
+                <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Klik tombol untuk membuat soal otomatis</div>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                  <button id="btnSoalDocxTop" class="${canDownload ? 'inline-flex' : 'inline-flex opacity-50 cursor-not-allowed'} items-center gap-2 h-9 px-4 rounded-lg border bg-white dark:bg-surface-dark text-sm font-bold"
+                    ${canDownload ? `onclick="window.__sp.downloadSoalDocx()"` : 'disabled'}>
+                    <span class="material-symbols-outlined text-[18px]">download</span>
+                    Download .docx
+                  </button>
+                  <button id="btnSoalPdfTop" class="${canDownload ? 'inline-flex' : 'inline-flex opacity-50 cursor-not-allowed'} items-center gap-2 h-9 px-4 rounded-lg border bg-white dark:bg-surface-dark text-sm font-bold"
+                    ${canDownload ? `onclick="window.__sp.downloadSoalPDF()"` : 'disabled'}>
+                    <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                    Download PDF
+                  </button>
+                </div>
+              </div>
+              <button class="inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold"
+                onclick="window.__sp.startBuildSoal()">
+                <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                Buat Soal Sekarang
+              </button>
+            </div>
+          </div>
+        `;
+        if (state.questions.length === 0) return `<div class="space-y-3">${buildNow}<div class="p-10 text-center">Belum ada soal. Klik "Buat Soal Sekarang".</div></div>`;
         
         const renderItem = (q, i) => `
           <div class="relative group break-inside-avoid">
@@ -2066,6 +2504,7 @@ if (!isset($_SESSION['user_id'])) {
 
         return `
           <div class="space-y-3">
+          ${buildNow}
           <div id="paper" class="bg-white text-black p-4 md:p-10 md:shadow-paper md:min-h-[297mm] font-serif border border-gray-200 mx-auto print:border-none print:shadow-none print:p-0">
             <div class="border-b-2 border-black pb-6 mb-8 relative">
               ${state.identity.logo ? `<img src="${state.identity.logo}" class="absolute right-0 top-0 h-16 w-auto">` : ``}
@@ -2643,11 +3082,14 @@ if (!isset($_SESSION['user_id'])) {
         const kelasOpts = CLASS_OPTIONS[M.jenjang] || [];
         const dimArr    = Array.isArray(M.dimensi) ? M.dimensi : [];
         const hasilAda  = !!M.hasil;
+        const tab = state.modulAjarTab || (hasilAda ? 'modul' : 'informasi');
+        const maErr = state.modulAjarError;
 
         const mkSel = (lbl, key, val, opts) => `
           <div class="flex flex-col gap-2">
             <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">${safeText(lbl)}</label>
             <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
+              data-ma-key="${safeText(key)}"
               onchange="window.__sp.setMA('${key}',this.value,true)">
               <option value="">— Pilih —</option>
               ${opts.map(o=>`<option value="${safeText(o)}" ${String(o)===String(val||'')?'selected':''}>${safeText(o)}</option>`).join('')}
@@ -2658,6 +3100,7 @@ if (!isset($_SESSION['user_id'])) {
           <div class="flex flex-col gap-2">
             <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">${safeText(lbl)}</label>
             <input class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
+              data-ma-key="${safeText(key)}"
               placeholder="${safeText(ph)}" value="${safeText(val||'')}"
               oninput="window.__sp.setMA('${key}',this.value,false)"
               onchange="window.__sp.setMA('${key}',this.value,true)"
@@ -2675,11 +3118,42 @@ if (!isset($_SESSION['user_id'])) {
           </label>`;
         }).join('');
 
-        const formHtml = `
-          <div class="space-y-6">
-            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
-              <div class="p-6 space-y-5">
-                <div>
+        const desktopTabs = `
+          <div class="hidden md:flex items-center justify-between gap-3 mb-4">
+            <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
+              ${[
+                { id: "informasi", label: "1. Informasi Dasar" },
+                { id: "detail", label: "2. Detail Pembelajaran" },
+                { id: "modul", label: "3. Modul Ajar" },
+              ].map(t => {
+                const active = tab === t.id;
+                return `<button class="${active ? 'bg-primary text-white' : 'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setModulAjarTab('${t.id}')">${t.label}</button>`;
+              }).join('')}
+            </div>
+          </div>
+        `;
+
+        const mobileNav = (cur) => {
+          const prev = cur === 'detail' ? 'informasi' : (cur === 'modul' ? 'detail' : null);
+          const next = cur === 'informasi' ? 'detail' : (cur === 'detail' ? 'modul' : null);
+          const rightLabel = cur === 'informasi' ? 'Detail Pembelajaran' : (cur === 'detail' ? 'Modul Ajar' : '');
+          return `
+            <div class="md:hidden mt-6 flex items-center gap-3">
+              <button class="flex-1 h-12 rounded-xl border bg-white dark:bg-surface-dark font-bold" ${prev ? `onclick="window.__sp.setModulAjarTab('${prev}')"` : 'disabled'}>Kembali</button>
+              <button class="flex-1 h-12 rounded-xl ${next ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'} font-bold" ${next ? `onclick="window.__sp.setModulAjarTab('${next}')"` : 'disabled'}>${rightLabel || 'Lanjut'}</button>
+            </div>
+          `;
+        };
+
+        const step1Html = `
+          <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
+            <div class="p-6 space-y-5">
+              ${maErr && tab === 'informasi' ? `
+                <div class="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300">
+                  ${safeText(maErr.msg || '')}
+                </div>` : ``}
+              <div>
+                <div class="flex items-center justify-between gap-3">
                   <div class="flex items-center gap-2">
                     <div class="text-xs font-bold text-primary bg-primary/10 inline-flex px-3 py-1 rounded-full">Langkah 1</div>
                     <button class="h-6 w-6 rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark inline-flex items-center justify-center"
@@ -2688,28 +3162,45 @@ if (!isset($_SESSION['user_id'])) {
                       <span class="material-symbols-outlined text-[16px]">help</span>
                     </button>
                   </div>
-                  <div class="text-xl font-bold mt-2">Informasi Dasar</div>
-                  <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Identitas pendidik dan konteks akademik</div>
+                  <button
+                    class="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold shadow-sm transition-colors"
+                    onclick="window.__sp.setModulAjarTab('detail')"
+                    title="Lanjut ke Detail Pembelajaran"
+                  >
+                    <span class="hidden sm:inline">Detail Pembelajaran</span>
+                    <span class="sm:hidden">Detail</span>
+                    <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+                  </button>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  ${mkInp('Nama Guru','namaGuru',M.namaGuru,'Contoh: Sunarwan, S.Pd.')}
-                  ${mkInp('Nama Institusi','institusi',M.institusi,'Contoh: SDN 1 Cilodong')}
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  ${mkSel('Kurikulum','kurikulum',M.kurikulum,['Kurikulum Merdeka','Kurikulum Berbasis Cinta'])}
-                  ${mkSel('Jenjang','jenjang',M.jenjang,['SD/MI','SMP/MTs','SMA/MA','SMK','PAUD'])}
-                  ${mkSel('Fase','fase',M.fase,faseOpts)}
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  ${mkSel('Kelas','kelas',M.kelas,kelasOpts)}
-                  ${mkInp('Mata Pelajaran','mapel',M.mapel,'Contoh: Bahasa Indonesia, Matematika, IPAS')}
-                </div>
+                <div class="text-xl font-bold mt-2">Informasi Dasar</div>
+                <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Identitas pendidik dan konteks akademik</div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                ${mkInp('Nama Guru','namaGuru',M.namaGuru,'Contoh: Sunarwan, S.Pd.')}
+                ${mkInp('Nama Institusi','institusi',M.institusi,'Contoh: SDN 1 Cilodong')}
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                ${mkSel('Kurikulum','kurikulum',M.kurikulum,['Kurikulum Merdeka','Kurikulum Berbasis Cinta'])}
+                ${mkSel('Jenjang','jenjang',M.jenjang,['SD/MI','SMP/MTs','SMA/MA','SMK','PAUD'])}
+                ${mkSel('Fase','fase',M.fase,faseOpts)}
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                ${mkSel('Kelas','kelas',M.kelas,kelasOpts)}
+                ${mkInp('Mata Pelajaran','mapel',M.mapel,'Contoh: Bahasa Indonesia, Matematika, IPAS')}
               </div>
             </div>
+          </div>
+        `;
 
-            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
-              <div class="p-6 space-y-5">
-                <div>
+        const step2Html = `
+          <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
+            <div class="p-6 space-y-5">
+              ${maErr && tab === 'detail' ? `
+                <div class="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300">
+                  ${safeText(maErr.msg || '')}
+                </div>` : ``}
+              <div>
+                <div class="flex items-center justify-between gap-3">
                   <div class="flex items-center gap-2">
                     <div class="text-xs font-bold text-primary bg-primary/10 inline-flex px-3 py-1 rounded-full">Langkah 2</div>
                     <button class="h-6 w-6 rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark inline-flex items-center justify-center"
@@ -2718,93 +3209,100 @@ if (!isset($_SESSION['user_id'])) {
                       <span class="material-symbols-outlined text-[16px]">help</span>
                     </button>
                   </div>
-                  <div class="text-xl font-bold mt-2">Detail Pembelajaran</div>
-                  <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Materi, durasi, model, dan profil lulusan</div>
+                  <button
+                    class="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold shadow-sm transition-colors"
+                    onclick="window.__sp.buildModulAjar()"
+                    title="Buka tab Modul Ajar dan buat dokumen"
+                  >
+                    <span class="hidden sm:inline">Modul Ajar</span>
+                    <span class="sm:hidden">Modul</span>
+                    <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+                  </button>
                 </div>
-                <div class="grid grid-cols-1 gap-5">
-                  ${mkInp('Materi Pokok / Judul Modul','judulModul',M.judulModul,'Contoh: Pengenalan Bunyi dan Kosa Kata')}
+                <div class="text-xl font-bold mt-2">Detail Pembelajaran</div>
+                <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Materi, durasi, model, dan profil lulusan</div>
+              </div>
+              <div class="grid grid-cols-1 gap-5">
+                ${mkInp('Materi Pokok / Judul Modul','judulModul',M.judulModul,'Contoh: Pengenalan Bunyi dan Kosa Kata')}
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                ${mkSel('Jumlah Pertemuan','jumlahPertemuan',M.jumlahPertemuan,['1','2','3','4','5','6','7','8','9','10','11','12'])}
+                ${mkInp('Durasi per Pertemuan (menit)','durasi',M.durasi,'Contoh: 50')}
+                ${mkInp('Jumlah Peserta Didik','jumlahSiswa',M.jumlahSiswa,'Contoh: 30')}
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                ${mkSel('Model Pembelajaran','modelPembelajaran',M.modelPembelajaran,MA_MODEL)}
+              </div>
+              <div>
+                <div class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark mb-2">
+                  Dimensi Profil Lulusan
+                  <span class="font-normal italic ml-1 text-xs">(min. 1 — sesuai SKL 2025)</span>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  ${mkSel('Jumlah Pertemuan','jumlahPertemuan',M.jumlahPertemuan,['1','2','3','4','5','6','7','8','9','10','11','12'])}
-                  ${mkInp('Durasi per Pertemuan (menit)','durasi',M.durasi,'Contoh: 50')}
-                  ${mkInp('Jumlah Peserta Didik','jumlahSiswa',M.jumlahSiswa,'Contoh: 30')}
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  ${mkSel('Model Pembelajaran','modelPembelajaran',M.modelPembelajaran,MA_MODEL)}
-                </div>
-                <div>
-                  <div class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark mb-2">
-                    Dimensi Profil Lulusan
-                    <span class="font-normal italic ml-1 text-xs">(min. 1 — sesuai SKL 2025)</span>
+                <div id="maDimensiWrap" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">${dimChecks}</div>
+              </div>
+              <div class="rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-4">
+                <label class="flex items-start gap-3 cursor-pointer select-none">
+                  <input type="checkbox" class="mt-1 accent-primary" ${M.supervisi ? 'checked' : ''} onchange="window.__sp.setMA('supervisi',this.checked,true)" />
+                  <div>
+                    <div class="text-sm font-bold">Mode Supervisi</div>
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-1">Tambahkan CP, ATP, dan KKTP agar lebih lengkap untuk supervisi. Jika nonaktif, bagian tersebut tidak dibuat.</div>
                   </div>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">${dimChecks}</div>
-                </div>
-                <div id="maError" class="hidden rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300"></div>
-                <div class="pt-1 flex flex-wrap items-center gap-3">
-                  <button onclick="window.__sp.buildModulAjar()"
-                    class="flex items-center gap-2 rounded-lg h-10 px-6 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors">
-                    <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
-                    GENERATE MODUL AJAR
-                  </button>
-                  ${hasilAda ? `
-                  <button id="btnExportMA" onclick="window.__sp.exportModulAjarDocx()"
-                    class="flex items-center gap-2 rounded-lg h-10 px-5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors">
-                    <span class="material-symbols-outlined text-[18px]">download</span>
-                    Download .docx
-                  </button>
-                  <button id="btnExportMAPDF" onclick="window.__sp.exportModulAjarPDF()"
-                    class="flex items-center gap-2 rounded-lg h-10 px-5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-sm transition-colors">
-                    <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-                    Download PDF
-                  </button>` : ''}
-                </div>
+                </label>
               </div>
             </div>
+          </div>
+        `;
 
-            ${hasilAda ? `
-            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
-              <div class="flex items-center justify-between px-6 py-4 border-b border-border-light dark:border-border-dark">
-                <div class="flex items-center gap-3">
-                  <div class="size-8 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-[18px]">check_circle</span>
+        const step3Html = `
+          <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
+            <div class="p-6 space-y-4">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <div class="text-xl font-bold">Modul Ajar</div>
+                  <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Generate dan lihat hasil dokumen modul ajar</div>
+                  <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <button id="btnMADocxTop" class="${hasilAda ? 'inline-flex' : 'inline-flex opacity-50 cursor-not-allowed'} items-center gap-2 h-9 px-4 rounded-lg border bg-white dark:bg-surface-dark text-sm font-bold"
+                      ${hasilAda ? `onclick="window.__sp.exportModulAjarDocx()"` : 'disabled'}>
+                      <span class="material-symbols-outlined text-[18px]">download</span>
+                      Download .docx
+                    </button>
+                    <button id="btnMAPdfTop" class="${hasilAda ? 'inline-flex' : 'inline-flex opacity-50 cursor-not-allowed'} items-center gap-2 h-9 px-4 rounded-lg border bg-white dark:bg-surface-dark text-sm font-bold"
+                      ${hasilAda ? `onclick="window.__sp.exportModulAjarPDF()"` : 'disabled'}>
+                      <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                      Download PDF
+                    </button>
                   </div>
-                  <div>
-                    <div class="font-bold text-sm">Modul Ajar Berhasil Dibuat</div>
-                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${safeText(M.mapel||'')} · ${safeText(M.judulModul||'')}</div>
-                  </div>
                 </div>
-                <div class="flex items-center gap-2">
-                  <button id="btnExportMA2" onclick="window.__sp.exportModulAjarDocx()"
-                    class="flex items-center gap-2 rounded-lg h-9 px-4 bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors">
-                    <span class="material-symbols-outlined text-[16px]">download</span>
-                    Download .docx
-                  </button>
-                  <button id="btnExportMAPDF2" onclick="window.__sp.exportModulAjarPDF()"
-                    class="flex items-center gap-2 rounded-lg h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-sm transition-colors">
-                    <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
-                    Download PDF
-                  </button>
-                </div>
+                <button onclick="window.__sp.buildModulAjar()"
+                  class="shrink-0 flex items-center gap-2 rounded-lg h-10 px-6 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors">
+                  <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                  Buat Modul Ajar Sekarang
+                </button>
               </div>
-              <div class="p-6 overflow-auto max-h-[72vh] custom-scrollbar">
-                <div id="maPreview" class="bg-white dark:bg-gray-950 border border-border-light dark:border-border-dark rounded-lg px-20 py-16 mx-auto
-                  font-serif text-[16px] leading-6 min-h-[1056px] max-w-[816px]
-                  [&_h1]:text-[18px] [&_h1]:font-bold [&_h1]:mt-8 [&_h1]:mb-3
-                  [&_h2]:text-[16px] [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-2
-                  [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:mt-5 [&_h3]:mb-2
-                  [&_table]:w-full [&_table]:border-collapse [&_table]:my-3 [&_table]:text-[14px]
-                  [&_td]:border [&_td]:border-gray-300 dark:[&_td]:border-gray-600 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top
-                  [&_th]:border [&_th]:border-gray-300 dark:[&_th]:border-gray-600 [&_th]:px-3 [&_th]:py-2 [&_th]:bg-gray-100 dark:[&_th]:bg-gray-800 [&_th]:font-bold
-                  [&_.ma-tbl>tbody>tr:nth-child(even)>td]:bg-gray-50 dark:[&_.ma-tbl>tbody>tr:nth-child(even)>td]:bg-gray-900/20
-                  [&_ul]:pl-6 [&_ul]:my-2 [&_li]:mb-1.5
-                  [&_ol]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol>li]:mb-1.5
-                  [&_em]:italic [&_strong]:font-bold
-                  [&_p]:mb-3 [&_p]:text-justify">
-                  ${maBuildPreviewHtml(M)}
-                </div>
-              </div>
-            </div>` : ''}
-          </div>`;
+              <div id="maError" class="${(maErr && tab === 'modul') ? '' : 'hidden'} rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300">${safeText((maErr && tab === 'modul') ? (maErr.msg || '') : '')}</div>
+            </div>
+          </div>
+
+          ${hasilAda ? `
+          <div class="overflow-auto max-h-[72vh] custom-scrollbar">
+            <div id="maPreview" class="
+              [&_.ma-table-wrap]:overflow-x-auto [&_.ma-table-wrap]:-mx-1 [&_.ma-table-wrap]:px-1 [&_.ma-table-wrap]:my-3
+              [&_table]:w-full [&_table]:border-collapse [&_table]:text-[14px]
+              [&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top
+              [&_th]:border [&_th]:border-gray-300 [&_th]:px-3 [&_th]:py-2 [&_th]:bg-gray-100 [&_th]:font-bold
+              [&_.ma-tbl>tbody>tr:nth-child(even)>td]:bg-gray-50
+              [&_ul]:pl-6 [&_ul]:my-2 [&_li]:mb-1.5
+              [&_ol]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol>li]:mb-1.5
+              [&_em]:italic [&_strong]:font-bold
+              [&_p]:mb-3 [&_p]:text-justify">
+              ${maBuildPreviewHtmlWysiwyg(M)}
+            </div>
+          </div>` : `
+          <div class="rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-6 text-sm text-text-sub-light dark:text-text-sub-dark">
+            Hasil belum ada. Klik Buat Modul Ajar Sekarang untuk membuat dokumen.
+          </div>
+          `}
+        `;
 
         if (M.isGenerating) return `
           <div class="flex flex-col items-center justify-center p-10 md:p-20 gap-4 max-w-2xl mx-auto">
@@ -2823,7 +3321,13 @@ if (!isset($_SESSION['user_id'])) {
             </div>
           </div>`;
 
-        return formHtml;
+        const body = tab === 'detail'
+          ? (step2Html + mobileNav('detail'))
+          : tab === 'modul'
+            ? (step3Html + mobileNav('modul'))
+            : (step1Html + mobileNav('informasi'));
+
+        return `<div class="space-y-6">${desktopTabs}${body}</div>`;
       };
 
       const renderLimit = () => {
@@ -3090,6 +3594,8 @@ if (!isset($_SESSION['user_id'])) {
         const addBeforeLine = (reWithGroups) => {
           s = s.replace(reWithGroups, (_m, p1, p2) => `${p1}${marker}\n${p2}`);
         };
+        // CP mulai halaman baru (pisahkan dari Informasi Umum)
+        addBeforeLine(/(^|\n)([^\S\r\n]*(?:#{1,4}\s*)?(?:\*{0,2})Capaian\s+Pembelajaran\s*\(CP\)\b[^\n]*)/im);
         // Page break sebelum Komponen Inti agar halaman 1 hanya Judul + Informasi Umum
         addBeforeLine(/(^|\n)([^\S\r\n]*(?:#{1,4}\s*)?(?:\*{0,2})B\.\s*KOMPONEN\s+INTI\b[^\n]*)/im);
         // Kegiatan Pembelajaran mulai halaman baru
@@ -3278,6 +3784,63 @@ if (!isset($_SESSION['user_id'])) {
           <div class="mt-10">${body}</div>
         `;
       }
+      function maBuildPreviewHtmlWysiwyg(M) {
+        const mapel = String(M?.mapel || '').trim();
+        const judul = String(M?.judulModul || '').trim();
+        const title = mapel ? `MODUL AJAR ${mapel.toUpperCase()}` : 'MODUL AJAR';
+        const sub = judul ? `"${safeText(judul)}"` : '';
+        const titleHtml = `
+          <div class="text-center">
+            <div class="font-bold text-[20px] tracking-wide">${safeText(title)}</div>
+            ${sub ? `<div class="italic text-[18px] mt-2">${sub}</div>` : ``}
+          </div>
+        `;
+
+        const normalized = maInsertPageBreakMarkers(maNormalizeContent(M));
+        const { pre, lkpd, post } = maSplitLKPD(normalized);
+        const preMd = maStripCLampiranHeading(pre || '');
+        const postMd = maStripCLampiranHeading(post || '');
+
+        const splitMdPages = (md) => {
+          const src = String(md || '');
+          const parts = src.split('[[PAGE_BREAK]]').map(s => s.trim()).filter(Boolean);
+          return parts.length ? parts : [''];
+        };
+        const wrapTables = (html) => {
+          let s = String(html || '');
+          s = s.replace(/<table/gi, '<div class="ma-table-wrap"><table');
+          s = s.replace(/<\/table>/gi, '</table></div>');
+          return s;
+        };
+
+        const pages = [];
+        const prePages = splitMdPages(preMd);
+        prePages.forEach((md, idx) => {
+          const html = wrapTables(maMarkdownToHtml(md));
+          const content = idx === 0 ? `${titleHtml}<div class="mt-10">${html}</div>` : html;
+          pages.push(content);
+        });
+
+        const lkpdData = maEnsureLKPDData(lkpd ? maParseLKPD(lkpd, M) : { judul, tujuan: [], alat: [], langkah: [], refleksi: [], kesimpulan: [] }, M, lkpd);
+        const lkpdHtml = maRenderLKPDHtml(lkpdData);
+        if (String(lkpdHtml || '').trim()) pages.push(lkpdHtml);
+
+        const postPages = splitMdPages(postMd);
+        if (String(postMd || '').trim()) {
+          postPages.forEach((md) => {
+            const html = wrapTables(maMarkdownToHtml(md));
+            pages.push(html);
+          });
+        }
+
+        const pageWrap = (inner) => `
+          <div class="bg-white text-black p-4 md:p-10 md:shadow-paper md:min-h-[297mm] font-serif border border-gray-200 mx-auto print:border-none print:shadow-none print:p-0 w-full">
+            ${inner}
+          </div>
+        `;
+
+        return `<div class="space-y-6">${pages.map(pageWrap).join('')}</div>`;
+      }
 
       async function buildModulAjar() {
         const M = state.modulAjar || {};
@@ -3285,9 +3848,33 @@ if (!isset($_SESSION['user_id'])) {
         const errEl = () => document.getElementById('maError');
         const showErr = (msg) => { const e=errEl(); if(e){e.textContent='⚠️ '+msg; e.classList.remove('hidden');} };
 
-        if (req.some(v=>!String(v||'').trim())) { showErr('Harap lengkapi semua field sebelum generate.'); return; }
-        if (!Array.isArray(M.dimensi)||M.dimensi.length===0) { showErr('Pilih minimal 1 Dimensi Profil Lulusan.'); return; }
+        const failMA = (tab, msg, key) => {
+          state.modulAjarTab = tab;
+          state.modulAjarError = { tab, msg, key };
+          render();
+          setTimeout(() => { try { focusMAKey(key); } catch {} }, 80);
+        };
+        const namaGuru = String(M.namaGuru || '').trim();
+        const institusi = String(M.institusi || '').trim();
+        const jenjang = String(M.jenjang || '').trim();
+        const mapel = String(M.mapel || '').trim();
+        const judul = String(M.judulModul || '').trim();
+        const jumlah = String(M.jumlahPertemuan || '').trim();
+        const durasi = String(M.durasi || '').trim();
+        const model = String(M.modelPembelajaran || '').trim();
 
+        if (!namaGuru) { failMA('informasi', 'Langkah 1 belum lengkap: isi Nama Guru dulu ya.', 'namaGuru'); return; }
+        if (!institusi) { failMA('informasi', 'Langkah 1 belum lengkap: isi Nama Institusi dulu ya.', 'institusi'); return; }
+        if (!jenjang) { failMA('informasi', 'Langkah 1 belum lengkap: pilih Jenjang dulu ya.', 'jenjang'); return; }
+        if (!mapel) { failMA('informasi', 'Langkah 1 belum lengkap: isi Mata Pelajaran dulu ya.', 'mapel'); return; }
+        if (!judul) { failMA('detail', 'Langkah 2 belum lengkap: isi Materi Pokok / Judul Modul dulu ya.', 'judulModul'); return; }
+        if (!jumlah) { failMA('detail', 'Langkah 2 belum lengkap: pilih Jumlah Pertemuan dulu ya.', 'jumlahPertemuan'); return; }
+        if (!durasi) { failMA('detail', 'Langkah 2 belum lengkap: isi Durasi per Pertemuan dulu ya.', 'durasi'); return; }
+        if (!model) { failMA('detail', 'Langkah 2 belum lengkap: pilih Model Pembelajaran dulu ya.', 'modelPembelajaran'); return; }
+        if (!Array.isArray(M.dimensi)||M.dimensi.length===0) { failMA('detail', 'Langkah 2 belum lengkap: pilih minimal 1 Dimensi Profil Lulusan dulu ya.', 'dimensi'); return; }
+
+        state.modulAjarTab = "modul";
+        state.modulAjarError = null;
         state.modulAjar.isGenerating = true;
         state.modulAjar.hasil = '';
         render();
@@ -3311,6 +3898,7 @@ Durasi/Pertemuan  : ${M.durasi} menit
 Model Pembelajaran: ${M.modelPembelajaran}
 Jumlah Siswa      : ${M.jumlahSiswa||'30'} siswa
 Dimensi Profil    : ${M.dimensi.join(', ')}
+Mode Supervisi    : ${M.supervisi ? 'AKTIF (sertakan CP, ATP, KKTP)' : 'NONAKTIF (tanpa CP, ATP, KKTP)'}
 =================
 
 Hasilkan Modul Ajar dengan SEMUA bagian berikut secara LENGKAP dan DETAIL:
@@ -3320,14 +3908,22 @@ Hasilkan Modul Ajar dengan SEMUA bagian berikut secara LENGKAP dan DETAIL:
 
 ## A. INFORMASI UMUM
 Tabel 2 kolom (Komponen | Keterangan): Nama Penyusun, Institusi, Tahun, Jenjang, Kelas, Fase, Alokasi Waktu, Kompetensi Awal (2-3 kalimat), Dimensi Profil Lulusan (tiap dimensi 1-2 kalimat kontekstual), Sarana dan Prasarana, Target Peserta Didik, Model Pembelajaran.
+${M.supervisi ? `
+### Capaian Pembelajaran (CP)
+Buat tabel: Elemen | Capaian Pembelajaran (ringkas, sesuai jenjang/fase). Minimal 3 elemen. Pastikan CP relevan dengan materi "${M.judulModul}".` : ``}
 
 ## B. KOMPONEN INTI
+${M.supervisi ? `
+### Alur Tujuan Pembelajaran (ATP)
+Buat tabel: Pertemuan | Tujuan Pembelajaran | Materi Kunci | Asesmen | Catatan.
+Jumlah baris harus sesuai "Jumlah Pertemuan" (${M.jumlahPertemuan}). Tujuan harus konsisten dengan CP dan materi.` : ``}
 
 ### 1. Tujuan Pembelajaran
 Min. 4 tujuan. Format: "Peserta didik mampu [kata kerja Bloom] [objek] [kondisi/kriteria]"
 
+${M.supervisi ? `
 ### 2. Kriteria Ketercapaian Tujuan Pembelajaran (KKTP)
-Min. 4 indikator konkret dan terukur.
+Min. 4 indikator konkret dan terukur.` : ``}
 
 ### 3. Asesmen
 a. Diagnostik (Awal) — aktivitas konkret
@@ -3369,7 +3965,9 @@ Min. 5 aspek, deskripsi KONKRET dan DAPAT DIAMATI.
 ### 7. Daftar Pustaka
 Min. 3 referensi format APA (1 Kemendikbudristek, 1 buku pedagogi, 1 lainnya).
 
-PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas ${M.kelas||M.fase}. Bahasa Indonesia baku.`;
+PENTING:
+- Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas ${M.kelas||M.fase}. Bahasa Indonesia baku.
+- Jika Mode Supervisi NONAKTIF, JANGAN tulis bagian CP, ATP, dan KKTP sama sekali.`;
 
         try {
           const ctrl = new AbortController();
@@ -3490,13 +4088,13 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
               if (inTbl) flushTbl();
               if (!line.trim()) { out.push(new Paragraph({...sp()})); continue; }
               if (/^####\s*/.test(line)) {
-                out.push(new Paragraph({...sp(140,60),children:[new TextRun({text:line.replace(/^####\s*/,''),font:FONT,size:24,bold:true})]}));
+                out.push(new Paragraph({keepNext:true,keepLines:true,...sp(140,60),children:[new TextRun({text:line.replace(/^####\s*/,''),font:FONT,size:24,bold:true})]}));
               } else if (/^###\s*/.test(line)) {
-                out.push(new Paragraph({...sp(180,80),children:[new TextRun({text:line.replace(/^###\s*/,''),font:FONT,size:26,bold:true})]}));
+                out.push(new Paragraph({keepNext:true,keepLines:true,...sp(180,80),children:[new TextRun({text:line.replace(/^###\s*/,''),font:FONT,size:26,bold:true})]}));
               } else if (/^##\s*/.test(line)) {
-                out.push(new Paragraph({...sp(240,100),children:[new TextRun({text:line.replace(/^##\s*/,''),font:FONT,size:28,bold:true})]}));
+                out.push(new Paragraph({keepNext:true,keepLines:true,...sp(240,100),children:[new TextRun({text:line.replace(/^##\s*/,''),font:FONT,size:28,bold:true})]}));
               } else if (/^#\s*/.test(line)) {
-                out.push(new Paragraph({...sp(280,120),children:[new TextRun({text:line.replace(/^#\s*/,''),font:FONT,size:32,bold:true})]}));
+                out.push(new Paragraph({keepNext:true,keepLines:true,...sp(280,120),children:[new TextRun({text:line.replace(/^#\s*/,''),font:FONT,size:32,bold:true})]}));
               } else if (line.match(/^[-•] /)) {
                 out.push(new Paragraph({...sp(40,40),indent:{left:400,hanging:200},children:[new TextRun({text:'• '+line.replace(/^[-•] /,'').replace(/\*\*(.+?)\*\*/g,'$1'),font:FONT,size:SZ})]}));
               } else if (line.match(/^\d+\. /)) {
@@ -3581,7 +4179,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
               children:[new TextRun({text:`MODUL AJAR ${(M.mapel||'').toUpperCase()}`,font:FONT,size:32,bold:true})]}),
             new Paragraph({alignment:AlignmentType.CENTER,...sp(0,260),
               children:[new TextRun({text:`"${M.judulModul||''}"`,font:FONT,size:26,italics:true})]}),
-            ...parseContent(maStripCLampiranHeading(preLKPD || '')),
+            ...parseContent(maInsertPageBreakMarkers(maStripCLampiranHeading(preLKPD || ''))),
             ...(lkpdTable ? [
               new Paragraph({ children: [new PageBreak()] }),
               new Paragraph({ ...sp(200, 80), children: [new TextRun({ text: 'C. LAMPIRAN', font: FONT, size: 26, bold: true })] }),
@@ -3590,7 +4188,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
               new Paragraph({ ...sp(120, 60) }),
               new Paragraph({ children: [new PageBreak()] }),
             ] : []),
-            ...parseContent(maStripCLampiranHeading(postLKPD || ''))
+            ...parseContent(maInsertPageBreakMarkers(maStripCLampiranHeading(postLKPD || '')))
           ];
 
           const doc2 = new Document({
@@ -4199,9 +4797,9 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           const mobileStepNav = (tab) => {
             const prev = tab === 'konfigurasi' ? 'identitas' : (tab === 'naskah' ? 'konfigurasi' : null);
             const next = tab === 'identitas' ? 'konfigurasi' : (tab === 'konfigurasi' ? 'naskah' : null);
-            const rightLabel = tab === 'identitas' ? 'Konfigurasi' : (tab === 'konfigurasi' ? 'Buat Naskah' : '');
+            const rightLabel = tab === 'identitas' ? 'Konfigurasi' : (tab === 'konfigurasi' ? 'Naskah Soal' : '');
             const rightOnClick = tab === 'konfigurasi'
-              ? `onclick="window.__sp.setPreviewTab('naskah'); window.__sp.buildPackage()"`
+              ? `onclick="window.__sp.startBuildSoal()"`
               : (next ? `onclick="window.__sp.setPreviewTab('${next}')"` : '');
             return `
               <div class="md:hidden mt-6 flex items-center gap-3">
@@ -4286,6 +4884,10 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="lg:col-span-2 bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
               <div class="p-6 space-y-6">
+                ${state.soalError && state.soalError.tab === 'identitas' ? `
+                  <div class="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300">
+                    ${safeText(state.soalError.msg || '')}
+                  </div>` : ``}
                 <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                   <div>
                     <div class="flex items-center gap-2">
@@ -4402,6 +5004,10 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
 
       const renderKonfigurasi = () => `
         <div class="space-y-6">
+          ${state.soalError && state.soalError.tab === 'konfigurasi' ? `
+            <div class="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300">
+              ${safeText(state.soalError.msg || '')}
+            </div>` : ``}
           <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm p-6">
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
             <div class="flex items-center gap-2">
@@ -4423,10 +5029,10 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
               </button>
               <button id="btnBuild"
                 class="hidden md:flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors"
-                onclick="window.__sp.buildPackage()"
+                onclick="window.__sp.startBuildSoal()"
               >
-                <span class="material-symbols-outlined text-[18px]">bolt</span>
-                Buat Paket Soal
+                <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+                Naskah Soal
               </button>
             </div>
           </div>
@@ -4445,7 +5051,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                   <li>Pilih Tingkat Kesulitan dan Cakupan Dimensi Bloom untuk variasi kognitif.</li>
                   <li>Aktifkan Ilustrasi/Gambar jika diperlukan agar sistem menyiapkan diagram/ascii/svg.</li>
                   <li>Ulangi untuk setiap bagian sesuai kebutuhan paket.</li>
-                  <li>Setelah selesai, klik Buat Paket Soal untuk menghasilkan naskah lengkap.</li>
+                  <li>Setelah selesai, klik Naskah Soal untuk menghasilkan naskah lengkap.</li>
                 </ol>
                 <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
                   Tips: Anda dapat menduplikasi bagian yang sudah sesuai lalu melakukan penyesuaian kecil.
@@ -4861,7 +5467,7 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
                     <li>Isi jumlah pertemuan, durasi per pertemuan, jumlah siswa.</li>
                     <li>Pilih Model Pembelajaran yang relevan.</li>
                     <li>Pilih Dimensi Profil Pelajar Pancasila (min. satu).</li>
-                    <li>Klik GENERATE MODUL AJAR untuk membuat dokumen.</li>
+                    <li>Klik Buat Modul Ajar Sekarang untuk membuat dokumen.</li>
                     <li>Gunakan Download .docx untuk menyimpan hasil.</li>
                   </ol>
                 </div>
@@ -5432,6 +6038,16 @@ PENTING: Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas 
       };
 
       const buildPackage = async () => {
+        const chk = validateBuatSoal();
+        if (!chk.ok) {
+          state.soalError = { tab: chk.tab, msg: chk.msg, path: chk.path };
+          state.previewTab = chk.tab;
+          saveDebounced(false);
+          render();
+          setTimeout(() => { try { focusByPath(chk.path); } catch {} }, 50);
+          return;
+        }
+        state.soalError = null;
         autoFillPaket();
         // preflight limit check
         try {
@@ -5855,6 +6471,7 @@ ${out}`;
             const path = node.getAttribute("data-path");
             const v = node.type === "number" ? Number(node.value) : node.value;
             setByPath(path, v);
+            if (state.soalError) state.soalError = null;
             autoFillPaket();
           };
 
@@ -7423,6 +8040,10 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       window.__sp = {
         setView,
         setPreviewTab,
+        startBuildSoal,
+        downloadSoalDocx,
+        downloadSoalPDF,
+        setModulAjarTab,
         setQuizTab,
         setQuizPublish,
         publishQuiz,
@@ -7488,6 +8109,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         setMA: (key, val, renderNow = false) => {
           if (!state.modulAjar) state.modulAjar = {};
           state.modulAjar[key] = val;
+          if (state.modulAjarError) state.modulAjarError = null;
           if (key === 'jenjang') { state.modulAjar.fase=''; state.modulAjar.kelas=''; }
           if (renderNow) {
             saveDebounced(true);
@@ -7501,6 +8123,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
           if (!Array.isArray(state.modulAjar.dimensi)) state.modulAjar.dimensi = [];
           if (checked) { if (!state.modulAjar.dimensi.includes(val)) state.modulAjar.dimensi.push(val); }
           else { state.modulAjar.dimensi = state.modulAjar.dimensi.filter(d=>d!==val); }
+          if (state.modulAjarError) state.modulAjarError = null;
           saveDebounced(false);
           render();
         },
@@ -7538,7 +8161,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       el("projectPicker").addEventListener("change", loadProject);
       el("btnReset").addEventListener("click", resetAll);
       const btnBuild = el("btnBuild");
-      if (btnBuild) btnBuild.addEventListener("click", buildPackage);
+      if (btnBuild) btnBuild.addEventListener("click", startBuildSoal);
       const logoPicker = el("logoPicker");
       if (logoPicker) {
         logoPicker.addEventListener("change", handleLogoSelected);
