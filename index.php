@@ -184,7 +184,7 @@ if (!isset($_SESSION['user_id'])) {
           </div>
           <div class="flex items-center justify-start gap-2 pb-3">
             <div id="tabs" class="hidden"></div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 md:hidden">
               <button id="btnSave" class="hidden md:inline-flex items-center gap-2 h-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors px-3">
                 <span class="material-symbols-outlined text-[18px] shrink-0">save</span>
                 <span class="hidden lg:inline text-sm font-medium whitespace-nowrap">Simpan</span>
@@ -2453,12 +2453,12 @@ if (!isset($_SESSION['user_id'])) {
                 <div class="text-xl font-bold">Naskah Soal</div>
                 <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Klik tombol untuk membuat soal otomatis</div>
                 <div class="mt-3 flex flex-wrap items-center gap-2">
-                  <button id="btnSoalDocxTop" class="${canDownload ? 'inline-flex' : 'inline-flex opacity-50 cursor-not-allowed'} items-center gap-2 h-9 px-4 rounded-lg border bg-white dark:bg-surface-dark text-sm font-bold"
+                  <button id="btnSoalDocxTop" class="${canDownload ? 'inline-flex bg-green-600 hover:bg-green-700 text-white border border-green-600' : 'inline-flex bg-gray-200 text-gray-500 border border-gray-300 opacity-60 cursor-not-allowed'} items-center gap-2 h-9 px-4 rounded-lg text-sm font-bold"
                     ${canDownload ? `onclick="window.__sp.downloadSoalDocx()"` : 'disabled'}>
                     <span class="material-symbols-outlined text-[18px]">download</span>
                     Download .docx
                   </button>
-                  <button id="btnSoalPdfTop" class="${canDownload ? 'inline-flex' : 'inline-flex opacity-50 cursor-not-allowed'} items-center gap-2 h-9 px-4 rounded-lg border bg-white dark:bg-surface-dark text-sm font-bold"
+                  <button id="btnSoalPdfTop" class="${canDownload ? 'inline-flex bg-green-600 hover:bg-green-700 text-white border border-green-600' : 'inline-flex bg-gray-200 text-gray-500 border border-gray-300 opacity-60 cursor-not-allowed'} items-center gap-2 h-9 px-4 rounded-lg text-sm font-bold"
                     ${canDownload ? `onclick="window.__sp.downloadSoalPDF()"` : 'disabled'}>
                     <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
                     Download PDF
@@ -3329,12 +3329,12 @@ if (!isset($_SESSION['user_id'])) {
                   <div class="text-xl font-bold">Modul Ajar</div>
                   <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Generate dan lihat hasil dokumen modul ajar</div>
                   <div class="mt-3 flex flex-wrap items-center gap-2">
-                    <button id="btnMADocxTop" class="${hasilAda ? 'inline-flex' : 'inline-flex opacity-50 cursor-not-allowed'} items-center gap-2 h-9 px-4 rounded-lg border bg-white dark:bg-surface-dark text-sm font-bold"
+                    <button id="btnMADocxTop" class="${hasilAda ? 'inline-flex bg-green-600 hover:bg-green-700 text-white border border-green-600' : 'inline-flex bg-gray-200 text-gray-500 border border-gray-300 opacity-60 cursor-not-allowed'} items-center gap-2 h-9 px-4 rounded-lg text-sm font-bold"
                       ${hasilAda ? `onclick="window.__sp.exportModulAjarDocx()"` : 'disabled'}>
                       <span class="material-symbols-outlined text-[18px]">download</span>
                       Download .docx
                     </button>
-                    <button id="btnMAPdfTop" class="${hasilAda ? 'inline-flex' : 'inline-flex opacity-50 cursor-not-allowed'} items-center gap-2 h-9 px-4 rounded-lg border bg-white dark:bg-surface-dark text-sm font-bold"
+                    <button id="btnMAPdfTop" class="${hasilAda ? 'inline-flex bg-green-600 hover:bg-green-700 text-white border border-green-600' : 'inline-flex bg-gray-200 text-gray-500 border border-gray-300 opacity-60 cursor-not-allowed'} items-center gap-2 h-9 px-4 rounded-lg text-sm font-bold"
                       ${hasilAda ? `onclick="window.__sp.exportModulAjarPDF()"` : 'disabled'}>
                       <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
                       Download PDF
@@ -4854,11 +4854,28 @@ PENTING:
                   return `<button class="${active?'bg-primary text-white':'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setPreviewTab('${t}')">${label}</button>`;
                 }).join('')}
               </div>
-              <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
-                onclick="${helpOnClick}" title="Petunjuk">
-                <span class="material-symbols-outlined text-[18px]">help</span>
-                <span class="ml-2">Petunjuk</span>
-              </button>
+              <div class="flex items-center gap-2">
+                <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                  onclick="saveProject()" title="Simpan">
+                  <span class="material-symbols-outlined text-[18px]">save</span>
+                  <span class="ml-2 hidden lg:inline">Simpan</span>
+                </button>
+                <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                  onclick="document.getElementById('projectPicker').value=''; document.getElementById('projectPicker').click();" title="Muat">
+                  <span class="material-symbols-outlined text-[18px]">folder_open</span>
+                  <span class="ml-2 hidden lg:inline">Muat</span>
+                </button>
+                <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                  onclick="document.getElementById('btnPrint').click();" title="Cetak">
+                  <span class="material-symbols-outlined text-[18px]">print</span>
+                  <span class="ml-2 hidden lg:inline">Cetak</span>
+                </button>
+                <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                  onclick="${helpOnClick}" title="Petunjuk">
+                  <span class="material-symbols-outlined text-[18px]">help</span>
+                  <span class="ml-2">Petunjuk</span>
+                </button>
+              </div>
             </div>
           `;
 
@@ -4970,15 +4987,6 @@ PENTING:
                     <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Data identitas disimpan otomatis</div>
                   </div>
                   <div class="flex gap-2">
-                    <label class="h-10 px-4 rounded-lg cursor-pointer flex items-center gap-2 border border-border-light dark:border-border-dark text-sm font-bold bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors">
-                      <span class="material-symbols-outlined text-[18px]">upload</span>
-                      <span>Muat</span>
-                      <input type="file" accept=".json" class="hidden" onchange="loadProject(event)" />
-                    </label>
-                    <button class="h-10 px-4 rounded-lg flex items-center gap-2 border border-border-light dark:border-border-dark text-sm font-bold bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors" onclick="saveProject()">
-                      <span class="material-symbols-outlined text-[18px]">save</span>
-                      <span>Simpan</span>
-                    </button>
                     <button
                       class="hidden md:flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors"
                       onclick="window.__sp.setPreviewTab('konfigurasi')"
