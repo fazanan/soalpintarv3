@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lpRaw = post('limitpaket', '');
     $lgRaw = post('limitgambar', '');
     $lp = $lpRaw === '' ? 300 : (int)max(0, (int)$lpRaw);
-    $lg = $lgRaw === '' ? 5 : (int)max(0, (int)$lgRaw);
+    $lg = $lgRaw === '' ? 0 : (int)max(0, (int)$lgRaw);
     $accessQuiz = isset($_POST['access_quiz']) ? 1 : 0;
     $accessRekap = isset($_POST['access_rekap_nilai']) ? 1 : 0;
     if ($role === 'admin') { $accessQuiz = 1; $accessRekap = 1; }
@@ -504,7 +504,7 @@ if ($stmt) {
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Limit Gambar</label>
-          <input id="createLimitGambar" name="limitgambar" type="number" min="0" class="w-full rounded border h-10 px-3" placeholder="5">
+          <input id="createLimitGambar" name="limitgambar" type="number" min="0" class="w-full rounded border h-10 px-3" placeholder="0">
         </div>
         <div class="grid grid-cols-1 gap-2">
           <label class="inline-flex items-center gap-2 text-sm">

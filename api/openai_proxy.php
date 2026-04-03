@@ -56,7 +56,7 @@ function log_audit(mysqli $db, int $user_id, string $level, string $category, st
 function get_limits(mysqli $db, int $user_id): array {
   $hasPkg = has_column($db, 'users', 'limitpaket');
   $hasImg = has_column($db, 'users', 'limitgambar');
-  $defaults = ['limitpaket' => 300, 'limitgambar' => 5];
+  $defaults = ['limitpaket' => 300, 'limitgambar' => 0];
   if (!$hasPkg && !$hasImg) return $defaults;
   $fields = [];
   if ($hasPkg) $fields[] = 'limitpaket';

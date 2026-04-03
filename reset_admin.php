@@ -68,7 +68,7 @@ if ($method === 'POST' && $tokenValidated) {
     } else {
       $role = 'admin';
       $lp = 300;
-      $lg = 5;
+      $lg = 0;
       $stmt = $mysqli->prepare('INSERT INTO users (username, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?)');
       if ($stmt) {
         $stmt->bind_param('sssii', $u, $hash, $role, $lp, $lg);

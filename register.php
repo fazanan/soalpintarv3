@@ -17,8 +17,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($row=$res->fetch_assoc()) $init = (int)$row['v'];
     $res && $res->close();
     $hash = password_hash($p, PASSWORD_BCRYPT);
-    $stmt = $mysqli->prepare('INSERT INTO users (username, password, limitpaket) VALUES (?, ?, ?)');
-    $stmt->bind_param('ssi', $u, $hash, $init);
+    $limitGambar = 0;
+    $stmt = $mysqli->prepare('INSERT INTO users (username, password, limitpaket, limitgambar) VALUES (?, ?, ?, ?)');
+    $stmt->bind_param('ssii', $u, $hash, $init, $limitGambar);
     if ($stmt->execute()) {
       $msg = 'Pendaftaran berhasil, silakan login';
     } else {

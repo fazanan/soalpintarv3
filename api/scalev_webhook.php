@@ -222,7 +222,7 @@ if (!$exists) {
   }
   $hash = password_hash('GuruPintar123!', PASSWORD_BCRYPT);
   $role = 'user';
-  $limitGambar = 5;
+  $limitGambar = 0;
   $noHp = extract_customer_phone($data);
   $hasNoHp = column_exists($mysqli, 'users', 'no_hp');
   $stmt = $hasNoHp

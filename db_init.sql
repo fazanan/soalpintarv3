@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
   access_quiz TINYINT(1) NOT NULL DEFAULT 1,
   access_rekap_nilai TINYINT(1) NOT NULL DEFAULT 1,
   limitpaket INT NOT NULL DEFAULT 300,
-  limitgambar INT NOT NULL DEFAULT 5,
+  limitgambar INT NOT NULL DEFAULT 0,
   token_input BIGINT UNSIGNED NOT NULL DEFAULT 0,
   token_output BIGINT UNSIGNED NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -212,5 +212,5 @@ ON DUPLICATE KEY UPDATE cost=VALUES(cost);
 -- Password: password  (disarankan langsung ganti)
 -- =========================
 INSERT INTO users (username, password, role, limitpaket, limitgambar)
-VALUES ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/5J7FBcgv6Y5Cy', 'admin', 300, 5)
+VALUES ('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/5J7FBcgv6Y5Cy', 'admin', 300, 0)
 ON DUPLICATE KEY UPDATE role='admin';
