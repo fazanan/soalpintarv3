@@ -478,6 +478,7 @@ if (!isset($_SESSION['user_id'])) {
           jenjang: "", fase: "", kelas: "", mapel: "",
           judulModul: "", jumlahPertemuan: "2",
           durasi: "50", jumlahSiswa: "30",
+          pendekatan: "Standar",
           modelPembelajaran: "Project Based Learning (PjBL)",
           supervisi: false,
           dimensi: [], hasil: "", isGenerating: false,
@@ -3176,6 +3177,10 @@ if (!isset($_SESSION['user_id'])) {
         const hasilAda  = !!M.hasil;
         const tab = state.modulAjarTab || (hasilAda ? 'modul' : 'informasi');
         const maErr = state.modulAjarError;
+        const pendekatanOpts = ['Standar','Deep Learning','Berbasis Cinta (KBC)','Deep Learning + KBC'];
+        if (M.pendekatan && !pendekatanOpts.includes(M.pendekatan)) pendekatanOpts.unshift(M.pendekatan);
+        const kurikulumOpts = ['Kurikulum Merdeka','Kurikulum 2013 (K13)'];
+        if (M.kurikulum && !kurikulumOpts.includes(M.kurikulum)) kurikulumOpts.unshift(M.kurikulum);
 
         const mkSel = (lbl, key, val, opts) => `
           <div class="flex flex-col gap-2">
@@ -3275,7 +3280,7 @@ if (!isset($_SESSION['user_id'])) {
                 ${mkInp('Nama Institusi','institusi',M.institusi,'Contoh: SDN 1 Cilodong')}
               </div>
               <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                ${mkSel('Kurikulum','kurikulum',M.kurikulum,['Kurikulum Merdeka','Kurikulum Berbasis Cinta'])}
+                ${mkSel('Kurikulum','kurikulum',M.kurikulum,kurikulumOpts)}
                 ${mkSel('Jenjang','jenjang',M.jenjang,['SD/MI','SMP/MTs','SMA/MA','SMK','PAUD'])}
                 ${mkSel('Fase','fase',M.fase,faseOpts)}
               </div>
@@ -3326,6 +3331,7 @@ if (!isset($_SESSION['user_id'])) {
                 ${mkInp('Jumlah Peserta Didik','jumlahSiswa',M.jumlahSiswa,'Contoh: 30')}
               </div>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                ${mkSel('Pendekatan Pembelajaran','pendekatan',M.pendekatan,pendekatanOpts)}
                 ${mkSel('Model Pembelajaran','modelPembelajaran',M.modelPembelajaran,MA_MODEL)}
               </div>
               <div>
@@ -3974,7 +3980,8 @@ if (!isset($_SESSION['user_id'])) {
         state.modulAjar.hasil = '';
         render();
 
-        const sys = `Anda adalah pakar desainer kurikulum Indonesia yang ahli dalam Kurikulum Merdeka 2025 dan Pembelajaran Mendalam (Deep Learning). Buat Modul Ajar lengkap mengikuti format resmi Kemendikbudristek. Tulis dalam Bahasa Indonesia baku dan formal. Hasilkan konten LENGKAP, DETAIL, SIAP PAKAI — tidak boleh ada placeholder. Rubrik wajib skala 1–4.`;
+        const isKBC = String(M.kurikulum || '').toLowerCase().includes('berbasis cinta');
+        const sys = `Anda adalah pakar desainer kurikulum Indonesia yang ahli dalam Kurikulum Merdeka 2025 dan Pembelajaran Mendalam (Deep Learning).${isKBC ? ' Anda juga memahami Kurikulum Berbasis Cinta (KBC) dan mampu mengintegrasikan unsur KBC secara nyata ke dalam modul ajar.' : ''} Buat Modul Ajar lengkap mengikuti format resmi Kemendikbudristek. Tulis dalam Bahasa Indonesia baku dan formal. Hasilkan konten LENGKAP, DETAIL, SIAP PAKAI — tidak boleh ada placeholder. Rubrik wajib skala 1–4.`;
 
         const usr = `Buatkan Modul Ajar LENGKAP dengan data berikut:
 
@@ -4003,6 +4010,10 @@ Hasilkan Modul Ajar dengan SEMUA bagian berikut secara LENGKAP dan DETAIL:
 
 ## A. INFORMASI UMUM
 Tabel 2 kolom (Komponen | Keterangan): Nama Penyusun, Institusi, Tahun, Jenjang, Kelas, Fase, Alokasi Waktu, Kompetensi Awal (2-3 kalimat), Dimensi Profil Lulusan (tiap dimensi 1-2 kalimat kontekstual), Sarana dan Prasarana, Target Peserta Didik, Model Pembelajaran.
+${isKBC ? `
+Tambahkan komponen khusus KBC:
+- "Unsur KBC" (jelaskan singkat 4–6 nilai/unsur yang dipakai pada modul ini, misalnya: cinta kepada Tuhan YME, cinta diri, cinta sesama, cinta lingkungan, cinta bangsa; sesuaikan dengan materi dan konteks kelas).
+- "Implementasi KBC" (2–4 poin praktik nyata yang terlihat di kegiatan pembelajaran, asesmen, dan refleksi).` : ``}
 ${M.supervisi ? `
 ### Capaian Pembelajaran (CP)
 Buat tabel: Elemen | Capaian Pembelajaran (ringkas, sesuai jenjang/fase). Minimal 3 elemen. Pastikan CP relevan dengan materi "${M.judulModul}".` : ``}
@@ -4031,6 +4042,8 @@ c. Sumatif (Akhir) — produk/instrumen penilaian
 ### 5. Kegiatan Pembelajaran
 Untuk SETIAP pertemuan buat tabel: Kegiatan | Deskripsi | Alokasi Waktu
 Struktur: Pendahuluan (~15%) dengan Mindful Learning, Inti (~70%) dengan fase ${M.modelPembelajaran}, Penutup (~15%).
+${isKBC ? `
+Khusus KBC: Pada SETIAP pertemuan, sisipkan minimal 1 aktivitas/strategi yang mencerminkan unsur KBC (misalnya: afirmasi/niat belajar, praktik empati, gotong royong, kepedulian lingkungan, etika komunikasi, refleksi rasa syukur). Pastikan tertulis eksplisit di deskripsi kegiatan.` : ``}
 
 ### 6. Refleksi
 2–3 pertanyaan refleksi untuk Peserta Didik dan 2–3 untuk Pendidik.
@@ -4145,6 +4158,8 @@ PENTING:
             const lines = src.split('\n');
             const out = [];
             let tblRows=[], inTbl=false;
+            let lastWasPB = false;
+            let lastWasBlank = false;
 
             const flushTbl = () => {
               if (!tblRows.length) return;
@@ -4171,7 +4186,11 @@ PENTING:
             for (let i=0;i<lines.length;i++) {
               const line=lines[i];
               if (String(line || '').trim() === '[[PAGE_BREAK]]') {
+                if (inTbl) flushTbl();
+                if (out.length === 0 || lastWasPB) continue;
                 out.push(new Paragraph({ children: [new PageBreak()] }));
+                lastWasPB = true;
+                lastWasBlank = false;
                 continue;
               }
               if (line.match(/^\|[-|: ]+\|?$/)) continue;
@@ -4181,7 +4200,14 @@ PENTING:
                 continue;
               }
               if (inTbl) flushTbl();
-              if (!line.trim()) { out.push(new Paragraph({...sp()})); continue; }
+              if (!line.trim()) {
+                if (out.length === 0 || lastWasBlank || lastWasPB) continue;
+                out.push(new Paragraph({...sp(40,40)}));
+                lastWasBlank = true;
+                continue;
+              }
+              lastWasPB = false;
+              lastWasBlank = false;
               if (/^####\s*/.test(line)) {
                 out.push(new Paragraph({keepNext:true,keepLines:true,...sp(140,60),children:[new TextRun({text:line.replace(/^####\s*/,''),font:FONT,size:24,bold:true})]}));
               } else if (/^###\s*/.test(line)) {
@@ -4274,7 +4300,7 @@ PENTING:
               children:[new TextRun({text:`MODUL AJAR ${(M.mapel||'').toUpperCase()}`,font:FONT,size:32,bold:true})]}),
             new Paragraph({alignment:AlignmentType.CENTER,...sp(0,260),
               children:[new TextRun({text:`"${M.judulModul||''}"`,font:FONT,size:26,italics:true})]}),
-            ...parseContent(maInsertPageBreakMarkers(maStripCLampiranHeading(preLKPD || ''))),
+            ...parseContent(maStripCLampiranHeading(preLKPD || '')),
             ...(lkpdTable ? [
               new Paragraph({ children: [new PageBreak()] }),
               new Paragraph({ ...sp(200, 80), children: [new TextRun({ text: 'C. LAMPIRAN', font: FONT, size: 26, bold: true })] }),
@@ -4283,7 +4309,7 @@ PENTING:
               new Paragraph({ ...sp(120, 60) }),
               new Paragraph({ children: [new PageBreak()] }),
             ] : []),
-            ...parseContent(maInsertPageBreakMarkers(maStripCLampiranHeading(postLKPD || '')))
+            ...parseContent(maStripCLampiranHeading(postLKPD || ''))
           ];
 
           const doc2 = new Document({
@@ -4317,6 +4343,17 @@ PENTING:
       // ═══════════════════════════════════════════════
       //  END MODUL AJAR
       // ═══════════════════════════════════════════════
+
+      function stripRppDuplicateInfo(raw) {
+        let txt = String(raw || '');
+        txt = txt.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const label = '(Sekolah|Satuan\\s*Pendidikan|Kelas\\s*\\/\\s*Semester|Kelas|Semester|Mata\\s*Pelajaran|Mapel|Materi|Materi\\s*Pokok|Topik|Alokasi\\s*Waktu|Waktu|Nama\\s*Guru|Guru|Tahun\\s*Pelajaran|Tahun)';
+        const oneMetaLine = String.raw`(?:\s*(?:[-*•]\s*)?(?:\d+[\.\)]\s*)?(?:\*\*)?${label}(?:\*\*)?\s*[:：]\s*[^\n]*\n)`;
+        const headingLine = String.raw`(?:\s*(?:#{1,6}\s*)?(?:RPP\b[^\n]*|Rencana\s+Pelaksanaan\s+Pembelajaran[^\n]*)\n)`;
+        const blockRe = new RegExp(String.raw`(?:^|\n)${headingLine}(?:(?:\s*\n)*)(${oneMetaLine}){2,}(?:\s*\n)*`, 'gi');
+        txt = txt.replace(blockRe, '\n');
+        return txt;
+      }
 
       const renderRPP = () => {
         const R = state.rpp || {};
@@ -4356,7 +4393,7 @@ PENTING:
               </tbody>
             </table>
           `;
-          const body = maMarkdownToHtml(String(R.hasil || ''));
+          const body = maMarkdownToHtml(stripRppDuplicateInfo(String(R.hasil || '')));
           return `
             <div class="text-center">
               <div class="font-bold text-[20px] tracking-wide">${safeText(title)}</div>
@@ -4396,8 +4433,8 @@ PENTING:
         const pendekatanOpts = [
           { v: 'Standar', l: 'Standar' },
           { v: 'Deep Learning', l: 'Deep Learning' },
-          { v: 'Kurikulum Cinta', l: 'Kurikulum Cinta' },
-          { v: 'Deep Learning + Cinta', l: 'Deep Learning + Cinta' },
+          { v: 'Berbasis Cinta (KBC)', l: 'Berbasis Cinta (KBC)' },
+          { v: 'Deep Learning + KBC', l: 'Deep Learning + KBC' },
         ];
         const kurikulumOpts = [
           { v: 'Merdeka', l: 'Kurikulum Merdeka' },
@@ -4554,8 +4591,17 @@ PENTING:
         const pendekatan = String(R.pendekatan || '').trim();
         const format = String(R.format || '').trim();
         const alokasi = String(R.alokasi_waktu || '').trim();
-        if (!jenjang || !kelas || !mapel || !materi || !kurikulum || !pendekatan || !format || !alokasi) {
-          showErr('Harap lengkapi field wajib sebelum generate.');
+        const missing = [];
+        if (!jenjang) missing.push('Jenjang');
+        if (!kelas) missing.push('Kelas');
+        if (!mapel) missing.push('Mata Pelajaran');
+        if (!materi) missing.push('Materi / Topik');
+        if (!kurikulum) missing.push('Kurikulum');
+        if (!pendekatan) missing.push('Pendekatan');
+        if (!format) missing.push('Format');
+        if (!alokasi) missing.push('Alokasi Waktu');
+        if (missing.length) {
+          showErr(`Harap lengkapi field wajib: ${missing.join(', ')}.`);
           return;
         }
         hideErr();
@@ -4564,7 +4610,7 @@ PENTING:
         state.rpp.hasil = '';
         render();
 
-        const sys = `Kamu adalah asisten profesional pembuat RPP (Rencana Pelaksanaan Pembelajaran) untuk guru di Indonesia. Buat RPP sesuai pilihan kurikulum dan pendekatan. Output harus formal, rapi, dan siap digunakan untuk supervisi sekolah. Gunakan Bahasa Indonesia baku, jelas, dan profesional. Tujuan pembelajaran berorientasi HOTS (utamakan C4–C6) dan kontekstual. Jangan generik. Hindari output yang terkesan AI. Output HARUS langsung berupa RPP tanpa penjelasan tambahan.`;
+        const sys = `Kamu adalah asisten profesional pembuat RPP (Rencana Pelaksanaan Pembelajaran) untuk guru di Indonesia. Buat RPP sesuai pilihan kurikulum dan pendekatan. Output harus formal, rapi, dan siap digunakan untuk supervisi sekolah. Gunakan Bahasa Indonesia baku, jelas, dan profesional. Tujuan pembelajaran berorientasi HOTS (utamakan C4–C6) dan kontekstual. Jangan generik. Hindari output yang terkesan AI. Output HARUS langsung berupa RPP tanpa penjelasan tambahan. Jangan mengulang bagian identitas/metadata (Sekolah, Kelas/Semester, Mata Pelajaran, Materi, Alokasi Waktu, Nama Guru) karena identitas sudah ditampilkan terpisah.`;
 
         const extra = [];
         const cp = String(R.cp_tp_kd || '').trim();
@@ -4575,9 +4621,9 @@ PENTING:
           : 'Format 1 lembar (ringkas, padat, siap supervisi).';
         const pendekatanInstr = pendekatan === 'Deep Learning'
           ? 'Pendekatan Deep Learning: wajib ada eksplorasi, analisis, refleksi.'
-          : pendekatan === 'Kurikulum Cinta'
-            ? 'Kurikulum Cinta: integrasikan nilai religius, toleransi, dan karakter secara halus.'
-            : pendekatan === 'Deep Learning + Cinta'
+          : pendekatan === 'Berbasis Cinta (KBC)'
+            ? 'Berbasis Cinta (KBC): integrasikan nilai religius, toleransi, dan karakter secara halus.'
+            : pendekatan === 'Deep Learning + KBC'
               ? 'Gabungan: seimbangkan eksplorasi/analisis/refleksi dengan nilai religius/karakter.'
               : 'Pendekatan standar: kegiatan logis dan terukur.';
 
@@ -4585,7 +4631,7 @@ PENTING:
           ? 'Gunakan sintaks: Apersepsi, Eksplorasi, Elaborasi, Konfirmasi, Refleksi.'
           : 'Gunakan struktur: Tujuan Pembelajaran, Materi, Kegiatan (Pendahuluan–Inti–Penutup), Asesmen (diagnostik/formatif/sumatif), Penilaian (sikap/pengetahuan/keterampilan).';
 
-        const usr = `Buatkan RPP dengan detail berikut:\n\nJenjang: ${jenjang}\nKelas: ${kelas}\nMata Pelajaran: ${mapel}\nMateri: ${materi}\nKurikulum: ${kurLabel}\nPendekatan: ${pendekatan}\nFormat: ${format}\nAlokasi Waktu: ${alokasi}\nNama Sekolah: ${String(R.nama_sekolah || '').trim()}\nNama Guru: ${String(R.nama_guru || '').trim()}\n\nKetentuan:\n- ${formatInstr}\n- ${pendekatanInstr}\n- ${sintaks}\n- Sertakan penilaian autentik: sikap, pengetahuan, keterampilan.\n- Output harus rapi (gunakan heading dan tabel bila perlu).\n${extra.length ? '\n' + extra.join('\n\n') : ''}\n\nOutput HARUS langsung berupa RPP.`;
+        const usr = `Buatkan RPP dengan detail berikut:\n\nJenjang: ${jenjang}\nKelas: ${kelas}\nMata Pelajaran: ${mapel}\nMateri: ${materi}\nKurikulum: ${kurLabel}\nPendekatan: ${pendekatan}\nFormat: ${format}\nAlokasi Waktu: ${alokasi}\nNama Sekolah: ${String(R.nama_sekolah || '').trim()}\nNama Guru: ${String(R.nama_guru || '').trim()}\n\nKetentuan:\n- ${formatInstr}\n- ${pendekatanInstr}\n- ${sintaks}\n- Sertakan penilaian autentik: sikap, pengetahuan, keterampilan.\n- Output harus rapi (gunakan heading dan tabel bila perlu).\n- PENTING: Jangan tulis ulang judul dan identitas/metadata seperti:\n  Sekolah:, Kelas/Semester:, Mata Pelajaran:, Materi:, Alokasi Waktu:, Nama Guru:.\n  Mulai langsung dari isi RPP (mis. Tujuan Pembelajaran / Komponen Inti / Kegiatan Pembelajaran).\n${extra.length ? '\n' + extra.join('\n\n') : ''}\n\nOutput HARUS langsung berupa RPP.`;
 
         try {
           const ctrl = new AbortController();
@@ -4757,7 +4803,7 @@ PENTING:
           });
 
           let bodyText = String(R.hasil || '');
-          bodyText = bodyText.replace(/^\s*#{1,3}\s*RPP\b[^\n]*\n?/i, '');
+          bodyText = stripRppDuplicateInfo(bodyText);
           bodyText = bodyText.trim();
 
           const children = [
