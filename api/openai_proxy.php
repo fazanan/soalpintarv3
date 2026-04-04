@@ -293,6 +293,7 @@ if ($type === 'chat') {
 }
 if ($type === 'modul_ajar') {
   // Full messages array, returns plain text (markdown), no JSON mode
+  @set_time_limit(0);
   $messages = $data['messages'] ?? [];
   $model    = (string)($data['model'] ?? 'gpt-4o-mini');
   if (empty($messages)) {
@@ -309,7 +310,7 @@ if ($type === 'modul_ajar') {
     'model'       => $model,
     'messages'    => $messages,
     'temperature' => 0.7,
-    'max_tokens'  => 4000,
+    'max_tokens'  => 12000,
   ], JSON_UNESCAPED_UNICODE);
   $ch = curl_init($url);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -319,7 +320,7 @@ if ($type === 'modul_ajar') {
   ]);
   curl_setopt($ch, CURLOPT_POST, true);
   curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-  curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+  curl_setopt($ch, CURLOPT_TIMEOUT, 240);
   $result = curl_exec($ch);
   $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
   $err    = curl_error($ch);

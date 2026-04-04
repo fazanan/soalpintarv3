@@ -3412,7 +3412,7 @@ if (!isset($_SESSION['user_id'])) {
             </div>
             <div class="text-center">
               <div class="font-bold text-lg">Menyusun Modul Ajar...</div>
-              <div class="text-sm text-text-sub-light mt-1">AI sedang membuat modul lengkap, tunggu 15–45 detik</div>
+              <div class="text-sm text-text-sub-light mt-1">AI sedang membuat modul lengkap. Semakin banyak JP/pertemuan dan semakin detail tabel, waktu proses akan semakin lama.</div>
             </div>
             <div class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 max-w-md w-full">
               <div class="flex items-start gap-3 p-4">
@@ -3684,9 +3684,229 @@ if (!isset($_SESSION['user_id'])) {
           s = s.replace(/\n{3,}/g, '\n\n');
           return s;
         };
+        const normalizeIdentifikasiKesiapan = (text) => {
+          const lines = String(text || '').split('\n');
+          const isHeading = (line) => /^(?:#{1,6}\s*)?IDENTIFIKASI\s+KESIAPAN\s+PESERTA\s+DIDIK\b/i.test(String(line || '').trim());
+          const isNextSection = (line) => /^(?:#{1,6}\s*)?(?:[ABC]\.\s*|##\s+|###\s+|#\s+)/.test(String(line || '').trim());
+          let start = -1;
+          for (let i = 0; i < lines.length; i++) {
+            if (isHeading(lines[i])) { start = i; break; }
+          }
+          if (start === -1) return text;
+          let end = lines.length;
+          for (let i = start + 1; i < lines.length; i++) {
+            const t = String(lines[i] || '').trim();
+            if (!t) continue;
+            if (isHeading(lines[i])) continue;
+            if (isNextSection(lines[i])) { end = i; break; }
+          }
+          const headingLine = String(lines[start] || '').trim();
+          const blockText = lines.slice(start + 1, end).join(' ');
+          let s = String(blockText || '');
+          s = s.replace(/\uF0B7/g, '•');
+          s = s.replace(/ï‚·/g, '•');
+          s = s.replace(/[●○◦∙·▪•]/g, '•');
+          s = s.replace(/\s+/g, ' ').trim();
+          const labelRe = /(Pengetahuan\s*Awal|Minat|Latar\s*Belakang|Kebutuhan\s*Belajar|Visual|Auditori|Kinestetik)\s*[:：]\s*/gi;
+          const hits = [];
+          let m;
+          while ((m = labelRe.exec(s)) !== null) {
+            hits.push({ key: m[1].replace(/\s+/g, ' ').trim(), idx: m.index, end: labelRe.lastIndex });
+            if (hits.length > 30) break;
+          }
+          if (hits.length === 0) return text;
+          const values = {};
+          for (let i = 0; i < hits.length; i++) {
+            const cur = hits[i];
+            const next = hits[i + 1];
+            const v = s.slice(cur.end, next ? next.idx : s.length).trim();
+            values[cur.key.toLowerCase()] = v.replace(/^(?:[-*•]\s*)/,'').trim();
+          }
+          const outLines = [];
+          const get = (k) => String(values[String(k).toLowerCase()] || '').trim();
+          const vPen = get('pengetahuan awal');
+          const vMinat = get('minat');
+          const vLB = get('latar belakang');
+          const vKB = get('kebutuhan belajar');
+          const vVis = get('visual');
+          const vAud = get('auditori');
+          const vKin = get('kinestetik');
+          if (vPen) outLines.push(`- Pengetahuan Awal: ${vPen}`);
+          if (vMinat) outLines.push(`- Minat: ${vMinat}`);
+          if (vLB) outLines.push(`- Latar Belakang: ${vLB}`);
+          if (vKB || vVis || vAud || vKin) {
+            outLines.push(`- Kebutuhan Belajar${vKB && !(vVis || vAud || vKin) ? `: ${vKB}` : ':'}`);
+            if (vVis) outLines.push(`  - Visual: ${vVis}`);
+            if (vAud) outLines.push(`  - Auditori: ${vAud}`);
+            if (vKin) outLines.push(`  - Kinestetik: ${vKin}`);
+          }
+          if (outLines.length === 0) return text;
+          const rebuilt = [headingLine, ...outLines, ''];
+          const before = lines.slice(0, start);
+          const after = lines.slice(end);
+          return [...before, ...rebuilt, ...after].join('\n').replace(/\n{3,}/g, '\n\n');
+        };
+        const normalizeKegiatanPertemuanTables = (text) => {
+          const lines = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+          const isPertemuan = (line) => /^\s*(?:#{1,6}\s*)?Pertemuan\s+\d+\b/i.test(String(line || '').trim());
+          const parsePertemuanHeader = (line) => {
+            const t = String(line || '').trim();
+            const m = t.match(/Pertemuan\s+(\d+)\s*(?:\((\d+)\s*menit\))?/i);
+            return { no: m ? Number(m[1]) : null, total: m && m[2] ? Number(m[2]) : null };
+          };
+          const isBoundary = (line) => {
+            const t = String(line || '').trim();
+            if (!t) return false;
+            if (isPertemuan(t)) return false;
+            if (/^(?:#{1,6}\s*)?Pertemuan\s+\d+\b/i.test(t)) return false;
+            if (/^(?:#{1,6}\s*)?IDENTIFIKASI\s+KESIAPAN\s+PESERTA\s+DIDIK\b/i.test(t)) return true;
+            if (/^(?:#{1,6}\s*)?(?:##\s+|###\s+|#\s+|[ABC]\.\s+)/.test(t)) return true;
+            return false;
+          };
+          const stageRe = /^\s*(?:[-•]\s*)?(Pendahuluan|Kegiatan\s+Inti|Penutup)\s*\((\d+)\s*menit\)\s*$/i;
+          const itemRe = /^\s*[-•]\s+(.+?)\s*$/;
+          const mmjTagRe = /\[(Mindful|Meaningful|Joyful)\]/gi;
+          const esc = (s) => String(s || '').replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim();
+
+          const out = [];
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (!isPertemuan(line)) {
+              out.push(line);
+              continue;
+            }
+            const hdr = parsePertemuanHeader(line);
+            let j = i + 1;
+            while (j < lines.length && !isPertemuan(lines[j]) && !isBoundary(lines[j])) j++;
+            const block = lines.slice(i + 1, j);
+            if (block.some((l) => /^\s*\|\s*Tahap\s*\|\s*Komponen\s*\|/i.test(String(l || '').trim()))) {
+              out.push(line);
+              out.push(...block);
+              i = j - 1;
+              continue;
+            }
+
+            const stages = [
+              { name: 'Pendahuluan', total: null, items: [] },
+              { name: 'Kegiatan Inti', total: null, items: [] },
+              { name: 'Penutup', total: null, items: [] },
+            ];
+            const stageIdx = (n) => {
+              const key = String(n || '').toLowerCase().replace(/\s+/g, ' ').trim();
+              if (key === 'pendahuluan') return 0;
+              if (key === 'kegiatan inti') return 1;
+              if (key === 'penutup') return 2;
+              return -1;
+            };
+            let curStage = -1;
+            for (let k = 0; k < block.length; k++) {
+              const raw = String(block[k] || '');
+              const t = raw.trim();
+              if (!t) continue;
+              const sm = t.match(stageRe);
+              if (sm) {
+                curStage = stageIdx(sm[1]);
+                if (curStage >= 0) stages[curStage].total = Number(sm[2]);
+                continue;
+              }
+              const im = raw.match(itemRe);
+              if (!im) continue;
+              const content = String(im[1] || '').trim();
+              const compSplit = content.split(':');
+              let komponen = '';
+              let detail = '';
+              if (compSplit.length >= 2) {
+                komponen = compSplit.shift().trim();
+                detail = compSplit.join(':').trim();
+              } else {
+                komponen = content.length > 40 ? content.slice(0, 40).trim() : content;
+                detail = content;
+              }
+              let dur = null;
+              const dm = detail.match(/\((\d+)\s*menit\)/i);
+              if (dm) {
+                dur = Number(dm[1]);
+                detail = detail.replace(dm[0], '').trim();
+              }
+              const tags = [];
+              let m;
+              while ((m = mmjTagRe.exec(detail)) !== null) {
+                const v = String(m[1] || '').trim();
+                if (v && !tags.includes(v)) tags.push(v);
+              }
+              detail = detail.replace(mmjTagRe, '').replace(/\s+/g, ' ').trim();
+              const catatan = tags.length ? tags.join(' / ') : '';
+              if (curStage === -1) curStage = 1;
+              stages[curStage].items.push({ komponen, detail, dur, catatan });
+            }
+
+            const knownStageTotals = stages.map(s => (typeof s.total === 'number' && !Number.isNaN(s.total) ? s.total : null));
+            let pertemuanTotal = hdr.total;
+            if (pertemuanTotal == null) {
+              const sumKnown = knownStageTotals.filter(v => v != null).reduce((a, b) => a + b, 0);
+              if (sumKnown > 0) pertemuanTotal = sumKnown;
+            }
+            if (pertemuanTotal != null) {
+              const missingIdx = stages.map((s, idx) => (s.total == null ? idx : -1)).filter(v => v !== -1);
+              const sumKnown = knownStageTotals.filter(v => v != null).reduce((a, b) => a + b, 0);
+              const remain = pertemuanTotal - sumKnown;
+              if (missingIdx.length === 1 && remain > 0) stages[missingIdx[0]].total = remain;
+              if (missingIdx.length > 1 && remain > 0) {
+                const base = Math.floor(remain / missingIdx.length);
+                let rem = remain - base * missingIdx.length;
+                missingIdx.forEach((idx) => {
+                  stages[idx].total = base + (rem > 0 ? 1 : 0);
+                  rem = Math.max(0, rem - 1);
+                });
+              }
+            }
+
+            stages.forEach((s) => {
+              const items = s.items;
+              if (!items.length) return;
+              const total = typeof s.total === 'number' && !Number.isNaN(s.total) ? s.total : null;
+              const sumKnown = items.filter(it => typeof it.dur === 'number').reduce((a, it) => a + it.dur, 0);
+              const missing = items.filter(it => it.dur == null);
+              if (missing.length) {
+                const target = total != null ? Math.max(0, total - sumKnown) : missing.length;
+                const base = Math.floor(target / missing.length);
+                let rem = target - base * missing.length;
+                missing.forEach((it) => {
+                  it.dur = base + (rem > 0 ? 1 : 0);
+                  rem = Math.max(0, rem - 1);
+                });
+              } else if (total != null && sumKnown !== total) {
+                const diff = total - sumKnown;
+                items[items.length - 1].dur = Math.max(0, items[items.length - 1].dur + diff);
+              }
+            });
+
+            const finalTotal = pertemuanTotal != null
+              ? pertemuanTotal
+              : stages.flatMap(s => s.items).reduce((a, it) => a + (Number(it.dur) || 0), 0);
+
+            const heading = `#### Pertemuan ${hdr.no || ''}${finalTotal ? ` (${finalTotal} menit)` : ''}`.trim();
+            const tableLines = [
+              '| Tahap | Komponen | Kegiatan (sangat detail) | Durasi (menit) | Catatan |',
+              '| --- | --- | --- | ---: | --- |',
+            ];
+            stages.forEach((s) => {
+              s.items.forEach((it) => {
+                tableLines.push(`| ${esc(s.name)} | ${esc(it.komponen)} | ${esc(it.detail)} | ${Number(it.dur) || 0} | ${esc(it.catatan)} |`);
+              });
+            });
+            out.push(heading);
+            out.push(...tableLines);
+            out.push('');
+            i = j - 1;
+          }
+          return out.join('\n').replace(/\n{3,}/g, '\n\n');
+        };
         let contentText = cleanRaw(M?.hasil || '');
         contentText = contentText.replace(/^\s*#{1,3}\s*MODUL AJAR[^\n]*\n?/i, '');
         contentText = contentText.replace(/^\s*#{1,3}\s*["“][^\n"”]+["”]\s*\n?/i, '');
+        contentText = normalizeIdentifikasiKesiapan(contentText);
+        contentText = normalizeKegiatanPertemuanTables(contentText);
         return contentText.trim();
       }
       function maInsertPageBreakMarkers(text) {
@@ -3945,6 +4165,7 @@ if (!isset($_SESSION['user_id'])) {
 
       async function buildModulAjar() {
         const M = state.modulAjar || {};
+        const baselineModulAjar = String(M.hasil || '');
         const req = [M.namaGuru,M.institusi,M.jenjang,M.mapel,M.judulModul,M.jumlahPertemuan,M.durasi,M.modelPembelajaran];
         const errEl = () => document.getElementById('maError');
         const showErr = (msg) => { const e=errEl(); if(e){e.textContent='⚠️ '+msg; e.classList.remove('hidden');} };
@@ -3980,16 +4201,155 @@ if (!isset($_SESSION['user_id'])) {
         state.modulAjar.hasil = '';
         render();
 
-        const isKBC = String(M.kurikulum || '').toLowerCase().includes('berbasis cinta');
-        const sys = `Anda adalah pakar desainer kurikulum Indonesia yang ahli dalam Kurikulum Merdeka 2025 dan Pembelajaran Mendalam (Deep Learning).${isKBC ? ' Anda juga memahami Kurikulum Berbasis Cinta (KBC) dan mampu mengintegrasikan unsur KBC secara nyata ke dalam modul ajar.' : ''} Buat Modul Ajar lengkap mengikuti format resmi Kemendikbudristek. Tulis dalam Bahasa Indonesia baku dan formal. Hasilkan konten LENGKAP, DETAIL, SIAP PAKAI — tidak boleh ada placeholder. Rubrik wajib skala 1–4.`;
+        const kurikulumLabel = String(M.kurikulum || 'Kurikulum Merdeka').trim();
+        const pendekatanLabel = String(M.pendekatan || 'Standar').trim() || 'Standar';
+        const isK13 = /2013|k13/i.test(kurikulumLabel);
+        const isDL = /deep\s*learning/i.test(pendekatanLabel);
+        const isKBC = /\bKBC\b/i.test(pendekatanLabel) || /berbasis cinta/i.test(pendekatanLabel);
+        const isDandK = isDL && isKBC;
 
-        const usr = `Buatkan Modul Ajar LENGKAP dengan data berikut:
+        const noKbcCleanupRule = !isKBC
+          ? `CATATAN PENTING (TANPA KBC):
+- Jangan menambahkan bagian/istilah KBC sama sekali.
+- Jika pada dokumen baseline masih ada "Unsur KBC", "Implementasi KBC", atau aktivitas KBC di kegiatan pembelajaran/refleksi/asesmen, hapus bagian tersebut sepenuhnya.`
+          : ``;
+
+        const approachRules = isDandK
+          ? `ARAH PENDEKATAN (DEEP LEARNING + KBC):
+- Di SETIAP pertemuan wajib ada urutan eksplisit: Eksplorasi → Analisis → Refleksi.
+- Di SETIAP pertemuan wajib ada elemen Mindful, Meaningful, Joyful (tulis eksplisit di kegiatan pembelajaran).
+- Di SETIAP pertemuan sisipkan minimal 1 aktivitas KBC yang konkret dan tertulis jelas (etika komunikasi/empati/gotong royong/kepedulian lingkungan/refleksi syukur/niat belajar).
+- Pertanyaan pemantik: open-ended dan mengandung dimensi nilai tanpa menggurui.
+- Asesmen: rubrik gabungan (kognitif + proses + karakter/KBC), skala 1–4, indikator dapat diamati.`
+          : isDL
+            ? `ARAH PENDEKATAN (DEEP LEARNING):
+- Di SETIAP pertemuan wajib ada urutan eksplisit: Eksplorasi → Analisis → Refleksi.
+- Di SETIAP pertemuan wajib ada elemen Mindful, Meaningful, Joyful (tulis eksplisit di kegiatan pembelajaran).
+- Pertanyaan pemantik: open-ended, menuntut alasan (mengapa/bagaimana) dan konteks nyata.
+- Asesmen: menilai proses berpikir (bukti analisis/justifikasi), rubrik analitis skala 1–4.
+${noKbcCleanupRule}`
+            : isKBC
+              ? `ARAH PENDEKATAN (KBC):
+- Tambahkan "Unsur KBC" dan "Implementasi KBC" secara eksplisit dan kontekstual.
+- Di SETIAP pertemuan sisipkan minimal 1 aktivitas KBC yang konkret dan tertulis jelas.
+- Asesmen: tambah observasi sikap/kolaborasi + refleksi nilai (tetap skala 1–4, indikator dapat diamati).
+- Hindari bahasa menggurui; tetap formal namun hangat.`
+              : `ARAH PENDEKATAN (STANDAR):
+- Kegiatan pembelajaran instruksional, terstruktur, dan terukur (contoh → latihan terbimbing → latihan mandiri).
+- Asesmen ringkas namun jelas (diagnostik/formatif/sumatif) dan rubrik skala 1–4 yang mudah dipakai.
+${noKbcCleanupRule}`;
+
+        const sys = String(baselineModulAjar || '').trim()
+          ? `Anda adalah editor kurikulum Indonesia. Tugas Anda adalah merevisi dokumen Modul Ajar yang sudah ada agar selaras dengan kurikulum dan pendekatan yang diminta, tanpa mengurangi kelengkapan dan tanpa mengubah struktur utama. Gunakan Bahasa Indonesia baku dan formal.`
+          : `Anda adalah pakar desainer kurikulum Indonesia. Buat Modul Ajar lengkap sesuai kurikulum dan pendekatan yang diminta. Gunakan Bahasa Indonesia baku dan formal. Hasilkan konten LENGKAP, DETAIL, SIAP PAKAI — tidak boleh ada placeholder. Rubrik wajib skala 1–4.`;
+
+        const modeSupervisiLabel = M.supervisi
+          ? (isK13 ? 'AKTIF (sertakan KD, Indikator, KKM)' : 'AKTIF (sertakan CP, ATP, KKTP)')
+          : (isK13 ? 'NONAKTIF (tanpa KD/Indikator/KKM)' : 'NONAKTIF (tanpa CP, ATP, KKTP)');
+
+        const supervisiA = M.supervisi
+          ? (isK13
+              ? `
+### Kompetensi Dasar (KD) dan Indikator
+Buat tabel:
+- KD Pengetahuan (3.x) | Indikator
+- KD Keterampilan (4.x) | Indikator
+Minimal 2 KD per ranah dan indikatornya terukur serta relevan dengan materi "${M.judulModul}".`
+              : `
+### Capaian Pembelajaran (CP)
+Buat tabel: Elemen | Capaian Pembelajaran (ringkas, sesuai jenjang/fase). Minimal 3 elemen. Pastikan CP relevan dengan materi "${M.judulModul}".`)
+          : ``;
+
+        const supervisiB = M.supervisi
+          ? (isK13
+              ? `
+### Kriteria Ketuntasan Minimal (KKM)
+Tuliskan KKM yang realistis untuk topik ini dan jelaskan kriteria ketuntasan secara ringkas.`
+              : `
+### Alur Tujuan Pembelajaran (ATP)
+Buat tabel: Pertemuan | Tujuan Pembelajaran | Materi Kunci | Asesmen | Catatan.
+Jumlah baris harus sesuai "Jumlah Pertemuan" (${M.jumlahPertemuan}). Tujuan harus konsisten dengan CP dan materi.`)
+          : ``;
+
+        const supervisiC = M.supervisi && !isK13
+          ? `
+### 2. Kriteria Ketercapaian Tujuan Pembelajaran (KKTP)
+Min. 4 indikator konkret dan terukur.`
+          : ``;
+
+        const instrKegiatan = (() => {
+          const dur = String(M.durasi || '').trim();
+          const durLabel = dur ? `${dur} menit` : '... menit';
+          const common = `FORMAT WAJIB (RAPI) untuk SETIAP pertemuan:
+- Tulis per pertemuan sebagai heading: "#### Pertemuan 1 (${durLabel})", "#### Pertemuan 2 (...)", dst sampai jumlah pertemuan terpenuhi.
+- Setelah heading, WAJIB buat tabel Markdown dengan kolom:
+  | Tahap | Komponen | Kegiatan (sangat detail) | Durasi (menit) | Catatan |
+- Isi baris-baris detail untuk:
+  - Pendahuluan: Salam & doa, apersepsi, motivasi, penyampaian tujuan (boleh tambah 1–2 komponen lain bila perlu).
+  - Kegiatan Inti: langkah-langkah detail sesuai pendekatan & kurikulum.
+  - Penutup: refleksi, rangkuman, tindak lanjut, salam & doa.
+- Kolom "Durasi (menit)" wajib angka. Total seluruh baris WAJIB = ${durLabel} untuk setiap pertemuan.
+- Jangan gunakan bullet simbol (●/○/•/) di dalam tabel. Jika perlu pemecahan, pakai kalimat yang dipisah dengan titik koma.`;
+
+          const intiK13 = `Untuk Kegiatan Inti (K13), gunakan alur saintifik 5M sebagai baris-baris dalam tabel dengan urutan:
+Mengamati → Menanya → Mencoba/Mengeksplorasi → Mengasosiasi/Menalar → Mengomunikasikan.
+Pastikan masing-masing punya durasi dan aktivitas yang konkret.`;
+
+          const intiMerdeka = `Untuk Kegiatan Inti, sesuaikan dengan model "${M.modelPembelajaran}" (tuliskan fase-fase model secara eksplisit), dan buat aktivitas yang konkret.`;
+
+          const dlRules = `Khusus Deep Learning:
+- Di Kegiatan Inti, wajib ada baris eksplisit: Eksplorasi, Analisis, Refleksi (boleh dipetakan ke 5M untuk K13).
+- Wajib ada elemen Mindful, Meaningful, Joyful tertulis eksplisit minimal 1 kali per pertemuan. Letakkan di kolom "Catatan" sebagai: Mindful / Meaningful / Joyful.
+- Pertanyaan pemantik dan refleksi harus mendorong alasan (mengapa/bagaimana) dan transfer ke konteks nyata.`;
+
+          if (isDL) return `${common}\n\n${isK13 ? intiK13 : intiMerdeka}\n\n${dlRules}`;
+          return `${common}\n\n${isK13 ? intiK13 : intiMerdeka}`;
+        })();
+
+        const kbcKegiatan = isKBC
+          ? `
+Khusus KBC: Pada SETIAP pertemuan, sisipkan minimal 1 aktivitas/strategi yang mencerminkan unsur KBC (misalnya: afirmasi/niat belajar, praktik empati, gotong royong, kepedulian lingkungan, etika komunikasi, refleksi rasa syukur). Pastikan tertulis eksplisit di deskripsi kegiatan.`
+          : ``;
+
+        const identifikasiKesiapan = `
+## IDENTIFIKASI KESIAPAN PESERTA DIDIK
+Tulis ringkas, kontekstual, dan rapi memakai daftar Markdown (jangan gunakan simbol bullet seperti ●/○/•/).
+Gunakan format ini:
+- Pengetahuan Awal: 1–2 kalimat.
+- Minat: 1 kalimat.
+- Latar Belakang: 1–2 kalimat (contoh konteks keseharian yang relevan).
+- Kebutuhan Belajar:
+  - Visual: 1 kalimat (media/representasi yang digunakan).
+  - Auditori: 1 kalimat (strategi mendengar/diskusi).
+  - Kinestetik: 1 kalimat (aktivitas praktik/permainan/gerak).
+Pastikan bagian ini muncul setelah A. INFORMASI UMUM.`;
+
+        const bahanPendidik = `Untuk Pendidik: 3–4 paragraf panduan pedagogis sesuai pendekatan "${pendekatanLabel}" dan model "${M.modelPembelajaran}".`;
+
+        const revisionLead = String(baselineModulAjar || '').trim()
+          ? `Tolong lakukan REVISI TERARAH, bukan membuat ulang dari nol.
+
+ATURAN REVISI:
+1) Pertahankan struktur utama dan heading besar yang sudah ada. Jangan hapus bagian besar.
+2) Fokus revisi pada:
+   - Pertanyaan Pemantik
+   - Kegiatan Pembelajaran per pertemuan (Pendahuluan/Inti/Penutup)
+   - Asesmen (diagnostik/formatif/sumatif) dan rubriknya
+   - Refleksi peserta didik & pendidik
+   - (Opsional) LKPD bila perlu agar konsisten
+3) Bagian lain pertahankan semaksimal mungkin, hanya rapikan jika perlu.
+4) Output harus tetap berupa Modul Ajar lengkap dan siap pakai.
+${!isKBC ? '\n5) Hapus semua bagian/penyebutan KBC jika ada pada baseline.' : ''}`
+          : `Buatkan Modul Ajar LENGKAP dengan data berikut:`;
+
+        const usr = `${revisionLead}
 
 === DATA INPUT ===
 Nama Guru         : ${M.namaGuru}
 Institusi         : ${M.institusi}
 Tahun             : ${new Date().getFullYear()}
-Kurikulum         : ${M.kurikulum||'Kurikulum Merdeka'}
+Kurikulum         : ${kurikulumLabel}
+Pendekatan        : ${pendekatanLabel}
 Jenjang           : ${M.jenjang}
 Kelas             : ${M.kelas||'-'}
 Fase              : ${M.fase||'-'}
@@ -4000,8 +4360,10 @@ Durasi/Pertemuan  : ${M.durasi} menit
 Model Pembelajaran: ${M.modelPembelajaran}
 Jumlah Siswa      : ${M.jumlahSiswa||'30'} siswa
 Dimensi Profil    : ${M.dimensi.join(', ')}
-Mode Supervisi    : ${M.supervisi ? 'AKTIF (sertakan CP, ATP, KKTP)' : 'NONAKTIF (tanpa CP, ATP, KKTP)'}
+Mode Supervisi    : ${modeSupervisiLabel}
 =================
+
+${approachRules}
 
 Hasilkan Modul Ajar dengan SEMUA bagian berikut secara LENGKAP dan DETAIL:
 
@@ -4014,22 +4376,17 @@ ${isKBC ? `
 Tambahkan komponen khusus KBC:
 - "Unsur KBC" (jelaskan singkat 4–6 nilai/unsur yang dipakai pada modul ini, misalnya: cinta kepada Tuhan YME, cinta diri, cinta sesama, cinta lingkungan, cinta bangsa; sesuaikan dengan materi dan konteks kelas).
 - "Implementasi KBC" (2–4 poin praktik nyata yang terlihat di kegiatan pembelajaran, asesmen, dan refleksi).` : ``}
-${M.supervisi ? `
-### Capaian Pembelajaran (CP)
-Buat tabel: Elemen | Capaian Pembelajaran (ringkas, sesuai jenjang/fase). Minimal 3 elemen. Pastikan CP relevan dengan materi "${M.judulModul}".` : ``}
+${supervisiA}
+
+${identifikasiKesiapan}
 
 ## B. KOMPONEN INTI
-${M.supervisi ? `
-### Alur Tujuan Pembelajaran (ATP)
-Buat tabel: Pertemuan | Tujuan Pembelajaran | Materi Kunci | Asesmen | Catatan.
-Jumlah baris harus sesuai "Jumlah Pertemuan" (${M.jumlahPertemuan}). Tujuan harus konsisten dengan CP dan materi.` : ``}
+${supervisiB}
 
 ### 1. Tujuan Pembelajaran
 Min. 4 tujuan. Format: "Peserta didik mampu [kata kerja Bloom] [objek] [kondisi/kriteria]"
 
-${M.supervisi ? `
-### 2. Kriteria Ketercapaian Tujuan Pembelajaran (KKTP)
-Min. 4 indikator konkret dan terukur.` : ``}
+${supervisiC}
 
 ### 3. Asesmen
 a. Diagnostik (Awal) — aktivitas konkret
@@ -4040,10 +4397,8 @@ c. Sumatif (Akhir) — produk/instrumen penilaian
 3 pertanyaan open-ended, kontekstual, mendorong berpikir kritis.
 
 ### 5. Kegiatan Pembelajaran
-Untuk SETIAP pertemuan buat tabel: Kegiatan | Deskripsi | Alokasi Waktu
-Struktur: Pendahuluan (~15%) dengan Mindful Learning, Inti (~70%) dengan fase ${M.modelPembelajaran}, Penutup (~15%).
-${isKBC ? `
-Khusus KBC: Pada SETIAP pertemuan, sisipkan minimal 1 aktivitas/strategi yang mencerminkan unsur KBC (misalnya: afirmasi/niat belajar, praktik empati, gotong royong, kepedulian lingkungan, etika komunikasi, refleksi rasa syukur). Pastikan tertulis eksplisit di deskripsi kegiatan.` : ``}
+${instrKegiatan}
+${kbcKegiatan}
 
 ### 6. Refleksi
 2–3 pertanyaan refleksi untuk Peserta Didik dan 2–3 untuk Pendidik.
@@ -4058,7 +4413,7 @@ Pengayaan konkret. Remedial dengan strategi spesifik.
 
 ### 3. Bahan Bacaan
 Untuk Peserta Didik: 3–4 paragraf sesuai jenjang.
-          Untuk Pendidik: 3–4 paragraf panduan pedagogis Deep Learning dan ${M.modelPembelajaran}.
+${bahanPendidik}
 
 ### 4. Media Pembelajaran
 Sumber video YouTube relevan, alat peraga, platform digital.
@@ -4075,11 +4430,19 @@ Min. 3 referensi format APA (1 Kemendikbudristek, 1 buku pedagogi, 1 lainnya).
 
 PENTING:
 - Tidak ada placeholder. Semua konten kontekstual untuk ${M.mapel} kelas ${M.kelas||M.fase}. Bahasa Indonesia baku.
-- Jika Mode Supervisi NONAKTIF, JANGAN tulis bagian CP, ATP, dan KKTP sama sekali.`;
+- Jika Mode Supervisi NONAKTIF: ${isK13 ? 'JANGAN tulis KD/Indikator/KKM sama sekali.' : 'JANGAN tulis CP, ATP, dan KKTP sama sekali.'}
+${String(baselineModulAjar || '').trim() ? `
+
+BASELINE MODUL AJAR (yang direvisi):
+<<<
+${baselineModulAjar}
+>>>` : ''}`;
 
         try {
           const ctrl = new AbortController();
-          const timer = setTimeout(()=>ctrl.abort(), 90000);
+          const pertemuan = Math.max(1, Number(M.jumlahPertemuan || 1) || 1);
+          const timeoutMs = Math.min(600000, 150000 + pertemuan * 60000);
+          const timer = setTimeout(()=>ctrl.abort(), timeoutMs);
           const resp = await fetch("api/openai_proxy.php", {
             method: "POST",
             headers: {"Content-Type":"application/json"},
@@ -4091,7 +4454,24 @@ PENTING:
           const data = await resp.json();
           const text = data?.content || data?.choices?.[0]?.message?.content || '';
           if (!text) throw new Error("Respons API kosong.");
-          state.modulAjar.hasil = text;
+          const stripKbcFromModulAjar = (raw) => {
+            const src = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const lines = src.split('\n');
+            const out = [];
+            for (let i = 0; i < lines.length; i++) {
+              const line = String(lines[i] || '');
+              const t = line.trim();
+              if (!t) { out.push(line); continue; }
+              if (/\bKBC\b/i.test(t)) continue;
+              if (/berbasis\s+cinta/i.test(t)) continue;
+              if (/unsur\s+kbc/i.test(t)) continue;
+              if (/implementasi\s+kbc/i.test(t)) continue;
+              out.push(line);
+            }
+            return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+          };
+          const finalText = isKBC ? text : stripKbcFromModulAjar(text);
+          state.modulAjar.hasil = finalText;
           state.modulAjar.isGenerating = false;
           saveDebounced(true);
           render();
@@ -4102,7 +4482,7 @@ PENTING:
             const title = `Modul Ajar - ${M.mapel || ''} - ${M.judulModul || ''}`.trim();
             const snapshot = {
               identity: { jenjang: M.jenjang||'', kelas: M.kelas||'', mataPelajaran: M.mapel||'' },
-              modulAjar: { ...M, hasil: text },
+              modulAjar: { ...M, hasil: finalText },
               questions: []
             };
             await fetch("api/soal_user.php", {
@@ -4132,7 +4512,10 @@ PENTING:
         } catch(e) {
           state.modulAjar.isGenerating = false;
           render();
-          setTimeout(()=>{ const el=document.getElementById('maError'); if(el){el.textContent='⚠️ Gagal: '+e.message; el.classList.remove('hidden');} }, 120);
+          const msg = (e && (e.name === 'AbortError' || /aborted/i.test(String(e.message || ''))))
+            ? 'Proses terlalu lama (timeout). Semakin banyak JP/pertemuan dan semakin detail tabel, waktu proses makin lama. Silakan coba lagi dan tunggu sampai selesai.'
+            : (e?.message || 'Terjadi kesalahan.');
+          setTimeout(()=>{ const el=document.getElementById('maError'); if(el){el.textContent='⚠️ Gagal: '+msg; el.classList.remove('hidden');} }, 120);
         }
       }
 
@@ -4216,8 +4599,16 @@ PENTING:
                 out.push(new Paragraph({keepNext:true,keepLines:true,...sp(240,100),children:[new TextRun({text:line.replace(/^##\s*/,''),font:FONT,size:28,bold:true})]}));
               } else if (/^#\s*/.test(line)) {
                 out.push(new Paragraph({keepNext:true,keepLines:true,...sp(280,120),children:[new TextRun({text:line.replace(/^#\s*/,''),font:FONT,size:32,bold:true})]}));
-              } else if (line.match(/^[-•] /)) {
-                out.push(new Paragraph({...sp(40,40),indent:{left:400,hanging:200},children:[new TextRun({text:'• '+line.replace(/^[-•] /,'').replace(/\*\*(.+?)\*\*/g,'$1'),font:FONT,size:SZ})]}));
+              } else if (/^\s*[-•]\s+/.test(line)) {
+                const lead = (line.match(/^\s*/)?.[0] || '').length;
+                const level = lead >= 2 ? 1 : 0;
+                const left = level ? 760 : 400;
+                const hang = 200;
+                out.push(new Paragraph({
+                  ...sp(40,40),
+                  indent:{left,hanging:hang},
+                  children:[new TextRun({text:'• '+String(line).replace(/^\s*[-•]\s+/,'').replace(/\*\*(.+?)\*\*/g,'$1'),font:FONT,size:SZ})]
+                }));
               } else if (line.match(/^\d+\. /)) {
                 const m=line.match(/^(\d+)\. (.*)/);
                 out.push(new Paragraph({...sp(40,40),indent:{left:400,hanging:200},children:[new TextRun({text:`${m[1]}. ${m[2].replace(/\*\*(.+?)\*\*/g,'$1')}`,font:FONT,size:SZ})]}));
