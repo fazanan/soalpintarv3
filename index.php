@@ -193,10 +193,7 @@ if (!isset($_SESSION['user_id'])) {
                 <span class="material-symbols-outlined text-[18px] shrink-0">folder_open</span>
                 <span class="hidden lg:inline text-sm font-medium whitespace-nowrap">Muat</span>
               </button>
-              <button id="btnPrint" class="inline-flex items-center gap-2 h-10 rounded-full border bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark transition-colors px-3">
-                <span class="material-symbols-outlined text-[18px] shrink-0">print</span>
-                <span class="text-sm font-medium whitespace-nowrap">Cetak</span>
-              </button>
+              
             </div>
           </div>
         </div>
@@ -457,6 +454,7 @@ if (!isset($_SESSION['user_id'])) {
         activeView: "preview",
         previewTab: "identitas",
         modulAjarTab: "informasi",
+        rppTab: "informasi",
         soalError: null,
         modulAjarError: null,
         _isGenerating: false,
@@ -1547,6 +1545,12 @@ if (!isset($_SESSION['user_id'])) {
       function closeMAHelp1(){ const m = el('modalMAHelp1'); if (m){ m.style.display='none'; m.classList.add('hidden'); } }
       function openMAHelp2(){ const m = el('modalMAHelp2'); if (m){ m.classList.remove('hidden'); m.style.display='flex'; } }
       function closeMAHelp2(){ const m = el('modalMAHelp2'); if (m){ m.style.display='none'; m.classList.add('hidden'); } }
+      function openMAHelp3(){ const m = el('modalMAHelp3'); if (m){ m.classList.remove('hidden'); m.style.display='flex'; } }
+      function closeMAHelp3(){ const m = el('modalMAHelp3'); if (m){ m.style.display='none'; m.classList.add('hidden'); } }
+      function openRPPHelp1(){ const m = el('modalRPPHelp1'); if (m){ m.classList.remove('hidden'); m.style.display='flex'; } }
+      function closeRPPHelp1(){ const m = el('modalRPPHelp1'); if (m){ m.style.display='none'; m.classList.add('hidden'); } }
+      function openRPPHelp2(){ const m = el('modalRPPHelp2'); if (m){ m.classList.remove('hidden'); m.style.display='flex'; } }
+      function closeRPPHelp2(){ const m = el('modalRPPHelp2'); if (m){ m.style.display='none'; m.classList.add('hidden'); } }
       async function exportModulAjarPDF() {
         try {
           await ensureJsPDF();
@@ -3215,6 +3219,10 @@ if (!isset($_SESSION['user_id'])) {
           </label>`;
         }).join('');
 
+        const helpOnClick = tab === 'informasi'
+          ? "window.__sp.openMAHelp1()"
+          : (tab === 'detail' ? "window.__sp.openMAHelp2()" : "window.__sp.openMAHelp3()");
+
         const desktopTabs = `
           <div class="hidden md:flex items-center justify-between gap-3 mb-4">
             <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
@@ -3226,6 +3234,23 @@ if (!isset($_SESSION['user_id'])) {
                 const active = tab === t.id;
                 return `<button class="${active ? 'bg-primary text-white' : 'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setModulAjarTab('${t.id}')">${t.label}</button>`;
               }).join('')}
+            </div>
+            <div class="flex items-center gap-2">
+              <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                onclick="saveProject()" title="Simpan">
+                <span class="material-symbols-outlined text-[18px]">save</span>
+                <span class="ml-2 hidden lg:inline">Simpan</span>
+              </button>
+              <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                onclick="document.getElementById('projectPicker').value=''; document.getElementById('projectPicker').click();" title="Muat">
+                <span class="material-symbols-outlined text-[18px]">folder_open</span>
+                <span class="ml-2 hidden lg:inline">Muat</span>
+              </button>
+              <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                onclick="${helpOnClick}" title="Petunjuk">
+                <span class="material-symbols-outlined text-[18px]">help</span>
+                <span class="ml-2">Petunjuk</span>
+              </button>
             </div>
           </div>
         `;
@@ -3428,7 +3453,60 @@ if (!isset($_SESSION['user_id'])) {
             ? (step3Html + mobileNav('modul'))
             : (step1Html + mobileNav('informasi'));
 
-        return `<div class="space-y-6">${desktopTabs}${body}</div>`;
+        const maHelpModals = `
+          <div id="modalMAHelp1" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+            <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-h-[85vh] overflow-auto">
+              <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Modul Ajar • Langkah 1</div>
+                <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeMAHelp1()">&times;</button>
+              </div>
+              <div class="p-5 space-y-3 text-sm leading-relaxed">
+                <ol class="list-decimal pl-5 space-y-2">
+                  <li>Isi Nama Guru dan Institusi.</li>
+                  <li>Pilih Kurikulum, Jenjang, Fase, dan Kelas.</li>
+                  <li>Isi Mata Pelajaran dan Materi Pokok/Judul Modul.</li>
+                  <li>Pastikan identitas lengkap sebelum lanjut ke Langkah 2.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+          <div id="modalMAHelp2" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+            <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-h-[85vh] overflow-auto">
+              <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Modul Ajar • Langkah 2</div>
+                <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeMAHelp2()">&times;</button>
+              </div>
+              <div class="p-5 space-y-3 text-sm leading-relaxed">
+                <ol class="list-decimal pl-5 space-y-2">
+                  <li>Isi jumlah pertemuan, durasi per pertemuan, jumlah siswa.</li>
+                  <li>Pilih Model Pembelajaran yang relevan.</li>
+                  <li>Pilih Dimensi Profil Pelajar Pancasila (min. satu).</li>
+                  <li>Klik Buat Modul Ajar Sekarang untuk membuat dokumen.</li>
+                  <li>Gunakan Download .docx untuk menyimpan hasil.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+          <div id="modalMAHelp3" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+            <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-h-[85vh] overflow-auto">
+              <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Modul Ajar • Langkah 3</div>
+                <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeMAHelp3()">&times;</button>
+              </div>
+              <div class="p-5 space-y-3 text-sm leading-relaxed">
+                <ol class="list-decimal pl-5 space-y-2">
+                  <li>Tab ini menampilkan hasil Modul Ajar dalam format preview.</li>
+                  <li>Jika hasil belum ada, kembali ke Langkah 2 lalu klik Buat Modul Ajar Sekarang.</li>
+                  <li>Gunakan Download .docx untuk menyimpan dokumen Word.</li>
+                  <li>Gunakan Download PDF untuk menyimpan versi PDF (jika tersedia).</li>
+                  <li>Jika dokumen panjang, tunggu sampai proses selesai dan jangan tutup halaman saat loading.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        `;
+
+        return `<div class="space-y-6">${desktopTabs}${body}${maHelpModals}</div>`;
       };
 
       const renderLimit = () => {
@@ -4746,10 +4824,111 @@ ${baselineModulAjar}
         return txt;
       }
 
+      function rppNormalizeRubrikToTables(raw) {
+        const src = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const lines = src.split('\n');
+        const isRubrikHeading = (line) => /^(?:#{1,6}\s*)?Rubrik\s+Penilaian\b/i.test(String(line || '').trim());
+        const isHeading = (line) => /^(?:#{1,6}\s+|[ABC]\.\s+)/.test(String(line || '').trim());
+        const pickLabel = (line) => {
+          const t = String(line || '').trim();
+          const m = t.match(/^(?:[-*•]\s*)?(Sikap|Pengetahuan|Keterampilan)\s*:?$/i);
+          return m ? String(m[1] || '').toLowerCase() : null;
+        };
+        const parseSikapItem = (line) => {
+          const t = String(line || '').trim();
+          const m = t.match(/^(?:[-*•]\s*)?([1-5])\s*[:.\-]\s*(.+)$/);
+          return m ? { skor: m[1], ket: m[2].trim() } : null;
+        };
+        const parseRangeItem = (line) => {
+          const t = String(line || '').trim();
+          const m = t.match(/^(?:[-*•]\s*)?(\d{1,3}\s*-\s*\d{1,3})\s*[:.\-]\s*(.+)$/);
+          return m ? { rentang: m[1].replace(/\s+/g, ''), ket: m[2].trim() } : null;
+        };
+
+        let start = -1;
+        for (let i = 0; i < lines.length; i++) {
+          if (isRubrikHeading(lines[i])) { start = i; break; }
+        }
+        if (start === -1) return raw;
+        let end = lines.length;
+        for (let i = start + 1; i < lines.length; i++) {
+          if (isRubrikHeading(lines[i])) continue;
+          if (isHeading(lines[i])) { end = i; break; }
+        }
+        const block = lines.slice(start + 1, end);
+        const sections = { sikap: [], pengetahuan: [], keterampilan: [] };
+        let cur = null;
+        for (let i = 0; i < block.length; i++) {
+          const line = block[i];
+          const lbl = pickLabel(line);
+          if (lbl) { cur = lbl; continue; }
+          if (!cur) continue;
+          if (cur === 'sikap') {
+            const it = parseSikapItem(line);
+            if (it) sections.sikap.push(it);
+          } else if (cur === 'pengetahuan' || cur === 'keterampilan') {
+            const it = parseRangeItem(line);
+            if (it) sections[cur].push(it);
+          }
+        }
+        const hasAny = sections.sikap.length || sections.pengetahuan.length || sections.keterampilan.length;
+        if (!hasAny) return raw;
+
+        const out = [];
+        out.push('## Rubrik Penilaian');
+        if (sections.sikap.length) {
+          out.push('');
+          out.push('### Sikap');
+          out.push('| Skor | Kriteria |');
+          out.push('| ---: | --- |');
+          sections.sikap.forEach(it => out.push(`| ${String(it.skor)} | ${String(it.ket).replace(/\|/g,'\\|')} |`));
+        }
+        if (sections.pengetahuan.length) {
+          out.push('');
+          out.push('### Pengetahuan');
+          out.push('| Rentang Nilai | Kriteria |');
+          out.push('| --- | --- |');
+          sections.pengetahuan.forEach(it => out.push(`| ${String(it.rentang)} | ${String(it.ket).replace(/\|/g,'\\|')} |`));
+        }
+        if (sections.keterampilan.length) {
+          out.push('');
+          out.push('### Keterampilan');
+          out.push('| Rentang Nilai | Kriteria |');
+          out.push('| --- | --- |');
+          sections.keterampilan.forEach(it => out.push(`| ${String(it.rentang)} | ${String(it.ket).replace(/\|/g,'\\|')} |`));
+        }
+        out.push('');
+
+        const before = lines.slice(0, start);
+        const after = lines.slice(end);
+        return [...before, ...out, ...after].join('\n').replace(/\n{3,}/g, '\n\n');
+      }
+
+      const setRppTab = (tab) => {
+        state.rppTab = tab;
+        saveDebounced(false);
+        render();
+      };
+
       const renderRPP = () => {
-        const R = state.rpp || {};
+        const R = (state.rpp && typeof state.rpp === 'object') ? state.rpp : {};
         const hasilAda = !!R.hasil;
-        const rppBuildPreviewHtml = (R) => {
+        const tab = state.rppTab || (hasilAda ? 'rpp' : 'informasi');
+        const rppInsertPageBreakMarkers = (text) => {
+          let s = String(text || '');
+          const marker = '[[PAGE_BREAK]]';
+          const addBeforeLine = (reWithGroups) => {
+            s = s.replace(reWithGroups, (_m, p1, p2) => `${p1}${marker}\n${p2}`);
+          };
+          addBeforeLine(/(^|\n)([^\S\r\n]*(?:#{1,4}\s*)?(?:\*{0,2})(?:A\.\s*)?Identitas\b[^\n]*)/im);
+          addBeforeLine(/(^|\n)([^\S\r\n]*(?:#{1,4}\s*)?(?:\*{0,2})Kegiatan\s+Pembelajaran\b[^\n]*)/im);
+          addBeforeLine(/(^|\n)([^\S\r\n]*(?:#{1,4}\s*)?(?:\*{0,2})Asesmen\b[^\n]*)/im);
+          addBeforeLine(/(^|\n)([^\S\r\n]*(?:#{1,4}\s*)?(?:\*{0,2})Penilaian\b[^\n]*)/im);
+          addBeforeLine(/(^|\n)([^\S\r\n]*(?:#{1,4}\s*)?(?:\*{0,2})Lampiran\b[^\n]*)/im);
+          s = s.replace(new RegExp(`${marker}\\s*\\n\\s*${marker}`, 'g'), marker);
+          return s;
+        };
+        const rppBuildPreviewHtmlWysiwyg = (R) => {
           const mapel = String(R.mata_pelajaran || '').trim();
           const materi = String(R.materi || '').trim();
           const kelas = String(R.kelas || '').trim();
@@ -4776,23 +4955,41 @@ ${baselineModulAjar}
           ];
           const table = `
             <table class="ma-tbl">
-              <thead>
-                <tr><th>Komponen</th><th>Keterangan</th></tr>
-              </thead>
-              <tbody>
-                ${rows.map(([k,v])=>`<tr><td>${safeText(k)}</td><td>${safeText(v)}</td></tr>`).join('')}
-              </tbody>
+              <thead><tr><th>Komponen</th><th>Keterangan</th></tr></thead>
+              <tbody>${rows.map(([k,v])=>`<tr><td>${safeText(k)}</td><td>${safeText(v)}</td></tr>`).join('')}</tbody>
             </table>
           `;
-          const body = maMarkdownToHtml(stripRppDuplicateInfo(String(R.hasil || '')));
-          return `
+          const titleHtml = `
             <div class="text-center">
               <div class="font-bold text-[20px] tracking-wide">${safeText(title)}</div>
               ${sub ? `<div class="italic text-[16px] mt-2">${safeText(sub)}</div>` : ``}
             </div>
             <div class="mt-8">${table}</div>
-            <div class="mt-10">${body}</div>
           `;
+          let bodyMd = stripRppDuplicateInfo(String(R.hasil || ''));
+          bodyMd = bodyMd.replace(/^\s*#{1,3}\s*RPP\b[^\n]*\n?/i, '');
+          bodyMd = bodyMd.trim();
+          bodyMd = rppNormalizeRubrikToTables(bodyMd);
+          bodyMd = rppInsertPageBreakMarkers(bodyMd);
+          const parts = String(bodyMd || '').split('[[PAGE_BREAK]]').map(s => s.trim()).filter(Boolean);
+          const pages = parts.length ? parts : [''];
+          const wrapTables = (html) => {
+            let s = String(html || '');
+            s = s.replace(/<table/gi, '<div class="ma-table-wrap"><table');
+            s = s.replace(/<\/table>/gi, '</table></div>');
+            return s;
+          };
+          const pageWrap = (inner) => `
+            <div class="rpp-page bg-white text-black p-4 md:p-10 md:shadow-paper md:min-h-[297mm] font-serif border border-gray-200 mx-auto print:border-none print:shadow-none print:p-0 w-full">
+              ${inner}
+            </div>
+          `;
+          const pageHtml = pages.map((md, idx) => {
+            const html = wrapTables(maMarkdownToHtml(md));
+            const content = idx === 0 ? `${titleHtml}<div class="mt-10">${html}</div>` : html;
+            return pageWrap(content);
+          }).join('');
+          return `<div class="space-y-6">${pageHtml}</div>`;
         };
         const mkSel = (lbl, key, val, opts) => `
           <div class="flex flex-col gap-2">
@@ -4800,6 +4997,7 @@ ${baselineModulAjar}
             <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
               data-rpp-key="${safeText(key)}"
               onchange="window.__sp.setRPP('${key}',this.value,true)">
+              <option value="">— Pilih —</option>
               ${opts.map(o=>`<option value="${safeText(o.v)}" ${String(o.v)===String(val||'')?'selected':''}>${safeText(o.l)}</option>`).join('')}
             </select>
           </div>`;
@@ -4843,98 +5041,150 @@ ${baselineModulAjar}
           { v: 'SMK', l: 'SMK' },
         ];
 
-        const formHtml = `
-          <div class="space-y-6">
-            <div class="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-6 py-4 text-amber-900 dark:text-amber-200">
-              <div class="font-bold">Bonus Fitur RPP</div>
-              <div class="text-sm mt-1">Fitur ini masih dalam pengembangan. Mohon maaf jika hasilnya belum sepenuhnya rapi—kami akan segera melakukan pembaruan.</div>
+        const helpOnClick = tab === 'informasi'
+          ? "window.__sp.openRPPHelp1()"
+          : "window.__sp.openRPPHelp2()";
+
+        const desktopTabs = `
+          <div class="hidden md:flex items-center justify-between gap-3">
+            <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
+              ${[
+                { id: 'informasi', label: '1. Informasi Dasar' },
+                { id: 'rpp', label: '2. RPP' },
+              ].map(t=>{
+                const active = tab === t.id;
+                return `<button class="${active?'bg-primary text-white':'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setRppTab('${t.id}')">${t.label}</button>`;
+              }).join('')}
             </div>
-            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
-              <div class="p-6 space-y-5">
+            <div class="flex items-center gap-2">
+              <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                onclick="saveProject()" title="Simpan">
+                <span class="material-symbols-outlined text-[18px]">save</span>
+                <span class="ml-2 hidden lg:inline">Simpan</span>
+              </button>
+              <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                onclick="document.getElementById('projectPicker').value=''; document.getElementById('projectPicker').click();" title="Muat">
+                <span class="material-symbols-outlined text-[18px]">folder_open</span>
+                <span class="ml-2 hidden lg:inline">Muat</span>
+              </button>
+              <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                onclick="${helpOnClick}" title="Petunjuk">
+                <span class="material-symbols-outlined text-[18px]">help</span>
+                <span class="ml-2">Petunjuk</span>
+              </button>
+            </div>
+          </div>
+        `;
+
+        const mobileNav = (cur) => {
+          const prev = cur === 'rpp' ? 'informasi' : null;
+          const next = cur === 'informasi' ? 'rpp' : null;
+          const rightLabel = cur === 'informasi' ? 'RPP' : '';
+          return `
+            <div class="md:hidden mt-6 flex items-center gap-3">
+              <button class="flex-1 h-12 rounded-xl border bg-white dark:bg-surface-dark font-bold" ${prev ? `onclick="window.__sp.setRppTab('${prev}')"` : 'disabled'}>Kembali</button>
+              <button class="flex-1 h-12 rounded-xl ${next ? 'bg-primary text-white' : 'bg-gray-200 text-gray-500'} font-bold" ${next ? `onclick="window.__sp.setRppTab('${next}')"` : 'disabled'}>${rightLabel || 'Lanjut'}</button>
+            </div>
+          `;
+        };
+
+        const step1Html = `
+          <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
+            <div class="p-6 space-y-5">
+              <div class="flex items-center justify-between gap-3">
                 <div>
-                  <div class="text-xl font-bold">Generator RPP</div>
-                  <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Buat RPP siap supervisi secara cepat, rapi, dan kontekstual</div>
+                  <div class="text-xl font-bold">Informasi Dasar</div>
+                  <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Lengkapi data untuk menyusun RPP</div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  ${mkSel('Jenjang','jenjang',R.jenjang,jenjangOpts)}
-                  ${mkInp('Kelas','kelas',R.kelas,'Contoh: VII / 7 / X')}
+                <button class="hidden md:flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors"
+                  onclick="window.__sp.setRppTab('rpp')">
+                  <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+                  RPP
+                </button>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                ${mkSel('Jenjang','jenjang',R.jenjang,jenjangOpts)}
+                ${mkInp('Kelas','kelas',R.kelas,'Contoh: VII / 7 / X')}
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                ${mkInp('Mata Pelajaran','mata_pelajaran',R.mata_pelajaran,'Contoh: IPAS / Matematika')}
+                ${mkInp('Materi / Topik','materi',R.materi,'Contoh: Listrik Statis')}
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                ${mkSel('Kurikulum','kurikulum',R.kurikulum,kurikulumOpts)}
+                ${mkSel('Pendekatan','pendekatan',R.pendekatan,pendekatanOpts)}
+                ${mkSel('Format','format',R.format,formatOpts)}
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                ${mkInp('Alokasi Waktu','alokasi_waktu',R.alokasi_waktu,'Contoh: 2 x 40 menit')}
+                ${mkInp('Nama Sekolah (opsional)','nama_sekolah',R.nama_sekolah,'Contoh: SMPN 1')}
+                ${mkInp('Nama Guru (opsional)','nama_guru',R.nama_guru,'Contoh: Siti, S.Pd.')}
+              </div>
+              <details class="rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-4">
+                <summary class="cursor-pointer font-semibold text-sm">Lanjutan (opsional)</summary>
+                <div class="mt-4">
+                  ${mkTxt('CP / TP / KD (opsional)','cp_tp_kd',R.cp_tp_kd||'','Tempel CP/TP (Merdeka) atau KD (K13) jika ada')}
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  ${mkInp('Mata Pelajaran','mata_pelajaran',R.mata_pelajaran,'Contoh: IPAS / Matematika')}
-                  ${mkInp('Materi / Topik','materi',R.materi,'Contoh: Listrik Statis')}
+              </details>
+              <div id="rppError" class="hidden rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300"></div>
+            </div>
+          </div>
+        `;
+
+        const downloadBtnClass = hasilAda
+          ? 'bg-green-600 hover:bg-green-700 text-white'
+          : 'bg-gray-200 text-gray-500 cursor-not-allowed';
+
+        const step2Html = `
+          <div class="space-y-6">
+            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
+              <div class="p-6 flex items-start justify-between gap-4">
+                <div>
+                  <div class="text-xl font-bold">RPP</div>
+                  <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Preview dan unduh dokumen RPP</div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  ${mkSel('Kurikulum','kurikulum',R.kurikulum,kurikulumOpts)}
-                  ${mkSel('Pendekatan','pendekatan',R.pendekatan,pendekatanOpts)}
-                  ${mkSel('Format','format',R.format,formatOpts)}
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  ${mkInp('Alokasi Waktu','alokasi_waktu',R.alokasi_waktu,'Contoh: 2 x 40 menit')}
-                  ${mkInp('Nama Sekolah (opsional)','nama_sekolah',R.nama_sekolah,'Contoh: SMPN 1')}
-                  ${mkInp('Nama Guru (opsional)','nama_guru',R.nama_guru,'Contoh: Siti, S.Pd.')}
-                </div>
-                <details class="rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-4">
-                  <summary class="cursor-pointer font-semibold text-sm">Lanjutan (opsional)</summary>
-                  <div class="mt-4">
-                    ${mkTxt('CP / TP / KD (opsional)','cp_tp_kd',R.cp_tp_kd||'','Tempel CP/TP (Merdeka) atau KD (K13) jika ada')}
-                  </div>
-                </details>
-                <div id="rppError" class="hidden rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300"></div>
-                <div class="pt-1 flex flex-wrap items-center gap-3">
-                  <button onclick="window.__sp.buildRPP()"
+                <div class="flex flex-wrap items-center justify-end gap-2">
+                  <button type="button" data-action="build-rpp"
                     class="flex items-center gap-2 rounded-lg h-10 px-6 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors">
                     <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
-                    GENERATE RPP
+                    Buat RPP Sekarang
                   </button>
-                  ${hasilAda ? `
-                  <button id="btnExportRPP" onclick="window.__sp.exportRPPDocx()"
-                    class="flex items-center gap-2 rounded-lg h-10 px-5 bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors">
+                  <button type="button" id="btnExportRPPTop" data-action="export-rpp-docx"
+                    class="flex items-center gap-2 rounded-lg h-10 px-5 ${downloadBtnClass} text-sm font-bold shadow-sm transition-colors"
+                    ${hasilAda ? '' : 'disabled'}>
                     <span class="material-symbols-outlined text-[18px]">download</span>
                     Download .docx
-                  </button>` : ''}
-                </div>
-              </div>
-            </div>
-
-            ${hasilAda ? `
-            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
-              <div class="flex items-center justify-between px-6 py-4 border-b border-border-light dark:border-border-dark">
-                <div class="flex items-center gap-3">
-                  <div class="size-8 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-[18px]">check_circle</span>
-                  </div>
-                  <div>
-                    <div class="font-bold text-sm">RPP Berhasil Dibuat</div>
-                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${safeText(R.mata_pelajaran||'')} · ${safeText(R.materi||'')}</div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-2">
-                  <button id="btnExportRPP2" onclick="window.__sp.exportRPPDocx()"
-                    class="flex items-center gap-2 rounded-lg h-9 px-4 bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors">
-                    <span class="material-symbols-outlined text-[16px]">download</span>
-                    Download .docx
+                  </button>
+                  <button type="button" id="btnExportRPPPdfTop" data-action="export-rpp-pdf"
+                    class="flex items-center gap-2 rounded-lg h-10 px-5 ${downloadBtnClass} text-sm font-bold shadow-sm transition-colors"
+                    ${hasilAda ? '' : 'disabled'}>
+                    <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                    Download PDF
                   </button>
                 </div>
               </div>
-              <div class="p-6 overflow-auto max-h-[72vh] custom-scrollbar">
-                <div id="rppPreview" class="bg-white dark:bg-gray-950 border border-border-light dark:border-border-dark rounded-lg px-20 py-16 mx-auto
-                  font-serif text-[16px] leading-6 min-h-[1056px] max-w-[816px]
-                  [&_h1]:text-[18px] [&_h1]:font-bold [&_h1]:mt-8 [&_h1]:mb-3
-                  [&_h2]:text-[16px] [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-2
-                  [&_h3]:text-[15px] [&_h3]:font-semibold [&_h3]:mt-5 [&_h3]:mb-2
-                  [&_table]:w-full [&_table]:border-collapse [&_table]:my-3 [&_table]:text-[14px]
-                  [&_td]:border [&_td]:border-gray-300 dark:[&_td]:border-gray-600 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top
-                  [&_th]:border [&_th]:border-gray-300 dark:[&_th]:border-gray-600 [&_th]:px-3 [&_th]:py-2 [&_th]:bg-gray-100 dark:[&_th]:bg-gray-800 [&_th]:font-bold
-                  [&_.ma-tbl>tbody>tr:nth-child(even)>td]:bg-gray-50 dark:[&_.ma-tbl>tbody>tr:nth-child(even)>td]:bg-gray-900/20
+              <div id="rppErrorTop" class="hidden mx-6 mb-6 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300"></div>
+            </div>
+            ${hasilAda ? `
+              <div class="overflow-auto max-h-[72vh] custom-scrollbar">
+                <div id="rppPreview" class="
+                  [&_.ma-table-wrap]:overflow-x-auto [&_.ma-table-wrap]:-mx-1 [&_.ma-table-wrap]:px-1 [&_.ma-table-wrap]:my-3
+                  [&_table]:w-full [&_table]:border-collapse [&_table]:text-[14px]
+                  [&_td]:border [&_td]:border-gray-300 [&_td]:px-3 [&_td]:py-2 [&_td]:align-top
+                  [&_th]:border [&_th]:border-gray-300 [&_th]:px-3 [&_th]:py-2 [&_th]:bg-gray-100 [&_th]:font-bold
+                  [&_.ma-tbl>tbody>tr:nth-child(even)>td]:bg-gray-50
                   [&_ul]:pl-6 [&_ul]:my-2 [&_li]:mb-1.5
                   [&_ol]:pl-6 [&_ol]:my-2 [&_ol]:list-decimal [&_ol>li]:mb-1.5
                   [&_em]:italic [&_strong]:font-bold
                   [&_p]:mb-3 [&_p]:text-justify">
-                  ${rppBuildPreviewHtml(R)}
+                  ${rppBuildPreviewHtmlWysiwyg(R)}
                 </div>
               </div>
-            </div>
-            ` : ``}
+            ` : `
+              <div class="rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-6 text-sm text-text-sub-light dark:text-text-sub-dark">
+                Hasil belum ada. Klik Buat RPP Sekarang untuk membuat dokumen.
+              </div>
+            `}
           </div>
         `;
 
@@ -4955,7 +5205,44 @@ ${baselineModulAjar}
             </div>
           </div>`;
 
-        return formHtml;
+        const body = tab === 'rpp' ? (step2Html + mobileNav('rpp')) : (step1Html + mobileNav('informasi'));
+
+        const rppHelpModals = `
+          <div id="modalRPPHelp1" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+            <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-h-[85vh] overflow-auto">
+              <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk RPP • Tab 1</div>
+                <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeRPPHelp1()">&times;</button>
+              </div>
+              <div class="p-5 space-y-3 text-sm leading-relaxed">
+                <ol class="list-decimal pl-5 space-y-2">
+                  <li>Lengkapi Jenjang, Kelas, Mata Pelajaran, dan Materi/Topik.</li>
+                  <li>Pilih Kurikulum, Pendekatan, dan Format RPP.</li>
+                  <li>Isi Alokasi Waktu. Nama Sekolah dan Nama Guru bersifat opsional.</li>
+                  <li>Jika punya CP/TP/KD, tempel di bagian Lanjutan (opsional) agar RPP lebih presisi.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+          <div id="modalRPPHelp2" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+            <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-h-[85vh] overflow-auto">
+              <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk RPP • Tab 2</div>
+                <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeRPPHelp2()">&times;</button>
+              </div>
+              <div class="p-5 space-y-3 text-sm leading-relaxed">
+                <ol class="list-decimal pl-5 space-y-2">
+                  <li>Klik Buat RPP Sekarang untuk membuat dokumen.</li>
+                  <li>Jika Anda memilih Deep Learning, pastikan RPP memuat Eksplorasi–Analisis–Refleksi dan tag [Mindful]/[Meaningful]/[Joyful].</li>
+                  <li>Gunakan Download .docx untuk Word dan Download PDF untuk versi PDF.</li>
+                  <li>Jika proses lama, tunggu sampai selesai dan jangan tutup halaman.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+        `;
+
+        return `<div class="space-y-6">${desktopTabs}${body}${rppHelpModals}</div>`;
       };
 
       function setRPP(key, value, persist) {
@@ -4970,8 +5257,9 @@ ${baselineModulAjar}
       }
 
       async function buildRPP() {
-        const R = state.rpp || {};
-        const errEl = () => document.getElementById('rppError');
+        if (!state.rpp || typeof state.rpp !== 'object') state.rpp = {};
+        const R = state.rpp;
+        const errEl = () => document.getElementById('rppError') || document.getElementById('rppErrorTop');
         const showErr = (msg) => { const e=errEl(); if(e){e.textContent='⚠️ '+msg; e.classList.remove('hidden');} };
         const hideErr = () => { const e=errEl(); if(e){e.textContent=''; e.classList.add('hidden');} };
 
@@ -5009,6 +5297,7 @@ ${baselineModulAjar}
 
         state.rpp.isGenerating = true;
         state.rpp.hasil = '';
+        state.rppTab = 'rpp';
         render();
 
         const sys = `Kamu adalah asisten profesional pembuat RPP (Rencana Pelaksanaan Pembelajaran) untuk guru di Indonesia. Buat RPP sesuai pilihan kurikulum dan pendekatan. Output harus formal, rapi, dan siap digunakan untuk supervisi sekolah. Gunakan Bahasa Indonesia baku, jelas, dan profesional. Tujuan pembelajaran berorientasi HOTS (utamakan C4–C6) dan kontekstual. Jangan generik. Hindari output yang terkesan AI. Output HARUS langsung berupa RPP tanpa penjelasan tambahan. Jangan mengulang bagian identitas/metadata (Sekolah, Kelas/Semester, Mata Pelajaran, Materi, Alokasi Waktu, Nama Guru) karena identitas sudah ditampilkan terpisah.`;
@@ -5020,19 +5309,51 @@ ${baselineModulAjar}
         const formatInstr = format === 'panjang'
           ? 'Format panjang (detail lengkap + rubrik penilaian).'
           : 'Format 1 lembar (ringkas, padat, siap supervisi).';
-        const pendekatanInstr = pendekatan === 'Deep Learning'
-          ? 'Pendekatan Deep Learning: wajib ada eksplorasi, analisis, refleksi.'
-          : pendekatan === 'Berbasis Cinta (KBC)'
-            ? 'Berbasis Cinta (KBC): integrasikan nilai religius, toleransi, dan karakter secara halus.'
-            : pendekatan === 'Deep Learning + KBC'
-              ? 'Gabungan: seimbangkan eksplorasi/analisis/refleksi dengan nilai religius/karakter.'
-              : 'Pendekatan standar: kegiatan logis dan terukur.';
+        const pendekatanLabel = String(pendekatan || '').trim() || 'Standar';
+        const isK13 = kurikulum === 'K13';
+        const isDL = /deep\s*learning/i.test(pendekatanLabel);
+        const isKBC = /\bKBC\b/i.test(pendekatanLabel) || /berbasis\s+cinta/i.test(pendekatanLabel);
+        const isDandK = isDL && isKBC;
+
+        const pendekatanInstr = isDandK
+          ? 'Pendekatan Deep Learning + KBC.'
+          : isDL
+            ? 'Pendekatan Deep Learning.'
+            : isKBC
+              ? 'Pendekatan Berbasis Cinta (KBC).'
+              : 'Pendekatan Standar.';
+
+        const approachRules = isDandK
+          ? `ATURAN PENDEKATAN (DEEP LEARNING + KBC) — WAJIB DIPATUHI:
+- Di bagian Kegiatan Pembelajaran, wajib ada urutan eksplisit: Eksplorasi → Analisis → Refleksi.
+- Di setiap pertemuan wajib ada elemen Mindful, Meaningful, Joyful yang ditulis eksplisit (gunakan tag: [Mindful], [Meaningful], [Joyful]).
+- Wajib ada integrasi KBC yang eksplisit dalam kegiatan, asesmen, dan refleksi (jangan menggurui).
+- Wajib ada subbagian "Unsur KBC" dan "Implementasi KBC" (ringkas, konkret).`
+          : isDL
+            ? `ATURAN PENDEKATAN (DEEP LEARNING) — WAJIB DIPATUHI:
+- Di bagian Kegiatan Pembelajaran, wajib ada urutan eksplisit: Eksplorasi → Analisis → Refleksi.
+- Di setiap pertemuan wajib ada elemen Mindful, Meaningful, Joyful yang ditulis eksplisit (gunakan tag: [Mindful], [Meaningful], [Joyful]).
+- Dilarang menambahkan KBC sama sekali (jangan tulis "KBC", "Berbasis Cinta", "Unsur KBC", "Implementasi KBC").`
+            : isKBC
+              ? `ATURAN PENDEKATAN (KBC) — WAJIB DIPATUHI:
+- Wajib ada subbagian "Unsur KBC" dan "Implementasi KBC" (ringkas, konkret, kontekstual).
+- Di Kegiatan Pembelajaran wajib ada aktivitas KBC yang eksplisit (mis. etika komunikasi, empati, gotong royong, kepedulian lingkungan, refleksi syukur/niat belajar).
+- Rubrik/asesmen memuat indikator sikap/kolaborasi yang dapat diamati (tidak menggurui).`
+              : `ATURAN PENDEKATAN (STANDAR) — WAJIB DIPATUHI:
+- Kegiatan pembelajaran instruksional, terstruktur, dan terukur (contoh → latihan terbimbing → latihan mandiri).
+- Dilarang menambahkan KBC sama sekali (jangan tulis "KBC", "Berbasis Cinta", "Unsur KBC", "Implementasi KBC").`;
 
         const sintaks = kurikulum === 'K13'
           ? 'Gunakan sintaks: Apersepsi, Eksplorasi, Elaborasi, Konfirmasi, Refleksi.'
           : 'Gunakan struktur: Tujuan Pembelajaran, Materi, Kegiatan (Pendahuluan–Inti–Penutup), Asesmen (diagnostik/formatif/sumatif), Penilaian (sikap/pengetahuan/keterampilan).';
 
-        const usr = `Buatkan RPP dengan detail berikut:\n\nJenjang: ${jenjang}\nKelas: ${kelas}\nMata Pelajaran: ${mapel}\nMateri: ${materi}\nKurikulum: ${kurLabel}\nPendekatan: ${pendekatan}\nFormat: ${format}\nAlokasi Waktu: ${alokasi}\nNama Sekolah: ${String(R.nama_sekolah || '').trim()}\nNama Guru: ${String(R.nama_guru || '').trim()}\n\nKetentuan:\n- ${formatInstr}\n- ${pendekatanInstr}\n- ${sintaks}\n- Sertakan penilaian autentik: sikap, pengetahuan, keterampilan.\n- Output harus rapi (gunakan heading dan tabel bila perlu).\n- PENTING: Jangan tulis ulang judul dan identitas/metadata seperti:\n  Sekolah:, Kelas/Semester:, Mata Pelajaran:, Materi:, Alokasi Waktu:, Nama Guru:.\n  Mulai langsung dari isi RPP (mis. Tujuan Pembelajaran / Komponen Inti / Kegiatan Pembelajaran).\n${extra.length ? '\n' + extra.join('\n\n') : ''}\n\nOutput HARUS langsung berupa RPP.`;
+        const k13Rules = isK13
+          ? `ATURAN K13 — WAJIB:
+- Gunakan pendekatan saintifik 5M di Kegiatan Inti: Mengamati, Menanya, Mencoba, Menalar, Mengomunikasikan (tulis eksplisit).
+- Kaitkan KI/KD/Indikator bila tersedia dari CP/TP/KD (opsional) yang ditempel.`
+          : ``;
+
+        const usr = `Buatkan RPP dengan detail berikut:\n\nJenjang: ${jenjang}\nKelas: ${kelas}\nMata Pelajaran: ${mapel}\nMateri: ${materi}\nKurikulum: ${kurLabel}\nPendekatan: ${pendekatanLabel}\nFormat: ${format}\nAlokasi Waktu: ${alokasi}\nNama Sekolah: ${String(R.nama_sekolah || '').trim()}\nNama Guru: ${String(R.nama_guru || '').trim()}\n\nKetentuan:\n- ${formatInstr}\n- ${pendekatanInstr}\n- ${sintaks}\n${k13Rules ? `- ${k13Rules.replace(/\n/g,'\n')}\n` : ''}- ${approachRules.replace(/\n/g,'\n')}\n- Sertakan penilaian autentik: sikap, pengetahuan, keterampilan.\n- Output harus rapi (gunakan heading dan tabel bila perlu).\n- Rubrik Penilaian WAJIB dalam bentuk tabel Markdown saja (bukan bullet):\n  - Sikap: tabel | Skor | Kriteria |\n  - Pengetahuan: tabel | Rentang Nilai | Kriteria |\n  - Keterampilan: tabel | Rentang Nilai | Kriteria |\n- PENTING: Jangan tulis ulang judul dan identitas/metadata seperti:\n  Sekolah:, Kelas/Semester:, Mata Pelajaran:, Materi:, Alokasi Waktu:, Nama Guru:.\n  Mulai langsung dari isi RPP (mis. Tujuan Pembelajaran / Komponen Inti / Kegiatan Pembelajaran).\n${extra.length ? '\n' + extra.join('\n\n') : ''}\n\nOutput HARUS langsung berupa RPP.`;
 
         try {
           const ctrl = new AbortController();
@@ -5048,7 +5369,45 @@ ${baselineModulAjar}
           const data = await resp.json();
           const text = data?.content || data?.choices?.[0]?.message?.content || '';
           if (!text) throw new Error("Respons API kosong.");
-          state.rpp.hasil = text;
+          const stripKbcFromRpp = (raw) => {
+            const src = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const lines = src.split('\n');
+            const out = [];
+            for (let i = 0; i < lines.length; i++) {
+              const line = String(lines[i] || '');
+              const t = line.trim();
+              if (!t) { out.push(line); continue; }
+              if (/\bKBC\b/i.test(t)) continue;
+              if (/berbasis\s+cinta/i.test(t)) continue;
+              if (/unsur\s+kbc/i.test(t)) continue;
+              if (/implementasi\s+kbc/i.test(t)) continue;
+              out.push(line);
+            }
+            return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+          };
+          let finalText = isKBC ? text : stripKbcFromRpp(text);
+          if (isDL) {
+            const hasEAR = /eksplorasi/i.test(finalText) && /analisis/i.test(finalText) && /refleksi/i.test(finalText);
+            const hasMMJ = /\[Mindful\]/i.test(finalText) && /\[Meaningful\]/i.test(finalText) && /\[Joyful\]/i.test(finalText);
+            if (!hasEAR || !hasMMJ) {
+              try {
+                const reviseSys = `Anda adalah editor RPP. Perbaiki RPP agar patuh ketat dengan aturan pendekatan. Jangan menambah identitas/metadata. Jangan memberi penjelasan—output langsung RPP yang sudah diperbaiki.`;
+                const reviseUsr = `Tolong revisi RPP berikut agar memenuhi aturan ini:\n${approachRules}\n${k13Rules ? `\n${k13Rules}\n` : ''}\n\nRPP (baseline):\n<<<\n${finalText}\n>>>`;
+                const resp2 = await fetch("api/openai_proxy.php", {
+                  method: "POST",
+                  headers: {"Content-Type":"application/json"},
+                  body: JSON.stringify({ type:"rpp", messages:[{role:"system",content:reviseSys},{role:"user",content:reviseUsr}], model:OPENAI_MODEL }),
+                  signal: ctrl.signal,
+                });
+                if (resp2.ok) {
+                  const data2 = await resp2.json();
+                  const text2 = data2?.content || data2?.choices?.[0]?.message?.content || '';
+                  if (text2) finalText = isKBC ? text2 : stripKbcFromRpp(text2);
+                }
+              } catch {}
+            }
+          }
+          state.rpp.hasil = finalText;
           state.rpp.isGenerating = false;
           saveDebounced(true);
           render();
@@ -5056,7 +5415,7 @@ ${baselineModulAjar}
             const usageIn = Number(data?.usage?.prompt_tokens ?? data?.usage?.input_tokens ?? data?._usage?.in ?? 0);
             const usageOut = Number(data?.usage?.completion_tokens ?? data?.usage?.output_tokens ?? data?._usage?.out ?? 0);
             const title = `RPP - ${mapel} ${kelas} - ${materi}`.trim();
-            const snapshot = { rpp: { ...R, hasil: text }, identity: { ...state.identity }, questions: [] };
+            const snapshot = { rpp: { ...R, hasil: finalText }, identity: { ...state.identity }, questions: [] };
             await fetch("api/soal_user.php", {
               method: "POST",
               headers: {"Content-Type":"application/json"},
@@ -5082,15 +5441,16 @@ ${baselineModulAjar}
           } catch {}
         } catch(e) {
           state.rpp.isGenerating = false;
+          state.rppTab = 'rpp';
           render();
-          setTimeout(()=>{ const el=document.getElementById('rppError'); if(el){el.textContent='⚠️ Gagal: '+e.message; el.classList.remove('hidden');} }, 120);
+          setTimeout(()=>{ showErr('Gagal: '+(e?.message || 'Terjadi kesalahan.')); }, 120);
         }
       }
 
       async function exportRPPDocx() {
         const R = state.rpp || {};
         if (!R.hasil) return;
-        const btn = document.getElementById('btnExportRPP') || document.getElementById('btnExportRPP2');
+        const btn = document.getElementById('btnExportRPPTop') || document.getElementById('btnExportRPP') || document.getElementById('btnExportRPP2');
         const origHTML = btn?.innerHTML;
         if (btn) { btn.disabled=true; btn.textContent='Membuat file...'; }
         try {
@@ -5206,6 +5566,7 @@ ${baselineModulAjar}
           let bodyText = String(R.hasil || '');
           bodyText = stripRppDuplicateInfo(bodyText);
           bodyText = bodyText.trim();
+          bodyText = rppNormalizeRubrikToTables(bodyText);
 
           const children = [
             new Paragraph({alignment:AlignmentType.CENTER,...sp(200,60),children:[new TextRun({text:'RPP (Rencana Pelaksanaan Pembelajaran)',font:FONT,size:32,bold:true})]}),
@@ -5231,6 +5592,48 @@ ${baselineModulAjar}
           URL.revokeObjectURL(a.href);
         } finally {
           if (btn) { btn.disabled=false; if (origHTML) btn.innerHTML = origHTML; }
+        }
+      }
+
+      async function exportRPPPdf() {
+        const R = state.rpp || {};
+        if (!R.hasil) return;
+        const btn = document.getElementById('btnExportRPPPdfTop');
+        const origHTML = btn?.innerHTML;
+        if (btn) { btn.disabled = true; btn.textContent = 'Membuat PDF...'; }
+        try {
+          await ensureHtml2Pdf();
+          const src = document.getElementById('rppPreview');
+          if (!src) { alert('Buka tab RPP dulu untuk menampilkan preview.'); return; }
+          const clone = src.cloneNode(true);
+          const wrapper = document.createElement('div');
+          wrapper.style.background = '#ffffff';
+          wrapper.style.color = '#000000';
+          const style = document.createElement('style');
+          style.textContent = `
+            .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 0 !important; }
+            .rpp-page { page-break-after: always; break-after: page; box-shadow: none !important; border: none !important; min-height: auto !important; height: auto !important; }
+            .rpp-page:last-child { page-break-after: auto; break-after: auto; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #cfcfcf; padding: 6px 8px; vertical-align: top; }
+            th { background: #f3f4f6; font-weight: 700; }
+          `;
+          wrapper.appendChild(style);
+          wrapper.appendChild(clone);
+
+          const safe = `${String(R.mata_pelajaran||'Mapel').replace(/\s+/g,'_')}_${String(R.kelas||'Kelas').replace(/\s+/g,'_')}_${String(R.materi||'Materi').replace(/[\s/]+/g,'_')}`;
+          await window.html2pdf().set({
+            margin: [10, 10, 12, 10],
+            filename: `RPP_${safe}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            pagebreak: { mode: ['css'] },
+          }).from(wrapper).save();
+        } catch (e) {
+          alert('Gagal membuat PDF: ' + (e?.message || 'Terjadi kesalahan.'));
+        } finally {
+          if (btn) { btn.disabled = false; if (origHTML) btn.innerHTML = origHTML; }
         }
       }
 
@@ -5342,11 +5745,6 @@ ${baselineModulAjar}
                   onclick="document.getElementById('projectPicker').value=''; document.getElementById('projectPicker').click();" title="Muat">
                   <span class="material-symbols-outlined text-[18px]">folder_open</span>
                   <span class="ml-2 hidden lg:inline">Muat</span>
-                </button>
-                <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
-                  onclick="document.getElementById('btnPrint').click();" title="Cetak">
-                  <span class="material-symbols-outlined text-[18px]">print</span>
-                  <span class="ml-2 hidden lg:inline">Cetak</span>
                 </button>
                 <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
                   onclick="${helpOnClick}" title="Petunjuk">
@@ -6023,6 +6421,23 @@ ${baselineModulAjar}
                     <li>Pilih Dimensi Profil Pelajar Pancasila (min. satu).</li>
                     <li>Klik Buat Modul Ajar Sekarang untuk membuat dokumen.</li>
                     <li>Gunakan Download .docx untuk menyimpan hasil.</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+            <div id="modalMAHelp3" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+              <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-h-[85vh] overflow-auto">
+                <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                  <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Modul Ajar • Langkah 3</div>
+                  <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeMAHelp3()">&times;</button>
+                </div>
+                <div class="p-5 space-y-3 text-sm leading-relaxed">
+                  <ol class="list-decimal pl-5 space-y-2">
+                    <li>Tab ini menampilkan hasil Modul Ajar dalam format preview.</li>
+                    <li>Jika hasil belum ada, kembali ke Langkah 2 lalu klik Buat Modul Ajar Sekarang.</li>
+                    <li>Gunakan Download .docx untuk menyimpan dokumen Word.</li>
+                    <li>Gunakan Download PDF untuk menyimpan versi PDF (jika tersedia).</li>
+                    <li>Jika dokumen panjang, tunggu sampai proses selesai dan jangan tutup halaman saat loading.</li>
                   </ol>
                 </div>
               </div>
@@ -8638,10 +9053,18 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         closeMAHelp1,
         openMAHelp2,
         closeMAHelp2,
+        openMAHelp3,
+        closeMAHelp3,
+        openRPPHelp1,
+        closeRPPHelp1,
+        openRPPHelp2,
+        closeRPPHelp2,
         exportModulAjarPDF,
+        setRppTab,
         setRPP,
         buildRPP,
         exportRPPDocx,
+        exportRPPPdf,
         setLkpdSource,
         buildLKPD,
         pickLkpdImage,
@@ -8689,26 +9112,36 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
 
       const btnThemeEl = el("btnTheme");
       if (btnThemeEl) btnThemeEl.addEventListener("click", toggleTheme);
-      
-      const btnPrint = el("btnPrint");
-      if (btnPrint) {
-        btnPrint.addEventListener("click", async () => {
-          try {
-            btnPrint.innerHTML = `<span class="animate-spin material-symbols-outlined text-[18px]">progress_activity</span> Mengunduh...`;
-            btnPrint.disabled = true;
-          } catch {}
-          try { await exportDocx(); } catch {}
-          await new Promise(r=>setTimeout(r,300));
-          try { await exportKunciDocx(); } catch {}
-          await new Promise(r=>setTimeout(r,300));
-          try { await exportKisiDocx(); } catch {}
-          try {
-            btnPrint.innerHTML = "Cetak";
-            btnPrint.disabled = false;
-          } catch {}
-        });
-      }
 
+      document.addEventListener("click", (e) => {
+        const t = e.target && e.target.closest ? e.target.closest("[data-action]") : null;
+        if (!t) return;
+        const a = t.getAttribute("data-action");
+        if (!a) return;
+        if (a === "build-rpp") {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          e.stopPropagation();
+          try {
+            Promise.resolve(window.__sp?.buildRPP?.()).catch((err) => {
+              alert('Gagal menjalankan proses RPP: ' + (err?.message || 'Terjadi kesalahan.'));
+            });
+          } catch (err) {
+            alert('Gagal menjalankan proses RPP: ' + (err?.message || 'Terjadi kesalahan.'));
+          }
+        } else if (a === "export-rpp-docx") {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          e.stopPropagation();
+          try { window.__sp?.exportRPPDocx?.(); } catch {}
+        } else if (a === "export-rpp-pdf") {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          e.stopPropagation();
+          try { window.__sp?.exportRPPPdf?.(); } catch {}
+        }
+      }, true);
+      
       el("btnSave").addEventListener("click", saveProject);
       el("btnLoad").addEventListener("click", () => {
         el("projectPicker").value = "";
