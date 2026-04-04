@@ -627,6 +627,33 @@ if (!isset($_SESSION['user_id'])) {
         return { ok: true, msg: "", tab: "", path: "" };
       };
 
+      const parseKelasNumber = (raw) => {
+        const s = String(raw || '').trim().toUpperCase();
+        if (!s) return null;
+        const dm = s.match(/\b(1[0-2]|[1-9])\b/);
+        if (dm) return Number(dm[1]);
+        const rm = s.match(/\b(XII|XI|X|IX|VIII|VII|VI|V|IV|III|II|I)\b/);
+        if (!rm) return null;
+        const roman = rm[1];
+        const map = { I:1, II:2, III:3, IV:4, V:5, VI:6, VII:7, VIII:8, IX:9, X:10, XI:11, XII:12 };
+        return map[roman] || null;
+      };
+      const faseLetterFromLabel = (raw) => {
+        const s = String(raw || '').trim();
+        const m = s.match(/Fase\s+([A-F])/i);
+        return m ? String(m[1]).toUpperCase() : null;
+      };
+      const expectedFaseLetter = (jenjang, kelasNum) => {
+        const j = String(jenjang || '').trim();
+        const k = Number(kelasNum || 0);
+        if (!k) return null;
+        if (j === 'SD/MI') return k <= 2 ? 'A' : (k <= 4 ? 'B' : (k <= 6 ? 'C' : null));
+        if (j === 'SMP/MTs') return (k >= 7 && k <= 9) ? 'D' : null;
+        if (j === 'SMA/MA') return k === 10 ? 'E' : ((k === 11 || k === 12) ? 'F' : null);
+        if (j === 'SMK') return k === 10 ? 'E' : ((k === 11 || k === 12) ? 'F' : ((k >= 7 && k <= 9) ? 'D' : null));
+        return null;
+      };
+
       const inputText = (label, path, value, placeholder) => `
         <div class="flex flex-col gap-2">
           <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">${safeText(label)}</label>
@@ -7070,6 +7097,27 @@ ${baselineModulAjar}
             ? `berbagai tema/topik yang sesuai untuk ${state.identity.mataPelajaran} tingkat ${state.identity.jenjang} kelas ${state.identity.kelas}`
             : `topik ${state.identity.topik || '-'} untuk ${state.identity.mataPelajaran} tingkat ${state.identity.jenjang} kelas ${state.identity.kelas}`;
 
+          const kelasNum = parseKelasNumber(state.identity.kelas);
+          const faseSel = faseLetterFromLabel(state.identity.fase);
+          const faseExp = expectedFaseLetter(state.identity.jenjang, kelasNum);
+          const faseEfektif = faseExp ? `Fase ${faseExp}` : (faseSel ? `Fase ${faseSel}` : String(state.identity.fase || ''));
+          const jenjangEfektif = String(state.identity.jenjang || '').trim();
+          const mapelEfektif = String(state.identity.mataPelajaran || '').trim();
+          const isSMA = jenjangEfektif === 'SMA/MA' || jenjangEfektif === 'SMK';
+          const isPancasila = /pancasila/i.test(mapelEfektif);
+          const isKelasAtas = Number(kelasNum || 0) >= 11;
+          const levelRules = isSMA && isPancasila && isKelasAtas
+            ? `KETENTUAN LEVEL (WAJIB):
+- Ini untuk ${jenjangEfektif} Kelas ${kelasNum || state.identity.kelas} (${faseEfektif}). Level harus setara SMA akhir.
+- DILARANG membuat soal level SD/SMP, contohnya: bunyi sila-sila, "sila pertama apa", lambang Garuda, urutan sila, definisi Pancasila yang sangat dasar.
+- Utamakan soal berbasis konteks/kasus, analisis argumen, dilema kebijakan publik, partisipasi warga, etika digital, HAM, demokrasi, konstitusi/UUD 1945, keberagaman dan konflik sosial, serta literasi kewargaan kontemporer.
+- Pertanyaan harus menuntut penalaran (mengapa/bagaimana), bukan hafalan.`
+            : (isSMA && Number(kelasNum || 0) >= 10
+              ? `KETENTUAN LEVEL (WAJIB):
+- Ini untuk ${jenjangEfektif} Kelas ${kelasNum || state.identity.kelas} (${faseEfektif}). Soal harus setara SMA/SMK, bukan level SD.
+- Utamakan konteks nyata, analisis, dan penerapan konsep (hindari definisi 1 kalimat yang terlalu dasar).`
+              : ``);
+
           const outputSchema = sec.bentuk === "menjodohkan"
             ? `OUTPUT JSON (Array of Objects):
 [
@@ -7131,9 +7179,10 @@ Kembalikan JSON persis: {"items": [...]}`;
 Buatlah daftar soal untuk BAGIAN: ${bagianLabel}.
 
 KONTEKS:
-Jenjang: ${state.identity.jenjang} ${state.identity.fase} Kelas ${state.identity.kelas}
+Jenjang: ${state.identity.jenjang} ${faseEfektif ? faseEfektif : state.identity.fase} Kelas ${state.identity.kelas}
 Mapel: ${state.identity.mataPelajaran}
 Topik: ${topikText}
+${levelRules ? `\n${levelRules}\n` : ''}
 
 PARAMETER:
 - Jumlah Soal: __JUMLAH__ butir.
