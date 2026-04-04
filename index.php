@@ -4407,6 +4407,7 @@ PENTING:
           <div class="flex flex-col gap-2">
             <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">${safeText(lbl)}</label>
             <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
+              data-rpp-key="${safeText(key)}"
               onchange="window.__sp.setRPP('${key}',this.value,true)">
               ${opts.map(o=>`<option value="${safeText(o.v)}" ${String(o.v)===String(val||'')?'selected':''}>${safeText(o.l)}</option>`).join('')}
             </select>
@@ -4583,7 +4584,11 @@ PENTING:
         const showErr = (msg) => { const e=errEl(); if(e){e.textContent='⚠️ '+msg; e.classList.remove('hidden');} };
         const hideErr = () => { const e=errEl(); if(e){e.textContent=''; e.classList.add('hidden');} };
 
-        const jenjang = String(R.jenjang || '').trim();
+        const getRppDomValue = (key) => {
+          const el = document.querySelector(`[data-rpp-key="${String(key || '')}"]`);
+          return el ? String(el.value || '') : '';
+        };
+        const jenjang = String(R.jenjang || getRppDomValue('jenjang') || '').trim();
         const kelas = String(R.kelas || '').trim();
         const mapel = String(R.mata_pelajaran || '').trim();
         const materi = String(R.materi || '').trim();
@@ -4591,6 +4596,11 @@ PENTING:
         const pendekatan = String(R.pendekatan || '').trim();
         const format = String(R.format || '').trim();
         const alokasi = String(R.alokasi_waktu || '').trim();
+        if (!String(R.jenjang || '').trim() && jenjang) {
+          state.rpp = state.rpp || {};
+          state.rpp.jenjang = jenjang;
+          saveDebounced(false);
+        }
         const missing = [];
         if (!jenjang) missing.push('Jenjang');
         if (!kelas) missing.push('Kelas');
