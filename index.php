@@ -657,13 +657,21 @@ if (!isset($_SESSION['user_id'])) {
       };
 
       const identityTopikDisplay = (I) => {
-        const ringkas = String(I?.topik_ringkas || I?.topik || "").trim();
-        if (ringkas) return ringkas;
         const raw = String(I?.topik_raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
         if (!raw) return "";
-        const firstLine = raw.split("\n").map(s => s.trim()).filter(Boolean)[0] || "";
-        const base = (firstLine || raw).trim();
-        return base.length > 180 ? base.slice(0, 180) + "…" : base;
+        const oneLine = raw.replace(/\s+/g, " ").trim();
+        const stop = new Set([
+          "dan","yang","dari","di","ke","untuk","pada","dengan","atau","sebagai","dalam","adalah","yaitu","yakni",
+          "ini","itu","tersebut","oleh","para","agar","bagi","tentang","serta","karena","maka","jika","sehingga",
+        ]);
+        const tokenize = (s) => s
+          .split(" ")
+          .map(w => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "").trim())
+          .filter(Boolean);
+        const words = tokenize(oneLine);
+        const filtered = words.filter(w => !stop.has(w.toLowerCase()));
+        const pick = (arr) => arr.slice(0, 5).join(" ").trim();
+        return pick(filtered.length ? filtered : words);
       };
 
       const inputText = (label, path, value, placeholder) => `
@@ -1563,6 +1571,14 @@ if (!isset($_SESSION['user_id'])) {
       }
       function closeIdentitasHelp() {
         const m = el('modalIdentitasHelp');
+        if (m) m.style.display = 'none';
+      }
+      function openSumberMateriHelp() {
+        const m = el('modalSumberMateriHelp');
+        if (m) m.style.display = 'flex';
+      }
+      function closeSumberMateriHelp() {
+        const m = el('modalSumberMateriHelp');
         if (m) m.style.display = 'none';
       }
       function openKonfigurasiHelp() {
@@ -5883,8 +5899,6 @@ ${baselineModulAjar}
         const root = el("viewRoot");
         root.innerHTML = computeView();
         wireInputs(root);
-        const detailsTopikRaw = el("detailsTopikRaw");
-        if (detailsTopikRaw) detailsTopikRaw.open = true;
         if (state.activeView === "riwayat") {
           loadRiwayat();
         }
@@ -5974,38 +5988,79 @@ ${baselineModulAjar}
                 </div>
                 <div class="grid grid-cols-1 gap-5">
                   <div class="space-y-3">
-                    <details id="detailsTopikRaw" class="rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark overflow-hidden">
-                      <summary class="cursor-pointer select-none px-4 py-3 flex items-center justify-between gap-3">
-                        <span class="text-sm font-bold">Sumber Materi</span>
-                        <span class="text-xs text-text-sub-light dark:text-text-sub-dark">${safeText(String(i.topik_raw || '').trim() ? `${String(i.topik_raw || '').trim().length} karakter` : 'kosong')}</span>
+                    <details id="detailsTopikRaw" open class="rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark overflow-hidden">
+                      <summary class="cursor-pointer select-none px-4 py-4 flex items-center justify-between gap-3">
+                        <span class="flex items-center gap-2">
+                          <span class="text-sm font-bold">Sumber Materi</span>
+                          <button type="button"
+                            class="flex size-7 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors"
+                            title="Petunjuk Sumber Materi"
+                            onclick="event.preventDefault(); event.stopPropagation(); window.__sp.openSumberMateriHelp();"
+                          >
+                            <span class="material-symbols-outlined text-[16px]">help</span>
+                          </button>
+                        </span>
+                        <span class="flex items-center gap-2 text-xs text-text-sub-light dark:text-text-sub-dark">
+                          <span>${safeText(String(i.topik_raw || '').trim() ? `${String(i.topik_raw || '').trim().length} karakter` : 'kosong')}</span>
+                          <span class="material-symbols-outlined text-[18px]">expand_more</span>
+                        </span>
                       </summary>
                       <div class="p-4 space-y-3 border-t border-border-light dark:border-border-dark">
-                        ${inputTextarea("Acuan Utama Soal", "identity.topik_raw", i.topik_raw, "Paste materi lengkap di sini, atau upload gambar/file/.docx.")}
-                        <div class="flex flex-wrap items-center gap-2">
-                          <button id="btnTopikUploadImg" class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikImage()">
+                        <div class="flex flex-col gap-2">
+                          <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Acuan Utama Soal</label>
+                          <textarea
+                            class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm min-h-[180px] md:min-h-[220px]"
+                            data-path="identity.topik_raw"
+                            placeholder="Paste materi lengkap di sini, atau upload gambar/file/.docx."
+                          >${safeText(i.topik_raw ?? "")}</textarea>
+                        </div>
+                        <div class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
+                          <button id="btnTopikUploadImg" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikImage()">
                             <span class="material-symbols-outlined text-[18px]">image</span>
                             Upload Gambar
                           </button>
-                          <button id="btnTopikUploadTxt" class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikText()">
+                          <button id="btnTopikUploadTxt" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikText()">
                             <span class="material-symbols-outlined text-[18px]">upload_file</span>
                             Upload File Teks
                           </button>
-                          <button id="btnTopikUploadDocx" class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikDocx()">
+                          <button id="btnTopikUploadDocx" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikDocx()">
                             <span class="material-symbols-outlined text-[18px]">description</span>
                             Upload .docx
                           </button>
-                          <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Upload akan disimpan sebagai Materi Mentah lalu dibuatkan Tema Ringkas otomatis.</div>
+                          <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Upload akan dimasukkan ke Sumber Materi.</div>
                         </div>
                       </div>
                     </details>
-                    <div class="flex flex-wrap items-center gap-2">
-                      <button id="btnTopikSummarize" class="flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.summarizeTopikInput()">
-                        <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
-                        Ringkas Sumber Materi
-                      </button>
-                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Tema ringkas hanya untuk tampilan. Soal mengacu ke Sumber Materi.</div>
+                    <div id="modalSumberMateriHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+                      <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-height-[85vh] overflow-auto">
+                        <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                          <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Sumber Materi</div>
+                          <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeSumberMateriHelp()">&times;</button>
+                        </div>
+                        <div class="p-5 space-y-4 text-sm leading-relaxed">
+                          <div>
+                            <div class="font-bold mb-1">Fungsi</div>
+                            <ul class="list-disc pl-5 space-y-1">
+                              <li>Sumber Materi adalah acuan utama untuk membuat soal.</li>
+                              <li>Semakin lengkap materinya, soal biasanya makin relevan dan tidak terlalu umum.</li>
+                              <li>Sistem tetap menyesuaikan level sesuai Jenjang, Fase, dan Kelas.</li>
+                            </ul>
+                          </div>
+                          <div>
+                            <div class="font-bold mb-1">Cara pakai</div>
+                            <ol class="list-decimal pl-5 space-y-1">
+                              <li>Tempel materi ke kolom Acuan Utama Soal, atau upload Gambar/File Teks/.docx.</li>
+                              <li>Atur Jenjang, Fase, Kelas, dan Mata Pelajaran.</li>
+                              <li>Lanjutkan Konfigurasi Bagian, lalu buat paket soal.</li>
+                            </ol>
+                          </div>
+                          <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
+                            Tips: Jika materi sangat panjang, cukup ambil bagian inti/topik utama agar soal lebih fokus.
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    ${inputText("Tema/Topik Ringkas (untuk tampilan)", "identity.topik_ringkas", String(i.topik_ringkas || i.topik || "").replace(/\\s+/g,' ').trim(), "Ringkas 1–2 kalimat. Jika kosong, akan diambil otomatis dari Materi Mentah.")}
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Topik untuk tampilan akan dibuat otomatis (maks. 5 kata) dari Sumber Materi.</div>
                   </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
@@ -7159,13 +7214,9 @@ ${baselineModulAjar}
                               sec.bentuk === "pg_kompleks" ? "Pilihan Ganda Kompleks" :
                               sec.bentuk === "menjodohkan" ? "Menjodohkan" :
                               sec.bentuk === "isian" ? "Isian Singkat" : "Uraian";
-          const topikRingkas = String(state.identity.topik_ringkas || state.identity.topik || "").trim();
           const topikRaw = String(state.identity.topik_raw || "").trim();
           const topikRawClip = topikRaw ? topikRaw.slice(0, 12000) : "";
-          const rawFirstLine = topikRaw
-            ? (topikRaw.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").map(s => s.trim()).filter(Boolean)[0] || "")
-            : "";
-          const topikDisplay = topikRingkas || (rawFirstLine || (topikRaw ? topikRaw.slice(0, 180) : "")).trim();
+          const topikDisplay = identityTopikDisplay(state.identity);
           const topikText = topikDisplay
             ? `tema ${topikDisplay} untuk ${state.identity.mataPelajaran} tingkat ${state.identity.jenjang} kelas ${state.identity.kelas}`
             : `berbagai tema/topik yang sesuai untuk ${state.identity.mataPelajaran} tingkat ${state.identity.jenjang} kelas ${state.identity.kelas}`;
@@ -7254,7 +7305,6 @@ Buatlah daftar soal untuk BAGIAN: ${bagianLabel}.
 KONTEKS:
 Jenjang: ${state.identity.jenjang} ${faseEfektif ? faseEfektif : state.identity.fase} Kelas ${state.identity.kelas}
 Mapel: ${state.identity.mataPelajaran}
-Tema Ringkas (label): ${topikDisplay || "-"}
 Sumber Materi Mentah (WAJIB jadi dasar utama soal):${topikRawClip ? `\n<<<\n${topikRawClip}\n>>>` : " -"}
 ${levelRules ? `\n${levelRules}\n` : ''}
 
@@ -7666,14 +7716,12 @@ ${out}`;
       };
       const setTopikFromMateri = async (text, btn, originalHtml, label) => {
         try {
-          const tema = await summarizeMateriToTema(text);
           state.identity = state.identity || {};
           const rawTxt = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
           state.identity.topik_raw = rawTxt.slice(0, 30000);
-          state.identity.topik_ringkas = tema;
           saveDebounced(true);
           render();
-          alert(`Tema materi berhasil dibuat dari ${label}.`);
+          alert(`Sumber materi berhasil dimuat dari ${label}.`);
         } catch (e) {
           alert("Gagal menganalisis materi: " + (e?.message || "Terjadi kesalahan."));
         } finally {
@@ -9287,6 +9335,8 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         generateRekapPDF,
         openIdentitasHelp,
         closeIdentitasHelp,
+        openSumberMateriHelp,
+        closeSumberMateriHelp,
         openKonfigurasiHelp,
         closeKonfigurasiHelp,
         openPreviewHelp,
@@ -9316,7 +9366,6 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         pickTopikImage,
         pickTopikText,
         pickTopikDocx,
-        summarizeTopikInput,
         buildPackage,
         uploadQuestionImage,
         exportDocx,
