@@ -5883,6 +5883,8 @@ ${baselineModulAjar}
         const root = el("viewRoot");
         root.innerHTML = computeView();
         wireInputs(root);
+        const detailsTopikRaw = el("detailsTopikRaw");
+        if (detailsTopikRaw) detailsTopikRaw.open = true;
         if (state.activeView === "riwayat") {
           loadRiwayat();
         }
@@ -5972,21 +5974,13 @@ ${baselineModulAjar}
                 </div>
                 <div class="grid grid-cols-1 gap-5">
                   <div class="space-y-3">
-                    ${inputTextarea("Tema/Topik Ringkas (untuk tampilan)", "identity.topik_ringkas", i.topik_ringkas || i.topik, "Ringkas 1–2 kalimat. Jika kosong, akan diambil otomatis dari Materi Mentah.")}
-                    <div class="flex flex-wrap items-center gap-2">
-                      <button id="btnTopikSummarize" class="flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.summarizeTopikInput()">
-                        <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
-                        Ringkas dari Mentah
-                      </button>
-                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Tema ringkas hanya untuk tampilan. Soal mengacu ke Materi Mentah.</div>
-                    </div>
-                    <details class="rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark overflow-hidden">
+                    <details id="detailsTopikRaw" class="rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark overflow-hidden">
                       <summary class="cursor-pointer select-none px-4 py-3 flex items-center justify-between gap-3">
-                        <span class="text-sm font-bold">Sumber Materi (Mentah)</span>
+                        <span class="text-sm font-bold">Sumber Materi</span>
                         <span class="text-xs text-text-sub-light dark:text-text-sub-dark">${safeText(String(i.topik_raw || '').trim() ? `${String(i.topik_raw || '').trim().length} karakter` : 'kosong')}</span>
                       </summary>
                       <div class="p-4 space-y-3 border-t border-border-light dark:border-border-dark">
-                        ${inputTextarea("Materi Mentah (acuan utama soal)", "identity.topik_raw", i.topik_raw, "Paste materi lengkap di sini, atau upload gambar/file/.docx.")}
+                        ${inputTextarea("Acuan Utama Soal", "identity.topik_raw", i.topik_raw, "Paste materi lengkap di sini, atau upload gambar/file/.docx.")}
                         <div class="flex flex-wrap items-center gap-2">
                           <button id="btnTopikUploadImg" class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikImage()">
                             <span class="material-symbols-outlined text-[18px]">image</span>
@@ -6004,6 +5998,14 @@ ${baselineModulAjar}
                         </div>
                       </div>
                     </details>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <button id="btnTopikSummarize" class="flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.summarizeTopikInput()">
+                        <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                        Ringkas Sumber Materi
+                      </button>
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Tema ringkas hanya untuk tampilan. Soal mengacu ke Sumber Materi.</div>
+                    </div>
+                    ${inputText("Tema/Topik Ringkas (untuk tampilan)", "identity.topik_ringkas", String(i.topik_ringkas || i.topik || "").replace(/\\s+/g,' ').trim(), "Ringkas 1–2 kalimat. Jika kosong, akan diambil otomatis dari Materi Mentah.")}
                   </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
