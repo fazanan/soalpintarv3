@@ -280,6 +280,9 @@ if (!isset($_SESSION['user_id'])) {
     <input id="projectPicker" type="file" accept=".json" class="hidden" />
     <input id="lkpdImgUpload" type="file" accept="image/*" class="hidden" />
     <input id="lkpdTxtUpload" type="file" accept=".txt,.md,.markdown,.csv,.json,.html,.htm" class="hidden" />
+    <input id="topikImgUpload" type="file" accept="image/*" class="hidden" />
+    <input id="topikTxtUpload" type="file" accept=".txt,.md,.markdown,.csv,.json,.html,.htm" class="hidden" />
+    <input id="topikDocxUpload" type="file" accept=".docx" class="hidden" />
     <input id="rosterPicker" type="file" accept=".csv,.txt" class="hidden" />
     <input id="rekapExcelPicker" type="file" accept=".xlsx,.xls" class="hidden" />
     <input id="rekapPrintLogoPicker" type="file" accept="image/*" class="hidden" />
@@ -502,7 +505,8 @@ if (!isset($_SESSION['user_id'])) {
           fase: "",
           kelas: "",
           mataPelajaran: "",
-          jenisTopik: "spesifik", // spesifik | campuran
+          topik_raw: "",
+          topik_ringkas: "",
           topik: "",
           logo: "",
         },
@@ -601,7 +605,6 @@ if (!isset($_SESSION['user_id'])) {
       const validateBuatSoal = () => {
         const I = state.identity || {};
         const P = state.paket || {};
-        const isSpesifik = String(I.jenisTopik || "spesifik") === "spesifik";
         const miss = (msg, tab, path) => ({ ok: false, msg, tab, path: path || "" });
 
         if (!String(I.namaSekolah || "").trim()) return miss("Langkah 1 belum lengkap: isi Nama Sekolah dulu ya.", "identitas", "identity.namaSekolah");
@@ -609,7 +612,6 @@ if (!isset($_SESSION['user_id'])) {
         if (!String(I.fase || "").trim()) return miss("Langkah 1 belum lengkap: pilih Fase dulu ya.", "identitas", "identity.fase");
         if (!String(I.kelas || "").trim()) return miss("Langkah 1 belum lengkap: isi Kelas dulu ya.", "identitas", "identity.kelas");
         if (!String(I.mataPelajaran || "").trim()) return miss("Langkah 1 belum lengkap: pilih Mata Pelajaran dulu ya.", "identitas", "identity.mataPelajaran");
-        if (isSpesifik && !String(I.topik || "").trim()) return miss("Langkah 1 belum lengkap: isi Topik / Lingkup Materi dulu ya.", "identitas", "identity.topik");
         if (!String(P.judul || "").trim()) return miss("Langkah 1 belum lengkap: isi Judul Paket dulu ya.", "identitas", "paket.judul");
         if (!String(P.tahunAjaran || "").trim()) return miss("Langkah 1 belum lengkap: isi Tahun Ajaran dulu ya.", "identitas", "paket.tahunAjaran");
 
@@ -652,6 +654,16 @@ if (!isset($_SESSION['user_id'])) {
         if (j === 'SMA/MA') return k === 10 ? 'E' : ((k === 11 || k === 12) ? 'F' : null);
         if (j === 'SMK') return k === 10 ? 'E' : ((k === 11 || k === 12) ? 'F' : ((k >= 7 && k <= 9) ? 'D' : null));
         return null;
+      };
+
+      const identityTopikDisplay = (I) => {
+        const ringkas = String(I?.topik_ringkas || I?.topik || "").trim();
+        if (ringkas) return ringkas;
+        const raw = String(I?.topik_raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+        if (!raw) return "";
+        const firstLine = raw.split("\n").map(s => s.trim()).filter(Boolean)[0] || "";
+        const base = (firstLine || raw).trim();
+        return base.length > 180 ? base.slice(0, 180) + "…" : base;
       };
 
       const inputText = (label, path, value, placeholder) => `
@@ -870,12 +882,13 @@ if (!isset($_SESSION['user_id'])) {
             const colonX = labelW;
             const valX = colonX + 12;
             const rowH = 18;
-            const isSpesifik = String(state.identity.jenisTopik || "spesifik") === "spesifik";
+            const topikDisplay = identityTopikDisplay(state.identity);
+            const isSpesifik = !!topikDisplay;
 
             const leftRows = [
               ["Mata Pelajaran", String(state.identity.mataPelajaran || "-"), "text"],
               ["Kelas / Fase", `${String(state.identity.kelas || "-")} / ${String(state.identity.fase || "-")}`, "text"],
-              ...(isSpesifik ? [["Topik / Lingkup Materi", String(state.identity.topik || "-"), "text"]] : []),
+              ...(isSpesifik ? [["Topik / Lingkup Materi", String(topikDisplay || "-"), "text"]] : []),
               ...(kind === "soal" ? [["Hari / Tanggal", "", "line"]] : []),
             ];
             const rightRows = kind === "soal"
@@ -2024,6 +2037,19 @@ if (!isset($_SESSION['user_id'])) {
         const parsed = JSON.parse(raw);
         state = { ...DEFAULT_STATE(), ...parsed };
         state.sections = parsed.sections?.length ? parsed.sections : DEFAULT_STATE().sections;
+        try {
+          state.identity = state.identity || {};
+          const I = state.identity;
+          if (!String(I.topik_raw || "").trim() && !String(I.topik_ringkas || "").trim() && String(I.topik || "").trim()) {
+            I.topik_raw = String(I.topik || "");
+            I.topik_ringkas = String(I.topik || "");
+          }
+          if (String(I.topik_raw || "").trim() && !String(I.topik_ringkas || "").trim()) {
+            const rawTxt = String(I.topik_raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+            const firstLine = rawTxt.split("\n").map(s => s.trim()).filter(Boolean)[0] || "";
+            I.topik_ringkas = (firstLine || rawTxt.slice(0, 180)).trim();
+          }
+        } catch {}
         return true;
       };
 
@@ -2306,6 +2332,19 @@ if (!isset($_SESSION['user_id'])) {
           try {
             const data = JSON.parse(e.target.result);
             state = { ...DEFAULT_STATE(), ...data };
+            try {
+              state.identity = state.identity || {};
+              const I = state.identity;
+              if (!String(I.topik_raw || "").trim() && !String(I.topik_ringkas || "").trim() && String(I.topik || "").trim()) {
+                I.topik_raw = String(I.topik || "");
+                I.topik_ringkas = String(I.topik || "");
+              }
+              if (String(I.topik_raw || "").trim() && !String(I.topik_ringkas || "").trim()) {
+                const rawTxt = String(I.topik_raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+                const firstLine = rawTxt.split("\n").map(s => s.trim()).filter(Boolean)[0] || "";
+                I.topik_ringkas = (firstLine || rawTxt.slice(0, 180)).trim();
+              }
+            } catch {}
             saveDebounced(true);
             render();
             alert("Proyek berhasil dimuat!");
@@ -2640,7 +2679,7 @@ if (!isset($_SESSION['user_id'])) {
                 <div class="space-y-1.5">
                   <div class="flex items-start"><span class="w-36 font-semibold shrink-0">Mata Pelajaran</span><span class="mr-2">:</span><span>${safeText(state.identity.mataPelajaran)}</span></div>
                   <div class="flex items-start"><span class="w-36 font-semibold shrink-0">Kelas / Fase</span><span class="mr-2">:</span><span>${safeText(state.identity.kelas)} / ${safeText(state.identity.fase)}</span></div>
-                  ${String(state.identity.jenisTopik || "spesifik") === "spesifik" ? `<div class="flex items-start"><span class="w-36 font-semibold shrink-0">Topik / Lingkup Materi</span><span class="mr-2">:</span><span>${safeText(state.identity.topik || "-")}</span></div>` : ``}
+                  ${identityTopikDisplay(state.identity) ? `<div class="flex items-start"><span class="w-36 font-semibold shrink-0">Topik / Lingkup Materi</span><span class="mr-2">:</span><span>${safeText(identityTopikDisplay(state.identity))}</span></div>` : ``}
                   <div class="flex items-center"><span class="w-36 font-semibold shrink-0">Hari / Tanggal</span><span class="mr-2">:</span><div class="border-b border-black border-dotted flex-1 h-4"></div></div>
                 </div>
                 <div class="space-y-1.5">
@@ -5929,17 +5968,46 @@ ${baselineModulAjar}
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                   ${selectField("Mata Pelajaran", "identity.mataPelajaran", i.mataPelajaran, SUBJECT_OPTIONS[i.jenjang] || [])}
-                  ${selectField("Jenis Topik", "identity.jenisTopik", i.jenisTopik || "spesifik", ["spesifik", "campuran"])}
+                  ${inputText("Semester (opsional)", "paket.semester", p.semester, "Contoh: Semester 2")}
                 </div>
                 <div class="grid grid-cols-1 gap-5">
-                  ${i.jenisTopik === "campuran" 
-                    ? `<div class="flex flex-col gap-2"><label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Topik</label><div class="min-h-[44px] flex items-center px-4 text-sm text-gray-500 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 italic">Otomatis berbagai tema</div></div>`
-                    : inputTextarea("Topik / Lingkup Materi", "identity.topik", i.topik, "Contoh: Pecahan / Sistem Pernapasan")
-                  }
+                  <div class="space-y-3">
+                    ${inputTextarea("Tema/Topik Ringkas (untuk tampilan)", "identity.topik_ringkas", i.topik_ringkas || i.topik, "Ringkas 1–2 kalimat. Jika kosong, akan diambil otomatis dari Materi Mentah.")}
+                    <div class="flex flex-wrap items-center gap-2">
+                      <button id="btnTopikSummarize" class="flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.summarizeTopikInput()">
+                        <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                        Ringkas dari Mentah
+                      </button>
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Tema ringkas hanya untuk tampilan. Soal mengacu ke Materi Mentah.</div>
+                    </div>
+                    <details class="rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark overflow-hidden">
+                      <summary class="cursor-pointer select-none px-4 py-3 flex items-center justify-between gap-3">
+                        <span class="text-sm font-bold">Sumber Materi (Mentah)</span>
+                        <span class="text-xs text-text-sub-light dark:text-text-sub-dark">${safeText(String(i.topik_raw || '').trim() ? `${String(i.topik_raw || '').trim().length} karakter` : 'kosong')}</span>
+                      </summary>
+                      <div class="p-4 space-y-3 border-t border-border-light dark:border-border-dark">
+                        ${inputTextarea("Materi Mentah (acuan utama soal)", "identity.topik_raw", i.topik_raw, "Paste materi lengkap di sini, atau upload gambar/file/.docx.")}
+                        <div class="flex flex-wrap items-center gap-2">
+                          <button id="btnTopikUploadImg" class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikImage()">
+                            <span class="material-symbols-outlined text-[18px]">image</span>
+                            Upload Gambar
+                          </button>
+                          <button id="btnTopikUploadTxt" class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikText()">
+                            <span class="material-symbols-outlined text-[18px]">upload_file</span>
+                            Upload File Teks
+                          </button>
+                          <button id="btnTopikUploadDocx" class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikDocx()">
+                            <span class="material-symbols-outlined text-[18px]">description</span>
+                            Upload .docx
+                          </button>
+                          <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Upload akan disimpan sebagai Materi Mentah lalu dibuatkan Tema Ringkas otomatis.</div>
+                        </div>
+                      </div>
+                    </details>
+                  </div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5 pt-2">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
                   ${inputText("Judul Paket", "paket.judul", p.judul, "Contoh: Ulangan Harian")}
-                  ${inputText("Semester", "paket.semester", p.semester, "Contoh: Semester 2")}
                   ${inputText("Tahun Ajaran", "paket.tahunAjaran", p.tahunAjaran, "Contoh: 2025/2026")}
                 </div>
                 
@@ -5955,13 +6023,9 @@ ${baselineModulAjar}
                   <ol class="list-decimal pl-5 space-y-2">
                     <li>Isi Nama Guru dan Nama Sekolah. Unggah logo sekolah (opsional, ≤ 200KB) untuk terlihat di kop lembar soal.</li>
                     <li>Pilih Jenjang, Fase, dan Kelas sesuai peserta didik.</li>
-                    <li>Pilih Mata Pelajaran dan Jenis Topik:
-                      <ul class="list-disc pl-5 mt-1">
-                        <li>Spesifik: tuliskan topik/lingkup materi (mis. “Pecahan” atau “Sistem Pernapasan”).</li>
-                        <li>Campuran: sistem akan membuat topik beragam otomatis.</li>
-                      </ul>
-                    </li>
-                    <li>Isi Judul Paket, Semester, dan Tahun Ajaran untuk identitas dokumen.</li>
+                    <li>Pilih Mata Pelajaran. Isi Tema/Topik Ringkas (opsional) untuk tampilan.</li>
+                    <li>Jika ingin soal sangat relevan, isi Sumber Materi (Mentah) dengan paste atau upload (gambar/file teks/.docx). Sistem akan membuat Tema Ringkas otomatis, tapi acuan utama soal tetap Materi Mentah.</li>
+                    <li>Isi Judul Paket dan Tahun Ajaran. Semester bersifat opsional.</li>
                     <li>Klik Simpan untuk menyimpan identitas, atau klik Konfigurasi untuk lanjut mengatur bagian soal.</li>
                   </ol>
                   <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
@@ -7093,9 +7157,16 @@ ${baselineModulAjar}
                               sec.bentuk === "pg_kompleks" ? "Pilihan Ganda Kompleks" :
                               sec.bentuk === "menjodohkan" ? "Menjodohkan" :
                               sec.bentuk === "isian" ? "Isian Singkat" : "Uraian";
-          const topikText = state.identity.jenisTopik === "campuran" 
-            ? `berbagai tema/topik yang sesuai untuk ${state.identity.mataPelajaran} tingkat ${state.identity.jenjang} kelas ${state.identity.kelas}`
-            : `topik ${state.identity.topik || '-'} untuk ${state.identity.mataPelajaran} tingkat ${state.identity.jenjang} kelas ${state.identity.kelas}`;
+          const topikRingkas = String(state.identity.topik_ringkas || state.identity.topik || "").trim();
+          const topikRaw = String(state.identity.topik_raw || "").trim();
+          const topikRawClip = topikRaw ? topikRaw.slice(0, 12000) : "";
+          const rawFirstLine = topikRaw
+            ? (topikRaw.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").map(s => s.trim()).filter(Boolean)[0] || "")
+            : "";
+          const topikDisplay = topikRingkas || (rawFirstLine || (topikRaw ? topikRaw.slice(0, 180) : "")).trim();
+          const topikText = topikDisplay
+            ? `tema ${topikDisplay} untuk ${state.identity.mataPelajaran} tingkat ${state.identity.jenjang} kelas ${state.identity.kelas}`
+            : `berbagai tema/topik yang sesuai untuk ${state.identity.mataPelajaran} tingkat ${state.identity.jenjang} kelas ${state.identity.kelas}`;
 
           const kelasNum = parseKelasNumber(state.identity.kelas);
           const faseSel = faseLetterFromLabel(state.identity.fase);
@@ -7181,8 +7252,13 @@ Buatlah daftar soal untuk BAGIAN: ${bagianLabel}.
 KONTEKS:
 Jenjang: ${state.identity.jenjang} ${faseEfektif ? faseEfektif : state.identity.fase} Kelas ${state.identity.kelas}
 Mapel: ${state.identity.mataPelajaran}
-Topik: ${topikText}
+Tema Ringkas (label): ${topikDisplay || "-"}
+Sumber Materi Mentah (WAJIB jadi dasar utama soal):${topikRawClip ? `\n<<<\n${topikRawClip}\n>>>` : " -"}
 ${levelRules ? `\n${levelRules}\n` : ''}
+
+KETENTUAN KESESUAIAN LEVEL (WAJIB):
+- Soal harus sesuai jenjang/fase/kelas yang dipilih. Jika materi mentah terlalu dasar atau terlalu tinggi, sesuaikan kedalaman dan kompleksitasnya agar tetap tepat level.
+- Prioritaskan konsep/subtopik yang paling dominan muncul di Materi Mentah (jika tersedia), bukan sekadar tema umum.
 
 PARAMETER:
 - Jumlah Soal: __JUMLAH__ butir.
@@ -7530,11 +7606,128 @@ ${out}`;
         elp.value = "";
         elp.click();
       };
+      const pickTopikImage = () => {
+        const elp = el("topikImgUpload");
+        if (!elp) return;
+        elp.value = "";
+        elp.click();
+      };
+      const pickTopikText = () => {
+        const elp = el("topikTxtUpload");
+        if (!elp) return;
+        elp.value = "";
+        elp.click();
+      };
+      const pickTopikDocx = () => {
+        const elp = el("topikDocxUpload");
+        if (!elp) return;
+        elp.value = "";
+        elp.click();
+      };
       async function ocrImageToText(file) {
         if (!window.Tesseract) throw new Error("OCR tidak tersedia");
         const result = await Tesseract.recognize(file, "eng");
         return String(result?.data?.text || "");
       }
+      const summarizeMateriToTema = async (rawText) => {
+        const text = String(rawText || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+        if (!text) throw new Error("Teks kosong");
+        const clipped = text.slice(0, 12000);
+        const prompt = `Ringkas materi berikut menjadi tema/topik untuk pembuatan paket soal.\n\nATURAN:\n- Output HARUS JSON.\n- Tema harus sesuai mapel/jenjang/kelas dari konteks.\n- Buat tema yang spesifik namun ringkas (maks 1–2 kalimat).\n\nOUTPUT JSON:\n{\n  "tema": "....",\n  "kata_kunci": ["...","...","..."]\n}\n\nKONTEKS:\n- Jenjang: ${String(state.identity?.jenjang || "-")}\n- Kelas: ${String(state.identity?.kelas || "-")}\n- Fase: ${String(state.identity?.fase || "-")}\n- Mapel: ${String(state.identity?.mataPelajaran || "-")}\n\nMATERI:\n${clipped}`;
+        const res = await callOpenAI(prompt);
+        const tema = String(res?.tema || res?.topik || "").trim();
+        const kata = Array.isArray(res?.kata_kunci) ? res.kata_kunci.map(x => String(x || "").trim()).filter(Boolean).slice(0, 7) : [];
+        const joined = kata.length ? ` (kata kunci: ${kata.join(", ")})` : "";
+        return (tema ? `${tema}${joined}` : clipped.slice(0, 200)).trim();
+      };
+      const summarizeTopikInput = async () => {
+        const rawNode = document.querySelector(`[data-path="identity.topik_raw"]`);
+        const ringkasNode = document.querySelector(`[data-path="identity.topik_ringkas"]`);
+        const raw = String(rawNode?.value ?? rawNode?.textContent ?? "").trim();
+        const fallback = String(ringkasNode?.value ?? ringkasNode?.textContent ?? "").trim();
+        const src = raw || fallback;
+        if (!src) { alert("Isi Materi Mentah (atau Tema Ringkas) dulu."); return; }
+        const btn = el("btnTopikSummarize");
+        const original = btn ? btn.innerHTML : "";
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Meringkas...'; }
+        try {
+          const tema = await summarizeMateriToTema(src);
+          state.identity = state.identity || {};
+          state.identity.topik_ringkas = tema;
+          saveDebounced(true);
+          render();
+        } catch (e) {
+          alert("Gagal meringkas: " + (e?.message || "Terjadi kesalahan."));
+        } finally {
+          if (btn) { btn.disabled = false; if (original) btn.innerHTML = original; }
+        }
+      };
+      const setTopikFromMateri = async (text, btn, originalHtml, label) => {
+        try {
+          const tema = await summarizeMateriToTema(text);
+          state.identity = state.identity || {};
+          const rawTxt = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+          state.identity.topik_raw = rawTxt.slice(0, 30000);
+          state.identity.topik_ringkas = tema;
+          saveDebounced(true);
+          render();
+          alert(`Tema materi berhasil dibuat dari ${label}.`);
+        } catch (e) {
+          alert("Gagal menganalisis materi: " + (e?.message || "Terjadi kesalahan."));
+        } finally {
+          if (btn) { btn.disabled = false; if (originalHtml) btn.innerHTML = originalHtml; }
+        }
+      };
+      const handleTopikTextSelected = (evt) => {
+        const file = evt.target?.files?.[0];
+        if (!file) return;
+        const btn = el("btnTopikUploadTxt");
+        const original = btn ? btn.innerHTML : "";
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Membaca...'; }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const text = String(reader.result || "");
+          setTopikFromMateri(text, btn, original, "file teks");
+        };
+        reader.onerror = () => { if (btn) { btn.disabled = false; btn.innerHTML = original; } };
+        reader.readAsText(file);
+      };
+      const handleTopikImageSelected = async (evt) => {
+        const file = evt.target?.files?.[0];
+        if (!file) return;
+        const btn = el("btnTopikUploadImg");
+        const original = btn ? btn.innerHTML : "";
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> OCR...'; }
+        try {
+          const text = await ocrImageToText(file);
+          await setTopikFromMateri(text, btn, original, "gambar");
+        } catch (e) {
+          if (btn) { btn.disabled = false; btn.innerHTML = original; }
+          alert("Gagal OCR gambar. Silakan coba file lain.");
+        }
+      };
+      const extractDocxText = async (file) => {
+        const fd = new FormData();
+        fd.append("file", file);
+        const resp = await fetch("api/extract_docx_text.php", { method: "POST", body: fd });
+        const data = await resp.json().catch(() => null);
+        if (!resp.ok || !data?.ok) throw new Error(String(data?.error || "extract_failed"));
+        return String(data.text || "");
+      };
+      const handleTopikDocxSelected = async (evt) => {
+        const file = evt.target?.files?.[0];
+        if (!file) return;
+        const btn = el("btnTopikUploadDocx");
+        const original = btn ? btn.innerHTML : "";
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Membaca...'; }
+        try {
+          const text = await extractDocxText(file);
+          await setTopikFromMateri(text, btn, original, ".docx");
+        } catch (e) {
+          if (btn) { btn.disabled = false; btn.innerHTML = original; }
+          alert("Gagal membaca .docx. Silakan coba file lain.");
+        }
+      };
       const handleLkpdTextSelected = (evt) => {
         const file = evt.target?.files?.[0];
         if (!file) return;
@@ -7912,13 +8105,13 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                         ],
                       }),
                     ]
-                  : state.identity.jenisTopik === "spesifik"
+                  : identityTopikDisplay(state.identity)
                   ? [
                       new TableRow({
                         children: [
                           new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Topik / Lingkup Materi", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
                           new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
-                          new TableCell({ children: [new Paragraph({ text: String(state.identity.topik || "-") })] }),
+                          new TableCell({ children: [new Paragraph({ text: String(identityTopikDisplay(state.identity) || "-") })] }),
                         ],
                       }),
                     ]
@@ -8224,13 +8417,13 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                       new TableCell({ children: [new Paragraph({ text: `${String(state.identity.kelas || "-")} / ${String(state.identity.fase || "-")}` })] }),
                     ],
                   }),
-                  ...(state.identity.jenisTopik === "spesifik"
+                  ...(identityTopikDisplay(state.identity)
                     ? [
                         new TableRow({
                           children: [
                             new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Topik / Lingkup Materi", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
                             new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
-                            new TableCell({ children: [new Paragraph({ text: String(state.identity.topik || "-") })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(identityTopikDisplay(state.identity) || "-") })] }),
                           ],
                         }),
                       ]
@@ -8431,13 +8624,13 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                       new TableCell({ children: [new Paragraph({ text: `${String(state.identity.kelas || "-")} / ${String(state.identity.fase || "-")}` })] }),
                     ],
                   }),
-                  ...(state.identity.jenisTopik === "spesifik"
+                  ...(identityTopikDisplay(state.identity)
                     ? [
                         new TableRow({
                           children: [
                             new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Topik / Lingkup Materi", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
                             new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
-                            new TableCell({ children: [new Paragraph({ text: String(state.identity.topik || "-") })] }),
+                            new TableCell({ children: [new Paragraph({ text: String(identityTopikDisplay(state.identity) || "-") })] }),
                           ],
                         }),
                       ]
@@ -8611,13 +8804,13 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                         ],
                       }),
                     ]
-                  : state.identity.jenisTopik === "spesifik"
+                  : identityTopikDisplay(state.identity)
                   ? [
                       new TableRow({
                         children: [
                           new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Topik / Lingkup Materi", bold: true })] })], width: { size: 40, type: WidthType.PERCENTAGE } }),
                           new TableCell({ children: [new Paragraph({ text: ":" })], width: { size: 5, type: WidthType.PERCENTAGE } }),
-                          new TableCell({ children: [new Paragraph({ text: String(state.identity.topik || "-") })] }),
+                          new TableCell({ children: [new Paragraph({ text: String(identityTopikDisplay(state.identity) || "-") })] }),
                         ],
                       }),
                     ]
@@ -9118,6 +9311,10 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         buildLKPD,
         pickLkpdImage,
         pickLkpdText,
+        pickTopikImage,
+        pickTopikText,
+        pickTopikDocx,
+        summarizeTopikInput,
         buildPackage,
         uploadQuestionImage,
         exportDocx,
@@ -9214,6 +9411,12 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       if (lkpdImg) lkpdImg.addEventListener("change", handleLkpdImageSelected);
       const lkpdTxt = el("lkpdTxtUpload");
       if (lkpdTxt) lkpdTxt.addEventListener("change", handleLkpdTextSelected);
+      const topikImg = el("topikImgUpload");
+      if (topikImg) topikImg.addEventListener("change", handleTopikImageSelected);
+      const topikTxt = el("topikTxtUpload");
+      if (topikTxt) topikTxt.addEventListener("change", handleTopikTextSelected);
+      const topikDocx = el("topikDocxUpload");
+      if (topikDocx) topikDocx.addEventListener("change", handleTopikDocxSelected);
       const rosterPicker = el("rosterPicker");
       if (rosterPicker) rosterPicker.addEventListener("change", handleRosterSelected);
       const rekapPicker = el("rekapExcelPicker");
