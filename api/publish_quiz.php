@@ -9,6 +9,31 @@ if (!isset($_SESSION['user_id'])) {
   exit;
 }
 require_once __DIR__ . '/../db.php';
+
+function table_exists(mysqli $db, string $table): bool {
+  $table = $db->real_escape_string($table);
+  $sql = "SHOW TABLES LIKE '$table'";
+  if ($res = $db->query($sql)) {
+    $ok = $res->num_rows > 0;
+    $res->close();
+    return $ok;
+  }
+  return false;
+}
+
+function log_audit(mysqli $db, int $user_id, string $level, string $category, string $message, ?int $http_status = null, array $context = []): void {
+  if (!table_exists($db, 'audit_logs')) return;
+  $endpoint = $_SERVER['REQUEST_URI'] ?? '';
+  $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+  $json = json_encode($context, JSON_UNESCAPED_UNICODE) ?: '';
+  $stmt = $db->prepare("INSERT INTO audit_logs (user_id, level, category, message, http_status, endpoint, ip_address, context) VALUES (?,?,?,?,?,?,?,?)");
+  if ($stmt) {
+    $stmt->bind_param('isssisss', $user_id, $level, $category, $message, $http_status, $endpoint, $ip, $json);
+    $stmt->execute();
+    $stmt->close();
+  }
+}
+
 $role = (string)($_SESSION['role'] ?? 'user');
 if ($role !== 'admin') {
   $access = isset($_SESSION['access_quiz']) ? (int)$_SESSION['access_quiz'] : null;
@@ -27,6 +52,7 @@ if ($role !== 'admin') {
   if ($access !== 1) {
     http_response_code(403);
     echo json_encode(['ok'=>false,'error'=>'no_access']);
+    log_audit($mysqli, (int)$_SESSION['user_id'], 'warn', 'quiz_publish', 'No access to publish quiz', 403, []);
     exit;
   }
 }
@@ -48,6 +74,10 @@ if (!is_array($data)) {
     'error'=>'invalid_json',
     'content_type'=> (string)($_SERVER['CONTENT_TYPE'] ?? ''),
     'length'=> strlen((string)$raw)
+  ]);
+  log_audit($mysqli, (int)$_SESSION['user_id'], 'warn', 'quiz_publish', 'Invalid JSON request', 400, [
+    'content_type' => (string)($_SERVER['CONTENT_TYPE'] ?? ''),
+    'length' => strlen((string)$raw),
   ]);
   exit;
 }
@@ -89,6 +119,12 @@ if (!is_array($answerKey) || count($answerKey) === 0) $missing[] = 'answer_key';
 if ($missing) {
   http_response_code(400);
   echo json_encode(['ok'=>false,'error'=>'invalid_input','missing'=>$missing], JSON_UNESCAPED_UNICODE);
+  log_audit($mysqli, (int)$_SESSION['user_id'], 'warn', 'quiz_publish', 'Invalid input', 400, [
+    'missing' => $missing,
+    'slug' => $slug,
+    'mapel' => $mapel,
+    'kelas' => $kelas,
+  ]);
   exit;
 }
 function normalize_slug(string $s): string {
@@ -123,6 +159,11 @@ $total = is_array($payloadObject['items'] ?? null) ? count($payloadObject['items
 if (!is_string($payloadJson) || $payloadJson === '' || !is_string($answerJson) || $answerJson === '') {
   http_response_code(500);
   echo json_encode(['ok'=>false,'error'=>'encode_fail'], JSON_UNESCAPED_UNICODE);
+  log_audit($mysqli, (int)$_SESSION['user_id'], 'error', 'quiz_publish', 'Encode payload failed', 500, [
+    'slug' => $slug,
+    'mapel' => $mapel,
+    'kelas' => $kelas,
+  ]);
   exit;
 }
 if ($expire === '') {
@@ -133,6 +174,12 @@ $stmt = $mysqli->prepare($sql);
 if (!$stmt) {
   http_response_code(500);
   echo json_encode(['ok'=>false,'error'=>'stmt_fail','errno'=>(int)$mysqli->errno]);
+  log_audit($mysqli, (int)$_SESSION['user_id'], 'error', 'quiz_publish', 'Prepare insert failed', 500, [
+    'errno' => (int)$mysqli->errno,
+    'slug' => $slug,
+    'mapel' => $mapel,
+    'kelas' => $kelas,
+  ]);
   exit;
 }
 $candidateSlug = $baseSlug;
@@ -154,6 +201,15 @@ while ($attempts < 8) {
     $stmt->close();
     http_response_code(500);
     echo json_encode(['ok'=>false,'error'=>'insert_fail','errno'=>$code]);
+    log_audit($mysqli, (int)$_SESSION['user_id'], 'error', 'quiz_publish', 'Insert failed', 500, [
+      'errno' => $code,
+      'slug_original' => $baseSlug,
+      'slug_candidate' => $candidateSlug,
+      'mapel' => $mapel,
+      'kelas' => $kelas,
+      'total' => $total,
+      'attempts' => $attempts,
+    ]);
     exit;
   }
   $slugAdjusted = true;
@@ -172,10 +228,29 @@ if (!$ok) {
   $stmt->close();
   http_response_code(409);
   echo json_encode(['ok'=>false,'error'=>'slug_exists']);
+  log_audit($mysqli, (int)$_SESSION['user_id'], 'warn', 'quiz_publish', 'Slug exists after retries', 409, [
+    'slug_original' => $baseSlug,
+    'mapel' => $mapel,
+    'kelas' => $kelas,
+    'total' => $total,
+    'attempts' => $attempts,
+  ]);
   exit;
 }
 $id = (int)$stmt->insert_id;
 $stmt->close();
+log_audit($mysqli, (int)$_SESSION['user_id'], 'info', 'quiz_publish', 'Quiz link published', 200, [
+  'published_id' => $id,
+  'slug' => $candidateSlug,
+  'slug_original' => $baseSlug,
+  'slug_adjusted' => $slugAdjusted ? 1 : 0,
+  'mapel' => $mapel,
+  'kelas' => $kelas,
+  'total' => $total,
+  'expire_at' => $expire,
+  'max_absen' => max(0, (int)$maxAbsen),
+  'show_solution' => $showSolution ? 1 : 0,
+]);
 echo json_encode([
   'ok'=>true,
   'id'=>$id,

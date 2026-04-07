@@ -1577,6 +1577,14 @@ if (!isset($_SESSION['user_id'])) {
         const m = el('modalIdentitasHelp');
         if (m) m.style.display = 'none';
       }
+      function openBuatSoalHelp() {
+        const m = el('modalBuatSoalHelp');
+        if (m) m.style.display = 'flex';
+      }
+      function closeBuatSoalHelp() {
+        const m = el('modalBuatSoalHelp');
+        if (m) m.style.display = 'none';
+      }
       function openSumberMateriHelp() {
         const m = el('modalSumberMateriHelp');
         if (m) m.style.display = 'flex';
@@ -5809,9 +5817,7 @@ ${baselineModulAjar}
 
       const computeView = () => {
         if (state.activeView === "preview") {
-          const helpOnClick = state.previewTab === 'identitas'
-            ? "window.__sp.openIdentitasHelp()"
-            : (state.previewTab === 'konfigurasi' ? "window.__sp.openKonfigurasiHelp()" : "window.__sp.openPreviewHelp()");
+          const helpOnClick = "window.__sp.openBuatSoalHelp()";
           const tabBar = `
             <div class="hidden md:flex items-center justify-between gap-3 mb-2">
               <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
@@ -5872,7 +5878,54 @@ ${baselineModulAjar}
             body = parts.join("") + mobileStepNav("naskah");
           }
 
-          return `<div class="pb-6 md:pb-0">${tabBar}${body}</div>`;
+          const globalHelp = `
+            <div id="modalBuatSoalHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+              <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[860px] max-height-[85vh] overflow-auto">
+                <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                  <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Buat Soal</div>
+                  <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeBuatSoalHelp()">&times;</button>
+                </div>
+                <div class="p-5 space-y-5 text-sm leading-relaxed">
+                  <div>
+                    <div class="font-bold mb-1">Alur singkat</div>
+                    <ol class="list-decimal pl-5 space-y-1">
+                      <li>Isi Identitas (jenjang/fase/kelas/mapel + Sumber Materi).</li>
+                      <li>Atur Konfigurasi bagian (bentuk soal & jumlah soal).</li>
+                      <li>Buat Naskah Soal, lalu unduh/cetak bila diperlukan.</li>
+                    </ol>
+                  </div>
+                  <div>
+                    <div class="font-bold mb-1">Tombol Simpan & Muat</div>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>Simpan: menyimpan proyek ke file .json (agar bisa dibuka lagi kapan saja).</li>
+                      <li>Muat: memulihkan proyek dari file .json yang pernah disimpan.</li>
+                      <li>Catatan: aplikasi juga menyimpan otomatis di browser, tapi Simpan .json tetap disarankan untuk backup.</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <div class="font-bold mb-1">Input wajib (mandatory)</div>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>Identitas: Nama Sekolah, Jenjang, Fase, Kelas, Mata Pelajaran, Judul Paket, Tahun Ajaran.</li>
+                      <li>Konfigurasi: minimal 1 Bagian dan Jumlah Soal minimal 1.</li>
+                      <li>Sumber Materi: opsional, tetapi sangat disarankan agar soal lebih relevan.</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <div class="font-bold mb-1">Fungsi tiap tab</div>
+                    <ul class="list-disc pl-5 space-y-1">
+                      <li>1. Identitas: mengatur konteks soal (level & mapel) dan memasukkan Sumber Materi.</li>
+                      <li>2. Konfigurasi: mengatur bentuk soal per bagian (PG/Isian/Uraian, dll), jumlah soal, kesulitan, dan opsi gambar.</li>
+                      <li>3. Naskah Soal: melihat hasil soal, melakukan perbaikan, lalu unduh/cetak.</li>
+                    </ul>
+                  </div>
+                  <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
+                    Tips: Jika hasil soal terlalu umum, tambahkan materi yang lebih spesifik di Sumber Materi, lalu buat ulang paket.
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+          return `<div class="pb-6 md:pb-0">${tabBar}${body}${globalHelp}</div>`;
         }
         if (state.activeView === "lkpd") return renderLKPD();
         if (state.activeView === "modul_ajar") return renderModulAjar();
@@ -9339,6 +9392,8 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         generateRekapPDF,
         openIdentitasHelp,
         closeIdentitasHelp,
+        openBuatSoalHelp,
+        closeBuatSoalHelp,
         openSumberMateriHelp,
         closeSumberMateriHelp,
         openKonfigurasiHelp,
