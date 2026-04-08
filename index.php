@@ -505,6 +505,7 @@ if (!isset($_SESSION['user_id'])) {
           waktuMenit: 90,
           hariTanggal: "",
         },
+        specialInstruction: "",
         previewFlags: { kunci: true, kisi: true },
         sections: [
           {
@@ -6305,6 +6306,9 @@ ${baselineModulAjar}
                       </div>
                     </div>
                     <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Topik untuk tampilan akan dibuat otomatis (maks. 5 kata) dari Sumber Materi.</div>
+                    <div class="pt-2">
+                      ${inputText("Perintah Khusus (opsional)", "specialInstruction", state.specialInstruction || "", "Contoh: Perbanyak soal cerita. / Soal Bahasa Jawa ngoko, huruf latin.")}
+                    </div>
                   </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
@@ -7841,6 +7845,11 @@ ${baselineModulAjar}
 - Utamakan konteks nyata, analisis, dan penerapan konsep (hindari definisi 1 kalimat yang terlalu dasar).`
               : ``);
 
+          const special = String(state.specialInstruction || "").trim();
+          const specialRules = special
+            ? `\nATURAN TAMBAHAN DARI GURU (WAJIB DIPATUHI):\n${special}\n- Jika aturan ini bertentangan dengan instruksi lain, prioritaskan aturan tambahan dari guru.\n`
+            : ``;
+
           const outputSchema = sec.bentuk === "menjodohkan"
             ? `OUTPUT JSON (Array of Objects):
 [
@@ -7933,6 +7942,7 @@ Jika soal membutuhkan gambar/diagram:
 1. Prioritas 1: Buat diagram ASCII sederhana di field "asciiDiagram".
 2. Prioritas 2: Buat kode SVG sederhana (hitam putih, viewBox minimal, tanpa width/height fixed) di field "svgSource".
 3. Prioritas 3: Jika sangat kompleks, kosongkan ascii/svg dan isi "imagePrompt" untuk digenerate AI Image.
+${specialRules}
 ${outputSchema}`;
 
           let needed = totalSec;
