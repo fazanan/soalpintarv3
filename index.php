@@ -236,7 +236,7 @@ if (!isset($_SESSION['user_id'])) {
         </div>
         <div id="quizBody" class="p-5 md:p-7"></div>
         <div
-          class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 px-5 py-4 border-t border-border-light dark:border-border-dark bg-background-light/50 dark:bg-background-dark/30"
+          class="flex flex-col md:flex-row md:items-center gap-3 px-5 py-4 border-t border-border-light dark:border-border-dark bg-background-light/50 dark:bg-background-dark/30"
         >
           <div class="flex items-center gap-2">
             <button
@@ -252,22 +252,6 @@ if (!isset($_SESSION['user_id'])) {
             >
               Selanjutnya
               <span class="material-symbols-outlined text-[18px]">chevron_right</span>
-            </button>
-          </div>
-          <div class="flex items-center gap-2">
-            <button
-              id="btnQuizRegen"
-              class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors"
-            >
-              <span class="material-symbols-outlined text-[18px]">autorenew</span>
-              Buat Soal Ulang
-            </button>
-            <button
-              id="btnQuizImgRegen"
-              class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors"
-            >
-              <span class="material-symbols-outlined text-[18px]">image</span>
-              Buat Ulang Gambar
             </button>
           </div>
         </div>
@@ -540,6 +524,7 @@ if (!isset($_SESSION['user_id'])) {
         questions: [],
         quiz: { idx: 0, answered: {}, input: "", reveal: false },
         quizSubtab: "live",
+        quizShareTab: "buat_link",
         quizPublishForm: { slug: "", jumlah: 32, expire: "", roster: [] },
         quizLastLink: "",
         quizLastPubId: 0,
@@ -547,7 +532,12 @@ if (!isset($_SESSION['user_id'])) {
         quizLastSlug: "",
         quizPublications: [],
         quizResults: [],
+        quizResultsQuery: "",
+        quizResultsLoadedAt: "",
         quizSelectedSlug: "",
+        quizPreviewCount: 10,
+        quizShowPreview: false,
+        riwayatKreditSearch: "",
         rekap: { 
           raw: [], 
           data: [], 
@@ -1585,6 +1575,176 @@ if (!isset($_SESSION['user_id'])) {
         const m = el('modalBuatSoalHelp');
         if (m) m.style.display = 'none';
       }
+      function openBagikanLinkHelp() {
+        const m = el('modalBagikanLinkHelp');
+        if (m) m.style.display = 'flex';
+      }
+      function closeBagikanLinkHelp() {
+        const m = el('modalBagikanLinkHelp');
+        if (m) m.style.display = 'none';
+      }
+      function openBagikanLinkFieldHelp(key) {
+        const m = el('modalBagikanLinkFieldHelp');
+        if (!m) return;
+        const titleEl = el('blfhTitle');
+        const bodyEl = el('blfhBody');
+        const map = {
+          slug: {
+            title: 'Nama Link (wajib)',
+            html: `<div class="space-y-2">
+              <div>Nama link dipakai sebagai identitas quiz saat dibagikan dan untuk memilih hasil di menu Hasil Quiz.</div>
+              <ul class="list-disc pl-5 space-y-1">
+                <li>Gunakan huruf/angka dan tanda minus.</li>
+                <li>Contoh: <b>biologi-kls10-pts</b></li>
+              </ul>
+            </div>`,
+          },
+          jumlah: {
+            title: 'Maks Absen / Siswa',
+            html: `<div class="space-y-2">
+              <div>Membatasi nomor absen/siswa yang boleh mengisi.</div>
+              <ul class="list-disc pl-5 space-y-1">
+                <li>Jika memakai Data Siswa (diunggah), batasnya mengikuti jumlah data siswa.</li>
+              </ul>
+            </div>`,
+          },
+          expire: {
+            title: 'Batas Waktu Link (opsional)',
+            html: `<div class="space-y-2">
+              <div>Quiz hanya bisa diakses/dikerjakan sampai waktu ini. Jika sudah lewat, link tidak bisa dibuka lagi.</div>
+              <ul class="list-disc pl-5 space-y-1">
+                <li>Maksimal 14 hari dari tanggal pembuatan link quiz.</li>
+                <li>Jika dikosongkan, sistem otomatis mengisi batas waktu 14 hari.</li>
+                <li>Isi tanggal, lalu pilih jam dan menit.</li>
+              </ul>
+            </div>`,
+          },
+          roster: {
+            title: 'Data Siswa (tidak wajib)',
+            html: `<div class="space-y-2">
+              <div>Jika diunggah, sistem bisa membuat link per siswa dan menampilkan nama di rekap.</div>
+              <ul class="list-disc pl-5 space-y-1">
+                <li>Format baris: <b>NoAbsen,Nama Siswa</b> (atau dipisah tab/semicolon).</li>
+                <li>Gunakan tombol Download Template TXT untuk contoh format.</li>
+                <li>Jika tidak diunggah, siswa akan diminta mengisi No Absen & Nama saat membuka link.</li>
+              </ul>
+            </div>`,
+          },
+          opsi: {
+            title: 'Opsi Quiz',
+            html: `<div class="space-y-3">
+              <div class="space-y-1">
+                <div class="font-bold">Tampilkan jawaban & pembahasan</div>
+                <div>Jika dicentang, setelah siswa submit, siswa dapat melihat jawaban benar dan pembahasan. Cocok untuk mode pembelajaran/latihan.</div>
+              </div>
+              <div class="space-y-1">
+                <div class="font-bold">Sertakan gambar (maks 5)</div>
+                <div>Jika dicentang, gambar pada soal akan disertakan saat publish. Maksimal 5 gambar per link quiz. Jika lebih dari 5, sistem akan menolak publish.</div>
+              </div>
+            </div>`,
+          },
+        };
+        const item = map[String(key || '')] || { title: 'Petunjuk', html: '' };
+        if (titleEl) titleEl.textContent = item.title;
+        if (bodyEl) bodyEl.innerHTML = item.html;
+        m.style.display = 'flex';
+      }
+      function closeBagikanLinkFieldHelp() {
+        const m = el('modalBagikanLinkFieldHelp');
+        if (m) m.style.display = 'none';
+      }
+      function openHasilQuizHelp() {
+        const m = el('modalHasilQuizHelp');
+        if (m) m.style.display = 'flex';
+      }
+      function closeHasilQuizHelp() {
+        const m = el('modalHasilQuizHelp');
+        if (m) m.style.display = 'none';
+      }
+      function toggleQuizPreviewPanel() {
+        const next = !state.quizShowPreview;
+        state.quizShowPreview = next;
+        state.quizPreviewCount = 10;
+        if (next) state.quizSubtab = 'live';
+        saveDebounced(false);
+        render();
+      }
+      function moreQuizPreview() {
+        const items = Array.isArray(state.questions) ? state.questions.filter(q => q && q.type === 'pg' && Array.isArray(q.options) && q.options.length >= 3) : [];
+        state.quizPreviewCount = Math.min((state.quizPreviewCount || 10) + 10, items.length);
+        saveDebounced(false);
+        render();
+      }
+      function buildQuizItemsHTMLInline() {
+        const items = Array.isArray(state.questions) ? state.questions.filter(q => q && q.type === 'pg' && Array.isArray(q.options) && q.options.length >= 3) : [];
+        const total = items.length;
+        const withImg = items.filter(q => String(q.image||'').trim()).length;
+        const n = Math.min(state.quizPreviewCount || 10, total);
+        const note = withImg > 5 ? `<div class="no-print rounded-md border border-amber-200 bg-amber-50 text-amber-900 p-3 text-xs">Terdeteksi ${withImg} soal bergambar. Saat Bagikan Link, maksimal 5 gambar akan disertakan.</div>` : '';
+
+        const renderQuizItem = (q, i) => `
+          <div class="relative break-inside-avoid">
+            <div class="flex gap-4">
+              <span class="font-bold text-lg min-w-[1.5rem]">${i + 1}.</span>
+              <div class="flex-1 pr-2">
+                <div>
+                  <p class="mb-4 pr-10 text-justify leading-relaxed text-lg">${safeText(String(q.question||''))}</p>
+                  ${q.image ? `<img src="${q.image}" class="w-64 h-64 object-contain rounded-lg mb-2 border shadow-sm">` : ""}
+                  <div class="grid grid-cols-1 gap-2 pl-1">
+                    ${(Array.isArray(q.options) ? q.options : []).map((opt, oi) => `
+                      <div class="flex gap-3 items-start">
+                        <span class="font-semibold pt-0.5">${String.fromCharCode(65 + oi)}.</span>
+                        <span class="leading-relaxed">${safeText(String(opt||''))}</span>
+                      </div>`).join("")}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const list = items.slice(0, n).map((q, i) => renderQuizItem(q, i)).join('');
+        return `
+          <div class="space-y-3">
+            <div id="paperQuiz" class="bg-white text-black p-4 md:p-10 md:shadow-paper md:min-h-[297mm] font-serif border border-gray-200 mx-auto">
+              <div class="border-b-2 border-black pb-6 mb-8 relative">
+                ${state.identity.logo ? `<img src="${state.identity.logo}" class="absolute right-0 top-0 h-16 w-auto">` : ``}
+                <div class="text-center mb-6">
+                  <h2 class="font-bold text-xl md:text-2xl uppercase tracking-wider mb-1">${safeText(state.identity.namaSekolah || "NAMA SEKOLAH")}</h2>
+                  <h3 class="font-bold text-base md:text-lg uppercase tracking-wide">${safeText(state.paket.judul || "PENILAIAN AKHIR SEMESTER")}</h3>
+                  <div class="text-sm mt-1">Tahun Pelajaran ${safeText(state.paket.tahunAjaran)}</div>
+                  <div class="text-xs mt-1">(Pratinjau Soal untuk Quiz • PG saja)</div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-2 text-sm">
+                  <div class="space-y-1.5">
+                    <div class="flex items-start"><span class="w-36 font-semibold shrink-0">Mata Pelajaran</span><span class="mr-2">:</span><span>${safeText(state.identity.mataPelajaran)}</span></div>
+                    <div class="flex items-start"><span class="w-36 font-semibold shrink-0">Kelas / Fase</span><span class="mr-2">:</span><span>${safeText(state.identity.kelas)} / ${safeText(state.identity.fase)}</span></div>
+                    ${identityTopikDisplay(state.identity) ? `<div class="flex items-start"><span class="w-36 font-semibold shrink-0">Topik / Lingkup Materi</span><span class="mr-2">:</span><span>${safeText(identityTopikDisplay(state.identity))}</span></div>` : ``}
+                    <div class="flex items-center"><span class="w-36 font-semibold shrink-0">Hari / Tanggal</span><span class="mr-2">:</span><div class="border-b border-black border-dotted flex-1 h-4"></div></div>
+                  </div>
+                  <div class="space-y-1.5">
+                    <div class="flex items-center"><span class="w-36 font-semibold shrink-0">Waktu</span><span class="mr-2">:</span><div class="border-b border-black border-dotted flex-1 h-4"></div></div>
+                    <div class="flex items-center"><span class="w-36 font-semibold shrink-0">Nama</span><span class="mr-2">:</span><div class="border-b border-black border-dotted flex-1 h-4"></div></div>
+                    <div class="flex items-center"><span class="w-36 font-semibold shrink-0">No. Absen</span><span class="mr-2">:</span><div class="border-b border-black border-dotted flex-1 h-4"></div></div>
+                  </div>
+                </div>
+              </div>
+              <div class="space-y-6">
+                <div>
+                  <div class="font-bold mb-1">PILIHAN GANDA</div>
+                  <div class="italic text-sm mb-4">Pilihlah salah satu jawaban yang paling tepat!</div>
+                  <div class="no-print text-xs text-text-sub-light dark:text-text-sub-dark mb-3">Total PG untuk quiz: <b>${total}</b> • Soal bergambar: <b>${withImg}</b></div>
+                  ${note}
+                  <div class="space-y-6">
+                    ${list || `<div class="p-10 text-center text-sm text-text-sub-light dark:text-text-sub-dark">Belum ada soal PG di paket.</div>`}
+                  </div>
+                  ${n < total ? `<div class="no-print mt-6"><button class="px-4 h-10 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.moreQuizPreview()">Muat Lagi</button></div>` : ``}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
       function openSumberMateriHelp() {
         const m = el('modalSumberMateriHelp');
         if (m) m.style.display = 'flex';
@@ -2078,6 +2238,13 @@ if (!isset($_SESSION['user_id'])) {
             I.topik_ringkas = (firstLine || rawTxt.slice(0, 180)).trim();
           }
         } catch {}
+        try {
+          const qst = String(state.quizSubtab || "").trim();
+          if (qst === "publish") { state.quizSubtab = "share"; state.quizShareTab = "buat_link"; }
+          if (qst === "results") { state.quizSubtab = "share"; state.quizShareTab = "hasil"; }
+          if (!state.quizShareTab) state.quizShareTab = "buat_link";
+          if (state.quizSubtab !== "live" && state.quizSubtab !== "share") state.quizSubtab = "live";
+        } catch {}
         return true;
       };
 
@@ -2372,6 +2539,13 @@ if (!isset($_SESSION['user_id'])) {
                 const firstLine = rawTxt.split("\n").map(s => s.trim()).filter(Boolean)[0] || "";
                 I.topik_ringkas = (firstLine || rawTxt.slice(0, 180)).trim();
               }
+            } catch {}
+            try {
+              const qst = String(state.quizSubtab || "").trim();
+              if (qst === "publish") { state.quizSubtab = "share"; state.quizShareTab = "buat_link"; }
+              if (qst === "results") { state.quizSubtab = "share"; state.quizShareTab = "hasil"; }
+              if (!state.quizShareTab) state.quizShareTab = "buat_link";
+              if (state.quizSubtab !== "live" && state.quizSubtab !== "share") state.quizSubtab = "live";
             } catch {}
             saveDebounced(true);
             render();
@@ -5956,6 +6130,19 @@ ${baselineModulAjar}
         const root = el("viewRoot");
         root.innerHTML = computeView();
         wireInputs(root);
+        if (state.activeView === "quiz" && state.quizSubtab === "share" && state.quizShareTab === "hasil") {
+          try {
+            const items = Array.isArray(state.quizPublications) ? state.quizPublications : [];
+            if (!items.length) {
+              await loadPublications();
+              const rootQuiz = el("viewRoot");
+              if (rootQuiz) {
+                rootQuiz.innerHTML = computeView();
+                wireInputs(rootQuiz);
+              }
+            }
+          } catch {}
+        }
         if (state.activeView === "riwayat") {
           loadRiwayat();
         }
@@ -6363,20 +6550,36 @@ ${baselineModulAjar}
 
       const renderQuizLanding = () => {
         const sub = state.quizSubtab || "live";
+        const shareTab = state.quizShareTab || "buat_link";
         const mapel = String(state.identity.mataPelajaran || "");
         const judulPaket = String(state.paket?.judul || "");
         const baseForSlug = mapel || judulPaket || 'soal';
         const slugDefault = baseForSlug.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
         if (!state.quizPublishForm.slug) state.quizPublishForm.slug = slugDefault || 'kelas';
         const tabs = `
-          <div class="flex items-center justify-between gap-2 border-b border-border-light dark:border-border-dark px-4 pt-4">
+          <div class="flex items-center justify-between gap-2 border-b border-border-light dark:border-border-dark px-4 pt-4 pb-3">
             <div class="flex items-center gap-2">
-              <button onclick="window.__sp.setQuizTab('live')" class="px-3 py-2 text-sm font-semibold ${sub==='live'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Live</button>
-              <button onclick="window.__sp.setQuizTab('publish')" class="px-3 py-2 text-sm font-semibold ${sub==='publish'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Buat Link</button>
-              ${(IS_ADMIN || HAS_QUIZ_ACCESS) ? `<button onclick="window.__sp.setQuizTab('results')" class="px-3 py-2 text-sm font-semibold ${sub==='results'?'text-primary border-b-2 border-primary':'text-text-sub-light'}">Hasil Nilai</button>` : ``}
+              <button onclick="window.__sp.toggleQuizPreviewPanel()" class="inline-flex items-center gap-2 h-10 px-3 rounded-lg text-sm font-bold border ${state.quizShowPreview ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-surface-dark border-border-light dark:border-border-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'}">
+                <span class="material-symbols-outlined text-[18px]">quiz</span>
+                Soal untuk Quiz
+              </button>
+              <button onclick="window.__sp.setQuizTab('live')" class="inline-flex items-center gap-2 h-10 px-3 rounded-lg text-sm font-bold border ${(!state.quizShowPreview && sub==='live')?'bg-primary text-white border-primary':'bg-white dark:bg-surface-dark border-border-light dark:border-border-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'}">
+                <span class="material-symbols-outlined text-[18px]">sports_esports</span>
+                Quiz Live
+              </button>
+              <button onclick="window.__sp.setQuizTab('share')" class="inline-flex items-center gap-2 h-10 px-3 rounded-lg text-sm font-bold border ${(!state.quizShowPreview && sub==='share')?'bg-primary text-white border-primary':'bg-white dark:bg-surface-dark border-border-light dark:border-border-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'}">
+                <span class="material-symbols-outlined text-[18px]">link</span>
+                Bagikan Link
+              </button>
             </div>
-            <button class="inline-flex items-center gap-2 h-9 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm"
-              onclick="window.__sp.openQuizHelp()"><span class="material-symbols-outlined text-[16px]">help</span><span class="hidden md:inline">Petunjuk</span></button>
+            <div class="flex items-center gap-2">
+              <span class="hidden md:inline-flex items-center gap-2 h-10 px-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 text-sm font-bold">
+                <span class="material-symbols-outlined text-[18px]">info</span>
+                Quiz hanya mendukung soal Pilihan Ganda
+              </span>
+              <button class="inline-flex items-center gap-2 h-10 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                onclick="window.__sp.openQuizHelp()"><span class="material-symbols-outlined text-[18px]">help</span><span class="hidden md:inline">Petunjuk</span></button>
+            </div>
           </div>
         `;
         const haveQuestions = Array.isArray(state.questions) && state.questions.length > 0;
@@ -6390,9 +6593,11 @@ ${baselineModulAjar}
         `;
         const live = `
           <div class="p-6 space-y-3">
-            <div class="text-xl font-bold">Mode Kuis</div>
-            <div class="text-sm text-text-sub-light dark:text-text-sub-dark">${haveQuestions ? 'Jalankan kuis interaktif di kelas' : 'Buat naskah soal terlebih dahulu di tab Identitas/Konfigurasi'}</div>
-            <button ${haveQuestions ? '' : 'disabled'} onclick="openQuiz()" class="px-4 py-2 rounded-lg ${haveQuestions ? 'bg-primary hover:bg-blue-600 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'} font-bold">Mulai</button>
+            <div>
+              <div class="text-xl font-bold">Quiz Live</div>
+              <div class="text-sm text-text-sub-light dark:text-text-sub-dark">${haveQuestions ? 'Mode interaktif: tampilkan soal di layar guru dan jalankan kuis di kelas. Cek dulu di “Soal untuk Quiz” untuk memastikan soal yang akan dipakai.' : 'Buat naskah soal dulu di menu Buat Soal (Identitas/Konfigurasi). Setelah ada, cek “Soal untuk Quiz”, lalu mulai Quiz Live atau Bagikan Link.'}</div>
+            </div>
+            <button ${haveQuestions ? '' : 'disabled'} onclick="openQuiz()" class="px-4 py-2 rounded-lg ${haveQuestions ? 'bg-primary hover:bg-blue-600 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'} font-bold">Mulai Quiz Live</button>
           </div>
         `;
         const pub = (() => {
@@ -6401,51 +6606,142 @@ ${baselineModulAjar}
           return `
             <div class="p-6 space-y-5">
               <div>
-                <div class="text-xl font-bold">Buat Link Soal Untuk Siswa</div>
-                <div class="text-sm text-text-sub-light mt-1">Buat tautan yang bisa diakses siswa tanpa login</div>
+                <div class="flex items-center gap-2">
+                  <div class="text-xl font-bold">Bagikan Link</div>
+                  <button type="button"
+                    class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors"
+                    title="Petunjuk Bagikan Link"
+                    onclick="window.__sp.openBagikanLinkHelp()"
+                  >
+                    <span class="material-symbols-outlined text-[18px]">help</span>
+                  </button>
+                </div>
+                <div class="text-sm text-text-sub-light mt-1">Buat tautan yang bisa diakses siswa tanpa login (untuk tugas/ujian mandiri).</div>
               </div>
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div class="space-y-1.5">
-                  <label class="text-sm font-semibold">Slug Mapel</label>
-                  <input class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(f.slug || '')}" placeholder="mis. biologi" oninput="window.__sp.setQuizPublish('slug', this.value)">
-                </div>
-                <div class="space-y-1.5">
-                  <label class="text-sm font-semibold">Jumlah Siswa</label>
-                  <input type="number" min="1" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${Number(f.jumlah||32)}" placeholder="mis. 32" oninput="window.__sp.setQuizPublish('jumlah', Number(this.value))">
-                </div>
-                <div class="space-y-1.5">
-                  <label class="text-sm font-semibold">Expire (opsional, YYYY-MM-DD HH:MM)</label>
-                  <input placeholder="2026-12-31 23:59" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(f.expire || '')}" oninput="window.__sp.setQuizPublish('expire', this.value)">
-                </div>
-              </div>
-              <div class="space-y-2">
-                <div class="text-sm font-semibold">Daftar Siswa (opsional)</div>
-                <div class="text-xs text-text-sub-light">Unggah file .csv / .txt dengan format baris: <code>NoAbsen,Nama Siswa</code> atau dipisah tab/semicolon</div>
-                <div class="flex items-center gap-3">
-                  <button type="button" onclick="document.getElementById('rosterPicker').click()" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark">Upload CSV/TXT</button>
-                  <button type="button" onclick="window.__sp.downloadRosterTemplate()" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark">Download Template TXT</button>
-                  <div class="text-xs text-text-sub-light">${Array.isArray(f.roster) && f.roster.length ? `Terbaca ${f.roster.length} siswa (berhasil diupload)` : 'Belum ada file diunggah'}</div>
-                </div>
-                ${Array.isArray(f.roster) && f.roster.length ? `
-                  <div class="rounded-lg border border-green-200 bg-green-50 text-green-800 p-3 text-sm">
-                    Berhasil diupload: terbaca <b>${f.roster.length}</b> siswa. Silakan klik tombol <b>Buat Link Siswa</b> di bawah ini.
+              <div id="modalBagikanLinkHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+                <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[800px] max-height-[85vh] overflow-auto">
+                  <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                    <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Bagikan Link</div>
+                    <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeBagikanLinkHelp()">&times;</button>
                   </div>
-                ` : ``}
+                  <div class="p-5 space-y-4 text-sm leading-relaxed">
+                    <div>
+                      <div class="font-bold mb-1">Fungsi</div>
+                      <ul class="list-disc pl-5 space-y-1">
+                        <li>Membuat link yang bisa dibuka siswa tanpa login.</li>
+                        <li>Cocok untuk tugas/ujian mandiri di rumah atau di lab.</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <div class="font-bold mb-1">Dua cara pakai</div>
+                      <ol class="list-decimal pl-5 space-y-1">
+                        <li>Tanpa Data Siswa: isi Pengaturan Link, lalu klik “Buat & Salin Link”. Siswa mengisi No Absen & Nama saat membuka link.</li>
+                        <li>Dengan Data Siswa: upload CSV/TXT dulu, lalu klik “Buat & Salin Link” untuk menampilkan daftar link per siswa.</li>
+                      </ol>
+                    </div>
+                    <div>
+                      <div class="font-bold mb-1">Input wajib & tidak wajib</div>
+                      <ul class="list-disc pl-5 space-y-1">
+                        <li>Wajib: Nama Link.</li>
+                        <li>Tidak wajib: Batas Waktu Link, Data Siswa, dan Opsi.</li>
+                      </ul>
+                    </div>
+                    <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
+                      Tips: Jika ingin rekap nama otomatis dan link unik per siswa, unggah Data Siswa.
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="flex items-center gap-3">
+              <div id="modalBagikanLinkFieldHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+                <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[680px] max-height-[85vh] overflow-auto">
+                  <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                    <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> <span id="blfhTitle">Petunjuk</span></div>
+                    <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeBagikanLinkFieldHelp()">&times;</button>
+                  </div>
+                  <div id="blfhBody" class="p-5 text-sm leading-relaxed"></div>
+                </div>
+              </div>
+              <div class="rounded-xl border bg-white dark:bg-surface-dark p-4 space-y-4">
+                <div class="font-bold">A. Pengaturan Link</div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div class="space-y-1.5">
+                    <div class="flex items-center gap-2">
+                      <label class="text-sm font-semibold">Nama Link (wajib)</label>
+                      <button type="button" class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('slug')">
+                        <span class="material-symbols-outlined text-[18px]">help</span>
+                      </button>
+                    </div>
+                    <input class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(f.slug || '')}" placeholder="contoh: biologi-kls10-pts" oninput="window.__sp.setQuizPublish('slug', this.value)">
+                  </div>
+                  <div class="space-y-1.5">
+                    <div class="flex items-center gap-2">
+                      <label class="text-sm font-semibold">Maks Absen / Siswa</label>
+                      <button type="button" class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('jumlah')">
+                        <span class="material-symbols-outlined text-[18px]">help</span>
+                      </button>
+                    </div>
+                    <input type="number" min="1" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${Number(f.jumlah||32)}" placeholder="contoh: 32" oninput="window.__sp.setQuizPublish('jumlah', Number(this.value))">
+                  </div>
+                  <div class="space-y-1.5">
+                    <div class="flex items-center gap-2">
+                      <label class="text-sm font-semibold">Batas Waktu Link (opsional)</label>
+                      <button type="button" class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('expire')">
+                        <span class="material-symbols-outlined text-[18px]">help</span>
+                      </button>
+                    </div>
+                    ${(() => {
+                      const parts = parseExpireParts(f.expire || '');
+                      const hourOptions = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+                        .map(h => `<option value="${h}" ${h===parts.hh?'selected':''}>${h}</option>`).join('');
+                      const minOptions = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
+                        .map(m => `<option value="${m}" ${m===parts.mm?'selected':''}>${m}</option>`).join('');
+                      return `
+                        <div class="grid grid-cols-3 gap-2">
+                          <input placeholder="31-12-2026" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(parts.date)}" oninput="window.__sp.setQuizExpirePart('date', this.value)">
+                          <select class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" onchange="window.__sp.setQuizExpirePart('hh', this.value)">${hourOptions}</select>
+                          <select class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" onchange="window.__sp.setQuizExpirePart('mm', this.value)">${minOptions}</select>
+                        </div>
+                      `;
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <div class="rounded-xl border bg-white dark:bg-surface-dark p-4 space-y-3">
+                <div class="flex items-center gap-2">
+                  <div class="font-bold">B. Opsi</div>
+                  <button type="button" class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('opsi')">
+                    <span class="material-symbols-outlined text-[18px]">help</span>
+                  </button>
+                </div>
                 <label class="inline-flex items-center gap-2 text-sm">
                   <input type="checkbox" ${f.showSolution ? 'checked' : ''} onchange="window.__sp.setQuizPublish('showSolution', this.checked)">
                   <span>Tampilkan jawaban & pembahasan setelah submit</span>
                 </label>
-              </div>
-              <div class="flex items-center gap-3">
                 <label class="inline-flex items-center gap-2 text-sm">
                   <input type="checkbox" ${(f.includeImages ?? true) ? 'checked' : ''} onchange="window.__sp.setQuizPublish('includeImages', this.checked)">
                   <span>Sertakan gambar (maks 5)</span>
                 </label>
               </div>
+              <div class="rounded-xl border bg-white dark:bg-surface-dark p-4 space-y-3">
+                <div class="flex items-center gap-2">
+                  <div class="font-bold">C. Data Siswa (tidak wajib)</div>
+                  <button type="button" class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('roster')">
+                    <span class="material-symbols-outlined text-[18px]">help</span>
+                  </button>
+                </div>
+                <div class="flex items-center gap-3 flex-wrap">
+                  <button type="button" onclick="document.getElementById('rosterPicker').click()" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark">Upload CSV/TXT</button>
+                  <button type="button" onclick="window.__sp.downloadRosterTemplate()" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark">Download Template TXT</button>
+                  <div class="text-xs text-text-sub-light">${Array.isArray(f.roster) && f.roster.length ? `Terbaca ${f.roster.length} siswa` : 'Belum ada file diunggah'}</div>
+                </div>
+                ${Array.isArray(f.roster) && f.roster.length ? `
+                  <div class="rounded-lg border border-green-200 bg-green-50 text-green-800 p-3 text-sm">
+                    Berhasil diupload: terbaca <b>${f.roster.length}</b> siswa.
+                  </div>
+                ` : ``}
+              </div>
               <div class="flex items-center gap-3">
-                <button onclick="window.__sp.publishQuiz()" class="px-4 h-11 rounded-lg bg-primary hover:bg-blue-600 text-white font-semibold">Buat Link Siswa</button>
+                <button onclick="window.__sp.publishQuiz()" class="px-4 h-11 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold">Buat & Salin Link</button>
                 <div id="pubMsg" class="text-sm text-text-sub-light"></div>
               </div>
               ${(() => {
@@ -6453,7 +6749,7 @@ ${baselineModulAjar}
                 const showLast = last && (!hasRoster || !state.quizLastPubId);
                 return showLast ? `
                 <div class="space-y-2">
-                  <div class="text-xs text-text-sub-light">Link publik:</div>
+                  <div class="text-xs text-text-sub-light">Link untuk siswa:</div>
                   <code class="block px-2.5 py-1 rounded-md border bg-white dark:bg-surface-dark font-mono text-xs">${last}</code>
                   <div>
                     <button type="button" data-link="${last}" onclick="navigator.clipboard.writeText(this.getAttribute('data-link')); this.textContent='Disalin'; setTimeout(()=>this.textContent='Salin',1500)" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm">Salin</button>
@@ -6471,8 +6767,8 @@ ${baselineModulAjar}
                     <div class="flex items-center justify-between gap-2">
                       <div class="text-sm font-semibold">Daftar Link Siswa (${f.roster.length})</div>
                       <div class="flex items-center gap-2">
-                        <button class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.exportRosterLinksCSV(${Number(state.quizLastPubId)}, '${safeText(state.quizLastSlug||'')}')">Download CSV</button>
-                        <button class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark inline-flex items-center gap-2" onclick="window.__sp.exportRosterLinksPDF(${Number(state.quizLastPubId)}, '${safeText(state.quizLastSlug||'')}')">
+                        <button class="px-4 h-9 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold" onclick="window.__sp.exportRosterLinksCSV(${Number(state.quizLastPubId)}, '${safeText(state.quizLastSlug||'')}')">Download CSV</button>
+                        <button class="px-4 h-9 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold inline-flex items-center gap-2" onclick="window.__sp.exportRosterLinksPDF(${Number(state.quizLastPubId)}, '${safeText(state.quizLastSlug||'')}')">
                           <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
                           Download PDF
                         </button>
@@ -6504,50 +6800,129 @@ ${baselineModulAjar}
           const exampleLink = pubObj ? `${location.origin}/soal_view.php?id=${encodeURIComponent(String(pubObj.id))}&n=1` : '';
           const roster = Array.isArray(state.quizPublishForm?.roster) ? state.quizPublishForm.roster : [];
           const nameMap = new Map(roster.map(r => [Number(r.absen), String(r.nama||'')]));
+          const query = String(state.quizResultsQuery || '').trim().toLowerCase();
+          const filteredRows = query
+            ? dataRows.filter(r => {
+                const ab = String(r?.absen ?? '').toLowerCase();
+                const nm = (String(r?.nama || r?.name || '') || (nameMap.get(Number(r?.absen)) || '')).toLowerCase();
+                return ab.includes(query) || nm.includes(query);
+              })
+            : dataRows;
           const scores = dataRows.map(r => r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0);
           const avg = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
           const max = scores.length ? Math.max(...scores) : 0;
+          const loadedAtText = (() => {
+            const raw = String(state.quizResultsLoadedAt || '').trim();
+            if (!raw) return '';
+            const d = new Date(raw);
+            if (Number.isNaN(d.getTime())) return '';
+            return d.toLocaleString('id-ID');
+          })();
+          const status = (() => {
+            if (!pubObj) return { text: 'Belum dipilih', cls: 'bg-gray-100 text-gray-700 border-gray-200' };
+            const active = Number(pubObj?.is_active ?? 1) === 1;
+            const expRaw = String(pubObj?.expire_at || '').trim();
+            const exp = expRaw ? new Date(expRaw.replace(' ', 'T')) : null;
+            const expired = exp && !Number.isNaN(exp.getTime()) ? exp.getTime() < Date.now() : false;
+            if (!active) return { text: 'Nonaktif', cls: 'bg-red-50 text-red-700 border-red-200' };
+            if (expired) return { text: 'Kedaluwarsa', cls: 'bg-amber-50 text-amber-800 border-amber-200' };
+            return { text: 'Aktif', cls: 'bg-green-50 text-green-800 border-green-200' };
+          })();
           const top3 = dataRows.slice(0,3).map((r,i) => {
             const ab = Number(r.absen);
             const nm = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
             return { rank: i+1, absen: ab, name: nm, nilai: r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0 };
           });
-          const rows = dataRows.map((r, idx) => {
+          const rows = filteredRows.map((r, idx) => {
             const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
             const ab = Number(r.absen);
             const nm = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
             const trophy = idx < 3 ? `<span class="material-symbols-outlined text-amber-500 text-[18px] align-middle">trophy</span>` : '';
+            const rowCls = idx % 2 ? 'bg-background-light/40 dark:bg-background-dark/30' : '';
             return `<tr>
-              <td class="border px-3 py-2 text-center">${idx+1} ${trophy}</td>
-              <td class="border px-3 py-2 text-center">${ab}</td>
-              <td class="border px-3 py-2">${safeText(nm || '-')}</td>
-              <td class="border px-3 py-2 text-center">${pct}</td>
+              <td class="border px-3 py-2 text-center ${rowCls}">${idx+1} ${trophy}</td>
+              <td class="border px-3 py-2 text-center ${rowCls}">${ab}</td>
+              <td class="border px-3 py-2 ${rowCls}">${safeText(nm || '-')}</td>
+              <td class="border px-3 py-2 text-center ${rowCls}">${pct}</td>
             </tr>`;
           }).join('');
           return `
             <div class="p-6 space-y-4">
-              <div class="text-xl font-bold">Hasil Nilai</div>
-              <div class="flex items-center flex-wrap gap-2">
-                <select id="selPub" class="flex-1 min-w-0 h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark">${options}</select>
-                <button onclick="window.__sp.loadResults()" class="px-4 h-11 rounded-lg border bg-white dark:bg-surface-dark">Muat</button>
-                <button onclick="window.__sp.loadPublications()" class="px-3 h-11 rounded-lg border bg-white dark:bg-surface-dark">Segarkan</button>
-                ${pubObj ? `
-                  <button onclick="window.__sp.exportResultsPDF('${safeText(pubObj.slug)}')" title="Download PDF"
-                    class="flex items-center justify-center h-11 w-11 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white">
-                    <span class="material-symbols-outlined">picture_as_pdf</span>
-                  </button>
-                ` : ``}
-                ${pubObj ? `
-                  <button onclick="window.__sp.exportResultsCSV('${safeText(pubObj.slug)}')" title="Download Laporan (CSV)"
-                    class="flex items-center justify-center h-11 w-11 rounded-lg border bg-white dark:bg-surface-dark">
-                    <span class="material-symbols-outlined">table</span>
-                  </button>
-                ` : ``}
+              <div class="flex items-center gap-2">
+                <div class="text-xl font-bold">Hasil Quiz</div>
+                <button type="button"
+                  class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors"
+                  title="Petunjuk Hasil Quiz"
+                  onclick="window.__sp.openHasilQuizHelp()"
+                >
+                  <span class="material-symbols-outlined text-[18px]">help</span>
+                </button>
+                <span class="ml-1 inline-flex items-center px-2.5 h-7 rounded-full border text-xs font-semibold ${status.cls}">${status.text}</span>
               </div>
-              <div class="text-xs rounded-md border border-amber-200 bg-amber-50 text-amber-800 p-3">
-                Data hasil dan gambar di server akan dihapus otomatis 24 jam setelah publish. Segera unduh JSON atau ZIP agar arsip aman.
+              <div id="modalHasilQuizHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+                <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[800px] max-height-[85vh] overflow-auto">
+                  <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                    <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Hasil Quiz</div>
+                    <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeHasilQuizHelp()">&times;</button>
+                  </div>
+                  <div class="p-5 space-y-4 text-sm leading-relaxed">
+                    <div>
+                      <div class="font-bold mb-1">Fungsi</div>
+                      <ul class="list-disc pl-5 space-y-1">
+                        <li>Melihat nilai dan peringkat siswa dari link yang sudah dibagikan.</li>
+                        <li>Mengunduh laporan untuk arsip.</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <div class="font-bold mb-1">Cara cek hasil</div>
+                      <ol class="list-decimal pl-5 space-y-1">
+                        <li>Pilih Nama Link pada dropdown.</li>
+                        <li>Klik Muat untuk mengambil data nilai terbaru.</li>
+                        <li>Daftar Nama Link akan muncul otomatis setelah Anda membuat link.</li>
+                      </ol>
+                    </div>
+                    <div>
+                      <div class="font-bold mb-1">Fungsi tombol</div>
+                      <ul class="list-disc pl-5 space-y-1">
+                        <li>Muat: mengambil hasil dari link yang dipilih.</li>
+                        <li>Ikon PDF: unduh laporan PDF.</li>
+                        <li>Ikon Tabel: unduh laporan CSV (untuk Excel).</li>
+                      </ul>
+                    </div>
+                    <div class="rounded-md border border-amber-200 bg-amber-50 text-amber-900 p-3 text-xs">
+                      Catatan: Data hasil dan gambar di server akan dihapus otomatis 14 hari setelah publish. Segera unduh laporan untuk arsip.
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div class="rounded-xl border bg-white dark:bg-surface-dark p-4 space-y-3">
+                <div class="flex flex-col md:flex-row md:items-center gap-2">
+                  <div class="flex-1 min-w-0">
+                    <div class="text-xs text-text-sub-light mb-1">Pilih Link Quiz</div>
+                    <select id="selPub" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark">${options}</select>
+                  </div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <button onclick="window.__sp.loadResults()" class="px-4 h-11 rounded-lg border bg-white dark:bg-surface-dark">Tampilkan Hasil Quiz</button>
+                    <button ${pubObj ? `onclick="window.__sp.exportResultsPDF('${safeText(pubObj.slug)}')"` : 'disabled'} title="Unduh PDF"
+                      class="flex items-center justify-center h-11 w-11 rounded-lg ${pubObj ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}">
+                      <span class="material-symbols-outlined">picture_as_pdf</span>
+                    </button>
+                    <button ${pubObj ? `onclick="window.__sp.exportResultsCSV('${safeText(pubObj.slug)}')"` : 'disabled'} title="Unduh CSV (Excel)"
+                      class="flex items-center justify-center h-11 w-11 rounded-lg ${pubObj ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}">
+                      <span class="material-symbols-outlined">table</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="flex flex-col md:flex-row md:items-center gap-2">
+                  <div class="flex-1 min-w-0">
+                    <input class="w-full h-10 px-3 rounded-lg border bg-white dark:bg-surface-dark text-sm" placeholder="Cari No Absen atau Nama Siswa..." value="${safeText(state.quizResultsQuery || '')}" oninput="window.__sp.setQuizResultsQuery(this.value)">
+                  </div>
+                </div>
+                <div class="text-xs rounded-md border border-amber-200 bg-amber-50 text-amber-800 p-3">
+                  Data hasil dan gambar di server akan dihapus otomatis 14 hari setelah publish. Segera unduh laporan untuk arsip.
+                </div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
                 <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
                   <div class="text-xs text-text-sub-light">Mata Pelajaran</div>
                   <div class="font-bold">${safeText(state.quizResultsMapel || '-')}</div>
@@ -6560,6 +6935,10 @@ ${baselineModulAjar}
                   <div class="text-xs text-text-sub-light">Nilai Tertinggi</div>
                   <div class="font-bold">${max}</div>
                 </div>
+                <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
+                  <div class="text-xs text-text-sub-light">Respon Masuk</div>
+                  <div class="font-bold">${dataRows.length}</div>
+                </div>
               </div>
               <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
                 <div class="font-bold mb-2">3 Besar</div>
@@ -6569,31 +6948,39 @@ ${baselineModulAjar}
               </div>
               <div class="overflow-auto">
                 <table class="min-w-full text-sm border">
-                  <thead class="bg-background-light dark:bg-background-dark">
+                  <thead class="bg-background-light dark:bg-background-dark sticky top-0 z-10">
                     <tr><th class="border px-3 py-2 text-center">Peringkat</th><th class="border px-3 py-2 text-center">No Absen</th><th class="border px-3 py-2 text-left">Nama Siswa</th><th class="border px-3 py-2 text-center">Nilai</th></tr>
                   </thead>
-                  <tbody>${rows || `<tr><td colspan="4" class="border px-3 py-6 text-center text-text-sub-light">Belum ada hasil.</td></tr>`}</tbody>
+                  <tbody>${rows || `<tr><td colspan="4" class="border px-3 py-6 text-center text-text-sub-light">${query ? 'Tidak ada data yang cocok.' : 'Belum ada hasil.'}</td></tr>`}</tbody>
                 </table>
               </div>
             </div>
           `;
         })();
+        const shareNav = `
+          <div class="px-4 pt-4">
+            <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
+              <button class="${shareTab==='buat_link'?'bg-primary text-white':'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setQuizShareTab('buat_link')">1. Buat Link</button>
+              <button class="${shareTab==='hasil'?'bg-primary text-white':'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setQuizShareTab('hasil')">2. Hasil Quiz</button>
+            </div>
+          </div>
+        `;
         const quizHelpModal = `
           <div id="modalQuizHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
             <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-h-[85vh] overflow-auto">
               <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
-                <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Quiz</div>
+                <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Fungsi Menu Quiz</div>
                 <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeQuizHelp()">&times;</button>
               </div>
               <div class="p-5 space-y-3 text-sm leading-relaxed">
                 <ol class="list-decimal pl-5 space-y-2">
-                  <li>Live: jalankan kuis interaktif menggunakan naskah yang sudah dibuat (butuh soal tersedia).</li>
-                  <li>Buat Link: isi slug, jumlah siswa, dan (opsional) unggah roster CSV/TXT “NoAbsen,Nama Siswa” untuk menghasilkan link unik per siswa.</li>
-                  <li>Publish: setelah berhasil, sistem menampilkan link contoh dan dapat mengunduh daftar link siswa (CSV).</li>
-                  <li>Hasil Nilai: muat dan unduh laporan JSON/ZIP/CSV; ringkasan nilai dan peringkat tersedia.</li>
+                  <li>Soal untuk Quiz: menampilkan pratinjau soal Pilihan Ganda yang akan dipakai untuk Quiz Live dan Bagikan Link. Pastikan sudah ada naskah soal terlebih dahulu.</li>
+                  <li>Quiz Live: dipakai saat kuis berlangsung di kelas. Guru menampilkan dan menjalankan soal secara langsung.</li>
+                  <li>Bagikan Link → 1. Buat Link: dipakai untuk membuat tautan yang bisa dibuka siswa (tugas/ujian mandiri tanpa login).</li>
+                  <li>Bagikan Link → 2. Hasil Quiz: dipakai untuk melihat nilai dan peringkat siswa dari link yang sudah dibagikan.</li>
                 </ol>
                 <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
-                  Catatan: Link dan data hasil akan otomatis dihapus 24 jam setelah publish. Segera simpan arsip JSON/ZIP.
+                  Catatan: Link dan data hasil akan otomatis dihapus 14 hari setelah publish. Segera simpan arsip JSON/ZIP.
                 </div>
               </div>
             </div>
@@ -6648,7 +7035,23 @@ ${baselineModulAjar}
               </div>
             </div>
           </div>`;
-        const body = !HAS_QUIZ_ACCESS ? noAccess : (sub==='publish' ? pub : sub==='results' ? res : live);
+        const previewInline = state.quizShowPreview ? `
+          <div class="px-4 pt-3 pb-6">
+            ${buildQuizItemsHTMLInline()}
+            <div class="mt-5 flex items-center gap-2">
+              <button class="inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold"
+                onclick="window.__sp.setPreviewTab('naskah'); window.__sp.setView('preview')">
+                <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                Buka Naskah Soal
+              </button>
+            </div>
+          </div>
+        ` : ``;
+        const body = !HAS_QUIZ_ACCESS
+          ? noAccess
+          : (sub === 'share'
+              ? `${shareNav}${shareTab==='hasil' ? res : pub}`
+              : (state.quizShowPreview ? previewInline : live));
         return `
           <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
             ${tabs}
@@ -6718,14 +7121,84 @@ ${baselineModulAjar}
         renderQuizContent();
       };
       const setQuizTab = (t) => {
-        state.quizSubtab = t;
+        const v = String(t || '').trim();
+        state.quizShowPreview = false;
+        if (v === 'results') {
+          state.quizSubtab = 'share';
+          state.quizShareTab = 'hasil';
+        } else if (v === 'publish' || v === 'share') {
+          state.quizSubtab = 'share';
+          if (!state.quizShareTab) state.quizShareTab = 'buat_link';
+        } else {
+          state.quizSubtab = 'live';
+        }
+        state.quizShareTab = state.quizShareTab || 'buat_link';
+        if (state.quizShareTab !== 'buat_link' && state.quizShareTab !== 'hasil') state.quizShareTab = 'buat_link';
         saveDebounced(true);
+        render();
+      };
+      const setQuizShareTab = async (t) => {
+        state.quizSubtab = 'share';
+        state.quizShowPreview = false;
+        const v = String(t || '').trim();
+        state.quizShareTab = (v === 'hasil') ? 'hasil' : 'buat_link';
+        saveDebounced(true);
+        if (state.quizShareTab === 'hasil') {
+          try { await loadPublications(); } catch {}
+        }
         render();
       };
       const setQuizPublish = (k, v) => {
         state.quizPublishForm = state.quizPublishForm || {};
         state.quizPublishForm[k] = v;
         saveDebounced(false);
+      };
+      const parseExpireParts = (s) => {
+        const raw = String(s || '').trim();
+        if (!raw) return { date: '', hh: '23', mm: '59' };
+        const m1 = raw.match(/^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+        if (m1) {
+          const dd = m1[1];
+          const mm = m1[2];
+          const yyyy = m1[3];
+          const hh = String(m1[4] ?? '23').padStart(2, '0');
+          const mi = String(m1[5] ?? '59').padStart(2, '0');
+          return { date: `${dd}-${mm}-${yyyy}`, hh, mm: mi };
+        }
+        const norm = raw.replace('T', ' ');
+        const m2 = norm.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{1,2}):(\d{2}))?$/);
+        if (m2) {
+          const yyyy = m2[1];
+          const mm = m2[2];
+          const dd = m2[3];
+          const hh = String(m2[4] ?? '23').padStart(2, '0');
+          const mi = String(m2[5] ?? '59').padStart(2, '0');
+          return { date: `${dd}-${mm}-${yyyy}`, hh, mm: mi };
+        }
+        return { date: raw, hh: '23', mm: '59' };
+      };
+      const setQuizExpirePart = (part, val) => {
+        state.quizPublishForm = state.quizPublishForm || {};
+        const cur = parseExpireParts(state.quizPublishForm.expire || '');
+        const v = String(val ?? '').trim();
+        const next = { ...cur };
+        if (part === 'date') next.date = v;
+        if (part === 'hh') next.hh = String(v || '23').padStart(2, '0');
+        if (part === 'mm') next.mm = String(v || '59').padStart(2, '0');
+        if (!next.date) {
+          state.quizPublishForm.expire = '';
+        } else {
+          const hh = String(next.hh || '23').padStart(2, '0');
+          const mm = String(next.mm || '59').padStart(2, '0');
+          state.quizPublishForm.expire = `${next.date} ${hh}:${mm}`;
+        }
+        saveDebounced(false);
+        render();
+      };
+      const setQuizResultsQuery = (q) => {
+        state.quizResultsQuery = String(q || "");
+        saveDebounced(false);
+        render();
       };
       const parseRosterText = (text) => {
         const lines = String(text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
@@ -6871,7 +7344,75 @@ ${baselineModulAjar}
         const payload = pg.map(q => ({ question: String(q.question||''), options: q.options.map(x=>String(x||'')) }));
         const answer_key = pg.map(q => Number(Array.isArray(q.answer)? q.answer[0] : q.answer || 0));
         const slug = String(state.quizPublishForm?.slug || "").trim().toLowerCase().replace(/[^a-z0-9\-]+/g,'-').replace(/^-+|-+$/g,'');
-        const expire = String(state.quizPublishForm?.expire || "").trim();
+        let expireRaw = String(state.quizPublishForm?.expire || "").trim();
+        const addDays = (d, days) => {
+          const x = new Date(d.getTime());
+          x.setDate(x.getDate() + Number(days || 0));
+          return x;
+        };
+        const pad2 = (n) => String(Number(n) || 0).padStart(2, '0');
+        const fmtDDMMYYYY = (d) => `${pad2(d.getDate())}-${pad2(d.getMonth() + 1)}-${d.getFullYear()}`;
+        const maxExpireDate = (() => {
+          const d = addDays(new Date(), 14);
+          d.setHours(23, 59, 0, 0);
+          return d;
+        })();
+        const parseExpireToDate = (s) => {
+          const v = String(s || '').trim().replace('T', ' ');
+          const m1 = v.match(/^(\d{2})-(\d{2})-(\d{4})\s+(\d{1,2}):(\d{2})$/);
+          if (m1) return new Date(Number(m1[3]), Number(m1[2]) - 1, Number(m1[1]), Number(m1[4]), Number(m1[5]), 0, 0);
+          const m2 = v.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})$/);
+          if (m2) return new Date(Number(m2[1]), Number(m2[2]) - 1, Number(m2[3]), Number(m2[4]), Number(m2[5]), 0, 0);
+          const m3 = v.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+          if (m3) return new Date(Number(m3[3]), Number(m3[2]) - 1, Number(m3[1]), 23, 59, 0, 0);
+          const m4 = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+          if (m4) return new Date(Number(m4[1]), Number(m4[2]) - 1, Number(m4[3]), 23, 59, 0, 0);
+          return null;
+        };
+        if (!expireRaw) {
+          expireRaw = `${fmtDDMMYYYY(maxExpireDate)} 23:59`;
+          state.quizPublishForm = state.quizPublishForm || {};
+          state.quizPublishForm.expire = expireRaw;
+          saveDebounced(false);
+        } else {
+          const dt = parseExpireToDate(expireRaw);
+          if (dt && !Number.isNaN(dt.getTime()) && dt.getTime() > maxExpireDate.getTime()) {
+            const fixed = `${fmtDDMMYYYY(maxExpireDate)} 23:59`;
+            expireRaw = fixed;
+            state.quizPublishForm = state.quizPublishForm || {};
+            state.quizPublishForm.expire = fixed;
+            saveDebounced(false);
+            alert('Batas waktu link maksimal 14 hari dari tanggal pembuatan. Nilai otomatis disesuaikan.');
+          }
+        }
+        if (/^\d{2}-\d{2}-\d{4}$/.test(expireRaw)) expireRaw = `${expireRaw} 23:59`;
+        if (/^\d{4}-\d{2}-\d{2}$/.test(expireRaw)) expireRaw = `${expireRaw} 23:59`;
+        const normalizeExpireDate = (s) => {
+          const v = String(s || "").trim();
+          const vv = v.replace('T', ' ');
+          const m1 = vv.match(/^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
+          if (m1) {
+            const dd = m1[1];
+            const mm = m1[2];
+            const yyyy = m1[3];
+            const hh = String(m1[4] ?? '').trim();
+            const mi = String(m1[5] ?? '').trim();
+            if (hh && mi) return `${yyyy}-${mm}-${dd} ${String(hh).padStart(2,'0')}:${String(mi).padStart(2,'0')}`;
+            return `${yyyy}-${mm}-${dd}`;
+          }
+          const m2 = vv.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{1,2}):(\d{2}))?$/);
+          if (m2) {
+            const yyyy = m2[1];
+            const mm = m2[2];
+            const dd = m2[3];
+            const hh = String(m2[4] ?? '').trim();
+            const mi = String(m2[5] ?? '').trim();
+            if (hh && mi) return `${yyyy}-${mm}-${dd} ${String(hh).padStart(2,'0')}:${String(mi).padStart(2,'0')}`;
+            return `${yyyy}-${mm}-${dd}`;
+          }
+          return v;
+        };
+        const expire = normalizeExpireDate(expireRaw);
         if (!slug) { alert("Isi slug."); return; }
         const btn = document.getElementById('pubMsg');
         if (btn) btn.textContent = "Memproses...";
@@ -6959,7 +7500,7 @@ ${baselineModulAjar}
           let js = null;
           try { js = JSON.parse(raw); } catch {}
           if (res.ok && js && js.ok) {
-            const expText = (expire && expire.trim()) ? expire.trim() : '24 jam (otomatis)';
+            const expText = (expireRaw && expireRaw.trim()) ? expireRaw.trim() : '14 hari (otomatis)';
             const classLink = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(js.id))}`;
             const exampleLink = `${classLink}&n=1`;
             const adjusted = Number(js.slug_adjusted || 0) === 1 && String(js.slug_original || '') && String(js.slug || '') !== String(js.slug_original || '');
@@ -7035,6 +7576,7 @@ ${baselineModulAjar}
           if (js && js.ok) {
             state.quizResults = js.items || [];
             state.quizResultsMapel = js.mapel || '';
+            state.quizResultsLoadedAt = new Date().toISOString();
             saveDebounced(false);
             render();
           }
@@ -9364,11 +9906,14 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         downloadSoalPDF,
         setModulAjarTab,
         setQuizTab,
+        setQuizShareTab,
         setQuizPublish,
+        setQuizExpirePart,
         publishQuiz,
         downloadRosterTemplate,
         loadPublications,
         loadResults,
+        setQuizResultsQuery,
         exportJSON,
         exportZIP,
         exportRosterLinksCSV,
@@ -9394,6 +9939,14 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         closeIdentitasHelp,
         openBuatSoalHelp,
         closeBuatSoalHelp,
+        openBagikanLinkHelp,
+        closeBagikanLinkHelp,
+        openBagikanLinkFieldHelp,
+        closeBagikanLinkFieldHelp,
+        openHasilQuizHelp,
+        closeHasilQuizHelp,
+        moreQuizPreview,
+        toggleQuizPreviewPanel,
         openSumberMateriHelp,
         closeSumberMateriHelp,
         openKonfigurasiHelp,
@@ -9542,6 +10095,8 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       let historyItems = [];
       let historyPage = 1;
       const historyPageSize = 10;
+      let creditPage = 1;
+      const creditPageSize = 10;
       const renderRiwayat = () => `
         <div class="space-y-4">
           <div class="flex items-center justify-between">
@@ -9575,6 +10130,39 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               </div>
             </div>
           </div>
+          <div class="flex items-center justify-between mt-2">
+            <div class="text-sm text-text-sub-light dark:text-text-sub-dark">Riwayat penggunaan kredit (lokal)</div>
+            <div class="flex items-center gap-2">
+              <input id="creditSearch" placeholder="Cari aktivitas..." class="rounded-lg border h-9 px-3 w-56 bg-white dark:bg-surface-dark border-border-light dark:border-border-dark" value="${safeText(state.riwayatKreditSearch || '')}" />
+            </div>
+          </div>
+          <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
+            <div class="px-4 py-3 border-b border-border-light dark:border-border-dark text-xs text-text-sub-light dark:text-text-sub-dark">
+              <span id="creditSummary"></span>
+            </div>
+            <div class="overflow-auto">
+              <table class="min-w-full text-sm border whitespace-nowrap">
+                <thead class="bg-background-light dark:bg-background-dark">
+                  <tr>
+                    <th class="border px-3 py-2 text-center">No</th>
+                    <th class="border px-3 py-2 text-left">Waktu</th>
+                    <th class="border px-3 py-2 text-left">Aktivitas</th>
+                    <th class="border px-3 py-2 text-left">Rincian</th>
+                    <th class="border px-3 py-2 text-center">Kredit</th>
+                  </tr>
+                </thead>
+                <tbody id="creditTBody"></tbody>
+              </table>
+            </div>
+            <div class="flex items-center justify-between px-3 py-2 border-t border-border-light dark:border-border-dark">
+              <div id="creditInfo" class="text-xs text-text-sub-light dark:text-text-sub-dark"></div>
+              <div class="flex items-center gap-2">
+                <button id="btnCreditPrev" class="rounded-lg h-8 px-3 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-xs font-bold">Sebelumnya</button>
+                <div id="creditPageInfo" class="text-xs"></div>
+                <button id="btnCreditNext" class="rounded-lg h-8 px-3 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-xs font-bold">Berikutnya</button>
+              </div>
+            </div>
+          </div>
         </div>
       `;
 
@@ -9601,6 +10189,20 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         const nextBtn = el("btnHistoryNext");
         if (prevBtn) prevBtn.onclick = () => { historyPage = Math.max(1, historyPage - 1); renderHistoryTable(); };
         if (nextBtn) nextBtn.onclick = () => { historyPage = historyPage + 1; renderHistoryTable(); };
+        renderCreditHistoryTable();
+        const cSearch = el("creditSearch");
+        if (cSearch) {
+          cSearch.oninput = () => {
+            state.riwayatKreditSearch = cSearch.value || '';
+            creditPage = 1;
+            saveDebounced(false);
+            renderCreditHistoryTable();
+          };
+        }
+        const cPrev = el("btnCreditPrev");
+        const cNext = el("btnCreditNext");
+        if (cPrev) cPrev.onclick = () => { creditPage = Math.max(1, creditPage - 1); renderCreditHistoryTable(); };
+        if (cNext) cNext.onclick = () => { creditPage = creditPage + 1; renderCreditHistoryTable(); };
       }
       function renderHistoryTable() {
         const tbody = el("historyTBody");
@@ -9659,6 +10261,54 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
           });
         });
       }
+      function renderCreditHistoryTable() {
+        const tbody = el("creditTBody");
+        if (!tbody) return;
+        const q = String(state.riwayatKreditSearch || "").toLowerCase().trim();
+        const items = Array.isArray(state.creditHistory) ? state.creditHistory.slice() : [];
+        const filtered = q ? items.filter(r => `${r?.kind||''} ${r?.detail||''}`.toLowerCase().includes(q)) : items;
+        const total = filtered.length;
+        const totalPages = Math.max(1, Math.ceil(total / creditPageSize));
+        if (creditPage > totalPages) creditPage = totalPages;
+        const start = (creditPage - 1) * creditPageSize;
+        const pageItems = filtered.slice(start, start + creditPageSize);
+        const rows = pageItems.map((r, idx) => {
+          const dt = new Date(r.ts || Date.now());
+          const t = dt.toLocaleString('id-ID', { day:'2-digit', month:'short', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+          const cost = Number(r.cost || 0);
+          return `<tr>
+            <td class="border px-3 py-2 text-center">${start + idx + 1}</td>
+            <td class="border px-3 py-2">${t}</td>
+            <td class="border px-3 py-2">${safeText(r.kind || '-')}</td>
+            <td class="border px-3 py-2">${safeText(r.detail || '')}</td>
+            <td class="border px-3 py-2 text-center text-red-600 font-semibold">-${cost}</td>
+          </tr>`;
+        }).join('');
+        tbody.innerHTML = rows || `<tr><td colspan="5" class="border px-3 py-6 text-center text-text-sub-light dark:text-text-sub-dark">Belum ada riwayat penggunaan kredit.</td></tr>`;
+        const info = el("creditInfo");
+        if (info) {
+          const to = Math.min(total, start + pageItems.length);
+          const from = total ? start + 1 : 0;
+          info.textContent = `Menampilkan ${from}–${to} dari ${total}`;
+        }
+        const pageInfo = el("creditPageInfo");
+        if (pageInfo) pageInfo.textContent = `Halaman ${total ? creditPage : 0}/${total ? totalPages : 0}`;
+        const prevBtn = el("btnCreditPrev");
+        const nextBtn = el("btnCreditNext");
+        if (prevBtn) prevBtn.disabled = creditPage <= 1;
+        if (nextBtn) nextBtn.disabled = creditPage >= totalPages;
+        const summary = el("creditSummary");
+        if (summary) {
+          const now = Date.now();
+          const startToday = new Date();
+          startToday.setHours(0,0,0,0);
+          const t0 = startToday.getTime();
+          const t7 = now - (7 * 24 * 60 * 60 * 1000);
+          const sumToday = items.filter(r => new Date(r.ts || 0).getTime() >= t0).reduce((a,r)=>a+Number(r.cost||0),0);
+          const sum7 = items.filter(r => new Date(r.ts || 0).getTime() >= t7).reduce((a,r)=>a+Number(r.cost||0),0);
+          summary.textContent = `Hari ini: -${sumToday} kredit • 7 hari terakhir: -${sum7} kredit • Total entri: ${items.length}`;
+        }
+      }
       el("btnExportTop").addEventListener("click", () => {
          if (state.questions.length === 0) return alert("Belum ada soal!");
          exportDocx();
@@ -9695,19 +10345,6 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         }
         renderQuizContent();
       });
-      el("btnQuizRegen").addEventListener("click", async () => {
-        const q = state.questions[state.quiz.idx];
-        if (!q) return;
-        await regenSingle(q.id);
-        renderQuizContent();
-      });
-      el("btnQuizImgRegen").addEventListener("click", async () => {
-        const q = state.questions[state.quiz.idx];
-        if (!q) return;
-        await regenImage(q.id);
-        renderQuizContent();
-      });
-
       if (load()) {
         applyTheme();
       } else {
