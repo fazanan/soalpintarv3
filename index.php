@@ -266,7 +266,6 @@ if (!isset($_SESSION['user_id'])) {
     <input id="lkpdTxtUpload" type="file" accept=".txt,.md,.markdown,.csv,.json,.html,.htm" class="hidden" />
     <input id="topikImgUpload" type="file" accept="image/*" class="hidden" />
     <input id="topikTxtUpload" type="file" accept=".txt,.md,.markdown,.csv,.json,.html,.htm" class="hidden" />
-    <input id="topikDocxUpload" type="file" accept=".docx" class="hidden" />
     <input id="rosterPicker" type="file" accept=".csv,.txt" class="hidden" />
     <input id="rekapExcelPicker" type="file" accept=".xlsx,.xls" class="hidden" />
     <input id="rekapPrintLogoPicker" type="file" accept="image/*" class="hidden" />
@@ -1769,6 +1768,80 @@ if (!isset($_SESSION['user_id'])) {
       function closePreviewHelp() {
         const m = el('modalPreviewHelp');
         if (m) m.style.display = 'none';
+      }
+      const BUAT_SOAL_TUTORIALS = {
+        identitas: [
+          { id: 'i1', title: 'Isi Identitas Dasar', src: 'tutorial/buatsoal/IdentitasSoal.wav' },
+          { id: 'i2', title: 'Sumber Materi: Cara Isi yang Benar', src: 'tutorial/buatsoal/SumberMateri.wav' },
+          { id: 'i3', title: 'Perintah Khusus: Contoh Penggunaan', src: 'tutorial/buatsoal/PerintahKhusus.wav' },
+        ],
+        konfigurasi: [
+          { id: 'k1', title: 'Konsep Multi-bagian', src: 'tutorial/buatsoal/KonsepMultiBagian.wav' },
+          { id: 'k2', title: 'Atur Bentuk & Jumlah Soal', src: 'tutorial/buatsoal/BagiandanJumlahSoal.wav' },
+          { id: 'k3', title: 'Tingkat Kesulitan & Bloom', src: 'tutorial/buatsoal/TingkatKesulitanDanBloom.wav' },
+          { id: 'k4', title: 'Duplikat & Hapus Bagian', src: 'tutorial/buatsoal/DuplikatDanHapusBagian.wav' },
+          { id: 'k5', title: 'Lanjut ke Naskah Soal', src: 'tutorial/buatsoal/NaskahSoal.wav' },
+        ],
+        naskah: [
+          { id: 'n1', title: 'Pengenalan Naskah Soal', src: 'tutorial/buatsoal/PengenalanNaskahSoal.wav' },
+          { id: 'n2', title: 'Buat Soal Sekarang', src: 'tutorial/buatsoal/BuatSoalSekarang.wav' },
+          { id: 'n3', title: 'Buat Ulang Soal per Nomor', src: 'tutorial/buatsoal/BuatUlangSoalPerNomor.wav' },
+          { id: 'n4', title: 'Prompt Gambar & Upload', src: 'tutorial/buatsoal/PromptGambarUpload.wav' },
+          { id: 'n5', title: 'Upload & Hapus Gambar', src: 'tutorial/buatsoal/UploadHapusGambar.wav' },
+          { id: 'n6', title: 'Download PDF & DOCX, Simpan & Muat', src: 'tutorial/buatsoal/DownloadSimpanMuat.wav' },
+        ],
+      };
+      function openBuatSoalTutorial(tab) {
+        const m = el('modalBuatSoalTutorial');
+        if (!m) return;
+        const t = String(tab || state.previewTab || 'identitas');
+        const list = Array.isArray(BUAT_SOAL_TUTORIALS[t]) ? BUAT_SOAL_TUTORIALS[t] : BUAT_SOAL_TUTORIALS.identitas;
+        const titleEl = el('bstModalTitle');
+        if (titleEl) {
+          const map = { identitas: 'Tutorial • Identitas', konfigurasi: 'Tutorial • Konfigurasi', naskah: 'Tutorial • Naskah Soal' };
+          titleEl.textContent = map[t] || 'Tutorial Buat Soal';
+        }
+        const listEl = el('bstList');
+        if (listEl) {
+          listEl.className = (t === 'konfigurasi' || t === 'naskah') ? 'grid grid-cols-1 md:grid-cols-2 gap-2' : 'space-y-2';
+          listEl.innerHTML = list.map((it, i) => `
+            <div class="w-full h-full rounded-lg border bg-white dark:bg-surface-dark p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="text-xs text-text-sub-light">#${i + 1}</div>
+                  <div class="font-bold">${safeText(it.title)}</div>
+                </div>
+                ${it.src ? `` : `<div class="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500">Segera hadir</div>`}
+              </div>
+              ${it.src ? `<div class="mt-3"><audio class="w-full rounded-lg border bg-white dark:bg-surface-dark" controls preload="none" src="${safeText(it.src)}"></audio></div>` : ``}
+            </div>
+          `).join('');
+        }
+        m.style.display = 'flex';
+      }
+      function closeBuatSoalTutorial() {
+        const m = el('modalBuatSoalTutorial');
+        if (m) m.style.display = 'none';
+        try {
+          document.querySelectorAll('#bstList audio').forEach(a => {
+            try { a.pause(); } catch {}
+            try { a.currentTime = 0; } catch {}
+          });
+        } catch {}
+      }
+      function playBuatSoalTutorial(id, tab) {
+        const t = String(tab || state.previewTab || 'identitas');
+        const list = Array.isArray(BUAT_SOAL_TUTORIALS[t]) ? BUAT_SOAL_TUTORIALS[t] : BUAT_SOAL_TUTORIALS.identitas;
+        const item = list.find(x => x.id === String(id || ''));
+        if (!item) return;
+        if (!item.src) return;
+        const title = el('bstTitle');
+        if (title) title.textContent = item.title;
+        const v = el('bstPlayer');
+        if (!v) return;
+        v.src = item.src;
+        v.load();
+        try { v.play(); } catch {}
       }
       function openMAHelp1(){ const m = el('modalMAHelp1'); if (m){ m.classList.remove('hidden'); m.style.display='flex'; } }
       function closeMAHelp1(){ const m = el('modalMAHelp1'); if (m){ m.style.display='none'; m.classList.add('hidden'); } }
@@ -5993,6 +6066,13 @@ ${baselineModulAjar}
       const computeView = () => {
         if (state.activeView === "preview") {
           const helpOnClick = "window.__sp.openBuatSoalHelp()";
+          const tutorialBtn = `
+                <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                  onclick="window.__sp.openBuatSoalTutorial()" title="Tutorial">
+                  <span class="material-symbols-outlined text-[18px]">volume_up</span>
+                  <span class="ml-2 hidden lg:inline">Tutorial</span>
+                </button>
+              `;
           const tabBar = `
             <div class="hidden md:flex items-center justify-between gap-3 mb-2">
               <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
@@ -6018,6 +6098,7 @@ ${baselineModulAjar}
                   <span class="material-symbols-outlined text-[18px]">help</span>
                   <span class="ml-2">Petunjuk</span>
                 </button>
+                ${tutorialBtn}
               </div>
             </div>
           `;
@@ -6100,7 +6181,26 @@ ${baselineModulAjar}
               </div>
             </div>
           `;
-          return `<div class="pb-6 md:pb-0">${tabBar}${body}${globalHelp}</div>`;
+          const tutorialModal = `
+            <div id="modalBuatSoalTutorial" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+              <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[900px] max-h-[85vh] overflow-auto">
+                <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                  <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">volume_up</span> <span id="bstModalTitle">Tutorial Buat Soal</span></div>
+                  <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeBuatSoalTutorial()">&times;</button>
+                </div>
+                <div class="p-5">
+                  <div class="space-y-2">
+                    <div class="text-sm font-bold">Daftar tutorial</div>
+                    <div id="bstList" class="space-y-2"></div>
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark">
+                      Catatan: file video/voice over akan ditambahkan menyusul.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+          return `<div class="pb-6 md:pb-0">${tabBar}${body}${globalHelp}${tutorialModal}</div>`;
         }
         if (state.activeView === "lkpd") return renderLKPD();
         if (state.activeView === "modul_ajar") return renderModulAjar();
@@ -6256,7 +6356,7 @@ ${baselineModulAjar}
                           <textarea
                             class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm min-h-[180px] md:min-h-[220px]"
                             data-path="identity.topik_raw"
-                            placeholder="Paste materi lengkap di sini, atau upload gambar/file/.docx."
+                            placeholder="Paste materi lengkap di sini, atau upload gambar/file teks."
                           >${safeText(i.topik_raw ?? "")}</textarea>
                         </div>
                         <div class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
@@ -6268,11 +6368,6 @@ ${baselineModulAjar}
                             <span class="material-symbols-outlined text-[18px]">upload_file</span>
                             Upload File Teks
                           </button>
-                          <button id="btnTopikUploadDocx" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikDocx()">
-                            <span class="material-symbols-outlined text-[18px]">description</span>
-                            Upload .docx
-                          </button>
-                          <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Upload akan dimasukkan ke Sumber Materi.</div>
                         </div>
                       </div>
                     </details>
@@ -6294,7 +6389,7 @@ ${baselineModulAjar}
                           <div>
                             <div class="font-bold mb-1">Cara pakai</div>
                             <ol class="list-decimal pl-5 space-y-1">
-                              <li>Tempel materi ke kolom Acuan Utama Soal, atau upload Gambar/File Teks/.docx.</li>
+                              <li>Tempel materi ke kolom Acuan Utama Soal, atau upload Gambar/File Teks.</li>
                               <li>Atur Jenjang, Fase, Kelas, dan Mata Pelajaran.</li>
                               <li>Lanjutkan Konfigurasi Bagian, lalu buat paket soal.</li>
                             </ol>
@@ -8279,12 +8374,6 @@ ${out}`;
         elp.value = "";
         elp.click();
       };
-      const pickTopikDocx = () => {
-        const elp = el("topikDocxUpload");
-        if (!elp) return;
-        elp.value = "";
-        elp.click();
-      };
       async function ocrImageToText(file) {
         if (!window.Tesseract) throw new Error("OCR tidak tersedia");
         const result = await Tesseract.recognize(file, "eng");
@@ -8363,28 +8452,6 @@ ${out}`;
         } catch (e) {
           if (btn) { btn.disabled = false; btn.innerHTML = original; }
           alert("Gagal OCR gambar. Silakan coba file lain.");
-        }
-      };
-      const extractDocxText = async (file) => {
-        const fd = new FormData();
-        fd.append("file", file);
-        const resp = await fetch("api/extract_docx_text.php", { method: "POST", body: fd });
-        const data = await resp.json().catch(() => null);
-        if (!resp.ok || !data?.ok) throw new Error(String(data?.error || "extract_failed"));
-        return String(data.text || "");
-      };
-      const handleTopikDocxSelected = async (evt) => {
-        const file = evt.target?.files?.[0];
-        if (!file) return;
-        const btn = el("btnTopikUploadDocx");
-        const original = btn ? btn.innerHTML : "";
-        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Membaca...'; }
-        try {
-          const text = await extractDocxText(file);
-          await setTopikFromMateri(text, btn, original, ".docx");
-        } catch (e) {
-          if (btn) { btn.disabled = false; btn.innerHTML = original; }
-          alert("Gagal membaca .docx. Silakan coba file lain.");
         }
       };
       const handleLkpdTextSelected = (evt) => {
@@ -9963,6 +10030,9 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         closeKonfigurasiHelp,
         openPreviewHelp,
         closePreviewHelp,
+        openBuatSoalTutorial,
+        closeBuatSoalTutorial,
+        playBuatSoalTutorial,
         openQuizHelp,
         closeQuizHelp,
         openMAHelp1,
@@ -9987,7 +10057,6 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         pickLkpdText,
         pickTopikImage,
         pickTopikText,
-        pickTopikDocx,
         buildPackage,
         uploadQuestionImage,
         exportDocx,
@@ -10088,8 +10157,6 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       if (topikImg) topikImg.addEventListener("change", handleTopikImageSelected);
       const topikTxt = el("topikTxtUpload");
       if (topikTxt) topikTxt.addEventListener("change", handleTopikTextSelected);
-      const topikDocx = el("topikDocxUpload");
-      if (topikDocx) topikDocx.addEventListener("change", handleTopikDocxSelected);
       const rosterPicker = el("rosterPicker");
       if (rosterPicker) rosterPicker.addEventListener("change", handleRosterSelected);
       const rekapPicker = el("rekapExcelPicker");
