@@ -3593,6 +3593,11 @@ if (!isset($_SESSION['user_id'])) {
                 <span class="material-symbols-outlined text-[18px]">help</span>
                 <span class="ml-2">Petunjuk</span>
               </button>
+              <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                onclick="window.__sp.openModulAjarTutorial()" title="Tutorial">
+                <span class="material-symbols-outlined text-[18px]">volume_up</span>
+                <span class="ml-2 hidden lg:inline">Tutorial</span>
+              </button>
             </div>
           </div>
         `;
@@ -3848,8 +3853,68 @@ if (!isset($_SESSION['user_id'])) {
           </div>
         `;
 
-        return `<div class="space-y-6">${desktopTabs}${body}${maHelpModals}</div>`;
+        const maTutorialModal = `
+          <div id="modalModulAjarTutorial" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+            <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[900px] max-h-[85vh] overflow-auto">
+              <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">volume_up</span> Tutorial Modul Ajar</div>
+                <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeModulAjarTutorial()">&times;</button>
+              </div>
+              <div class="p-5">
+                <div id="maTutorialList" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div>
+                <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-3">Catatan: audio menyusul.</div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        return `<div class="space-y-6">${desktopTabs}${body}${maHelpModals}${maTutorialModal}</div>`;
       };
+
+      const MODUL_AJAR_TUTORIALS = [
+        { id: 'ma1', title: 'Informasi Dasar (Isi identitas)', src: 'tutorial/modulajar/modul1.wav' },
+        { id: 'ma2', title: 'Detail Pembelajaran (materi, durasi, model, dimensi)', src: 'tutorial/modulajar/modul2.wav' },
+        { id: 'ma3', title: 'Mode Supervisi (CP, ATP, KKTP)', src: 'tutorial/modulajar/modul3.wav' },
+        { id: 'ma4', title: 'Buat Modul Ajar Sekarang (generate)', src: 'tutorial/modulajar/modul4.wav' },
+        { id: 'ma5', title: 'Review hasil & perbaikan cepat', src: 'tutorial/modulajar/modul5.wav' },
+        { id: 'ma6', title: 'Download DOCX/PDF, Simpan & Muat', src: 'tutorial/modulajar/modul6.wav' },
+      ];
+      function openModulAjarTutorial() {
+        const m = el('modalModulAjarTutorial');
+        if (!m) return;
+        const list = el('maTutorialList');
+        if (list) {
+          list.innerHTML = MODUL_AJAR_TUTORIALS.map((it, i) => `
+            <div class="w-full h-full rounded-lg border bg-white dark:bg-surface-dark p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="text-xs text-text-sub-light">#${i + 1}</div>
+                  <div class="font-bold">${safeText(it.title)}</div>
+                </div>
+                ${it.src ? `` : `<div class="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500">Segera hadir</div>`}
+              </div>
+              ${it.src ? `<div class="mt-3"><audio class="w-full rounded-lg border bg-white dark:bg-surface-dark" controls preload="none" src="${safeText(it.src)}"></audio></div>` : ``}
+            </div>
+          `).join('');
+        }
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+        m.style.display = 'flex';
+      }
+      function closeModulAjarTutorial() {
+        const m = el('modalModulAjarTutorial');
+        if (m) {
+          m.style.display = 'none';
+          m.classList.add('hidden');
+          m.classList.remove('flex');
+        }
+        try {
+          document.querySelectorAll('#maTutorialList audio').forEach(a => {
+            try { a.pause(); } catch {}
+            try { a.currentTime = 0; } catch {}
+          });
+        } catch {}
+      }
 
       const renderLimit = () => {
         const info = state.limitInfo || {};
@@ -10104,6 +10169,8 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         closeMAHelp2,
         openMAHelp3,
         closeMAHelp3,
+        openModulAjarTutorial,
+        closeModulAjarTutorial,
         openRPPHelp1,
         closeRPPHelp1,
         openRPPHelp2,
