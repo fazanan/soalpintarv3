@@ -6678,6 +6678,11 @@ ${baselineModulAjar}
               </span>
               <button class="inline-flex items-center gap-2 h-10 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
                 onclick="window.__sp.openQuizHelp()"><span class="material-symbols-outlined text-[18px]">help</span><span class="hidden md:inline">Petunjuk</span></button>
+              <button class="inline-flex items-center gap-2 h-10 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                onclick="window.__sp.openQuizTutorial()" title="Tutorial">
+                <span class="material-symbols-outlined text-[18px]">volume_up</span>
+                <span class="hidden md:inline">Tutorial</span>
+              </button>
             </div>
           </div>
         `;
@@ -7083,6 +7088,19 @@ ${baselineModulAjar}
                 </div>
               </div>
             </div>
+          </div>
+          <div id="modalQuizTutorial" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+              <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[900px] max-h-[85vh] overflow-auto">
+                <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                  <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">volume_up</span> Tutorial Quiz</div>
+                  <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeQuizTutorial()">&times;</button>
+                </div>
+                <div class="p-5">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2" id="quizTutorialList"></div>
+                  <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-3">Catatan: audio menyusul.</div>
+                </div>
+              </div>
+            </div>
             <div id="modalMAHelp1" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
               <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-h-[85vh] overflow-auto">
                 <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
@@ -7133,7 +7151,7 @@ ${baselineModulAjar}
                 </div>
               </div>
             </div>
-          </div>`;
+          `;
         const previewInline = state.quizShowPreview ? `
           <div class="px-4 pt-3 pb-6">
             ${buildQuizItemsHTMLInline()}
@@ -7161,6 +7179,49 @@ ${baselineModulAjar}
       };
       function openQuizHelp(){ const m = el('modalQuizHelp'); if (m) m.style.display='flex'; }
       function closeQuizHelp(){ const m = el('modalQuizHelp'); if (m) m.style.display='none'; }
+      const QUIZ_TUTORIALS = [
+        { id: 'q1', title: 'Soal untuk Quiz (Pratinjau)', src: 'tutorial/quiz/quiz1.wav' },
+        { id: 'q2', title: 'Quiz Live (Mulai & kontrol)', src: 'tutorial/quiz/quiz2.wav' },
+        { id: 'q3', title: 'Bagikan Link (Buat link + Data Siswa)', src: 'tutorial/quiz/quiz3.wav' },
+        { id: 'q4', title: 'Opsi & Pengaturan Link (expire, jumlah, gambar, pembahasan)', src: 'tutorial/quiz/quiz4.wav' },
+        { id: 'q5', title: 'Hasil Quiz (lihat, filter, unduh)', src: 'tutorial/quiz/quiz5.wav' },
+        { id: 'q6', title: 'Catatan 14 hari & Troubleshooting', src: 'tutorial/quiz/quiz6.wav' },
+      ];
+      function openQuizTutorial() {
+        const m = el('modalQuizTutorial'); if (!m) return;
+        const list = el('quizTutorialList');
+        if (list) {
+          list.innerHTML = QUIZ_TUTORIALS.map((it, i) => `
+            <div class="w-full h-full rounded-lg border bg-white dark:bg-surface-dark p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="text-xs text-text-sub-light">#${i + 1}</div>
+                  <div class="font-bold">${safeText(it.title)}</div>
+                </div>
+                ${it.src ? `` : `<div class="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500">Segera hadir</div>`}
+              </div>
+              ${it.src ? `<div class="mt-3"><audio class="w-full rounded-lg border bg-white dark:bg-surface-dark" controls preload="none" src="${safeText(it.src)}"></audio></div>` : ``}
+            </div>
+          `).join('');
+        }
+        m.classList.remove('hidden');
+        m.classList.add('flex');
+        m.style.display = 'flex';
+      }
+      function closeQuizTutorial() {
+        const m = el('modalQuizTutorial');
+        if (m) {
+          m.style.display = 'none';
+          m.classList.add('hidden');
+          m.classList.remove('flex');
+        }
+        try {
+          document.querySelectorAll('#quizTutorialList audio').forEach(a => {
+            try { a.pause(); } catch {}
+            try { a.currentTime = 0; } catch {}
+          });
+        } catch {}
+      }
 
       const openQuiz = () => {
         if (!Array.isArray(state.questions) || state.questions.length === 0) {
@@ -10035,6 +10096,8 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         playBuatSoalTutorial,
         openQuizHelp,
         closeQuizHelp,
+        openQuizTutorial,
+        closeQuizTutorial,
         openMAHelp1,
         closeMAHelp1,
         openMAHelp2,
