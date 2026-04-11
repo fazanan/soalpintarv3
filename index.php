@@ -306,6 +306,12 @@ if (!isset($_SESSION['user_id'])) {
         "SMP/MTs": ["Kelas 7", "Kelas 8", "Kelas 9"],
         "SMA/MA": ["Kelas 10", "Kelas 11", "Kelas 12"],
         "SMK": ["Kelas 10", "Kelas 11", "Kelas 12"],
+        "SMK/MAK": ["Kelas 10", "Kelas 11", "Kelas 12", "Kelas 13"],
+        "Paket A": ["Kelas 1", "Kelas 2", "Kelas 3", "Kelas 4", "Kelas 5", "Kelas 6"],
+        "Paket B": ["Kelas 7", "Kelas 8", "Kelas 9"],
+        "Paket C": ["Kelas 10", "Kelas 11", "Kelas 12"],
+        "PAUD": ["Fase Fondasi"],
+        "TK": ["Kelompok A", "Kelompok B"],
       };
 
       const SUBJECT_OPTIONS = {
@@ -425,6 +431,29 @@ if (!isset($_SESSION['user_id'])) {
           "Muatan Lokal",
           "Bimbingan Konseling",
         ],
+        "PAUD": [
+          "PAUD (Fase Fondasi)",
+        ],
+        "TK": [
+          "PAUD (Fase Fondasi)",
+        ],
+      };
+      SUBJECT_OPTIONS["SMK/MAK"] = SUBJECT_OPTIONS["SMK"];
+      SUBJECT_OPTIONS["Paket A"] = SUBJECT_OPTIONS["SD/MI"];
+      SUBJECT_OPTIONS["Paket B"] = SUBJECT_OPTIONS["SMP/MTs"];
+      SUBJECT_OPTIONS["Paket C"] = SUBJECT_OPTIONS["SMA/MA"];
+
+      const KES_PAKET_OPTIONS = ["Paket A", "Paket B", "Paket C"];
+      const resolveJenjang = (jenjang, kesetaraanPaket) => {
+        const j = String(jenjang || "").trim();
+        if (j === "Kesetaraan") return String(kesetaraanPaket || "").trim();
+        return j;
+      };
+      const displayJenjang = (jenjang, kesetaraanPaket) => {
+        const j = String(jenjang || "").trim();
+        if (j !== "Kesetaraan") return j;
+        const p = String(kesetaraanPaket || "").trim();
+        return p ? `Kesetaraan (${p})` : "Kesetaraan";
       };
 
       const uuid = () => {
@@ -453,6 +482,7 @@ if (!isset($_SESSION['user_id'])) {
           topik: "",
           materi: "",
           jenjang: "",
+          kesetaraanPaket: "",
           fase: "",
           kelas: "",
           mataPelajaran: "",
@@ -464,6 +494,7 @@ if (!isset($_SESSION['user_id'])) {
           namaGuru: "", institusi: "",
           kurikulum: "Kurikulum Merdeka",
           jenjang: "", fase: "", kelas: "", mapel: "",
+          kesetaraanPaket: "",
           judulModul: "", jumlahPertemuan: "2",
           durasi: "50", jumlahSiswa: "30",
           pendekatan: "Standar",
@@ -473,6 +504,8 @@ if (!isset($_SESSION['user_id'])) {
         },
         rpp: {
           jenjang: "",
+          kesetaraanPaket: "",
+          fase: "",
           kelas: "",
           mata_pelajaran: "",
           materi: "",
@@ -489,6 +522,7 @@ if (!isset($_SESSION['user_id'])) {
           namaGuru: "",
           namaSekolah: "",
           jenjang: "",
+          kesetaraanPaket: "",
           fase: "",
           kelas: "",
           mataPelajaran: "",
@@ -565,7 +599,148 @@ if (!isset($_SESSION['user_id'])) {
           .replaceAll("&", "&amp;")
           .replaceAll("<", "&lt;")
           .replaceAll(">", "&gt;");
+      const safeAttr = (s) =>
+        safeText(s)
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#39;");
       const sectionLetter = (idx) => String.fromCharCode("A".charCodeAt(0) + idx);
+
+      const cp046MapelUi = {
+        modulAjar: { open: false, items: [], key: "", abort: null, timer: null, q: "" },
+        rpp: { open: false, items: [], key: "", abort: null, timer: null, q: "" },
+      };
+
+      const cp046GetCtxMeta = (ctx) => {
+        if (ctx === "modulAjar") {
+          const M = state.modulAjar || {};
+          return {
+            jenjang: resolveJenjang(M.jenjang, M.kesetaraanPaket),
+            fase: String(M.fase || "").trim(),
+          };
+        }
+        if (ctx === "rpp") {
+          const R = state.rpp || {};
+          return {
+            jenjang: resolveJenjang(R.jenjang, R.kesetaraanPaket),
+            fase: String(R.fase || "").trim(),
+          };
+        }
+        return { jenjang: "", fase: "" };
+      };
+
+      const cp046MapelDropdownId = (ctx) => {
+        if (ctx === "modulAjar") return "cp046MapelDropdown_modulAjar";
+        if (ctx === "rpp") return "cp046MapelDropdown_rpp";
+        return "";
+      };
+
+      const cp046MapelClose = (ctx) => {
+        const ui = cp046MapelUi[ctx];
+        if (!ui) return;
+        ui.open = false;
+        ui.items = [];
+        const id = cp046MapelDropdownId(ctx);
+        const box = id ? document.getElementById(id) : null;
+        if (box) {
+          box.innerHTML = "";
+          box.classList.add("hidden");
+        }
+      };
+
+      const cp046MapelBlur = (ctx) => {
+        cp046MapelClose(ctx);
+      };
+
+      const cp046MapelPick = (ctx, label, slug) => {
+        cp046MapelClose(ctx);
+        if (ctx === "modulAjar") {
+          window.__sp.setMA("mapel", label, false);
+          window.__sp.setMA("mapel_cp046_slug", slug, true);
+          return;
+        }
+        if (ctx === "rpp") {
+          window.__sp.setRPP("mata_pelajaran", label, false);
+          window.__sp.setRPP("mapel_cp046_slug", slug, true);
+          return;
+        }
+        render();
+      };
+
+      const cp046MapelPickFromEl = (node) => {
+        const el = node && node.getAttribute ? node : null;
+        if (!el) return;
+        const ctx = String(el.getAttribute("data-ctx") || "");
+        const label = String(el.getAttribute("data-label") || "");
+        const slug = String(el.getAttribute("data-slug") || "");
+        cp046MapelPick(ctx, label, slug);
+      };
+
+      const cp046MapelRenderBox = (ctx, items) => {
+        const ui = cp046MapelUi[ctx];
+        if (!ui) return;
+        const id = cp046MapelDropdownId(ctx);
+        const box = id ? document.getElementById(id) : null;
+        if (!box) return;
+        box.innerHTML = "";
+        const arr = Array.isArray(items) ? items : [];
+        if (arr.length === 0) { box.classList.add("hidden"); return; }
+        for (const it of arr) {
+          const label = String(it?.label || "").trim();
+          const slug = String(it?.slug || "").trim();
+          if (!label || !slug) continue;
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "w-full text-left px-3 py-2 text-sm hover:bg-background-light dark:hover:bg-background-dark";
+          btn.setAttribute("data-ctx", ctx);
+          btn.setAttribute("data-label", label);
+          btn.setAttribute("data-slug", slug);
+          btn.textContent = label;
+          btn.addEventListener("mousedown", (e) => {
+            try { e.preventDefault(); } catch {}
+            try { e.stopPropagation(); } catch {}
+            window.__sp.cp046MapelPickFromEl(btn);
+          });
+          box.appendChild(btn);
+        }
+        box.classList.remove("hidden");
+      };
+
+      const cp046MapelInput = async (ctx, q) => {
+        const ui = cp046MapelUi[ctx];
+        if (!ui) return;
+        ui.q = String(q || "");
+        const meta = cp046GetCtxMeta(ctx);
+        const jenjang = String(meta.jenjang || "").trim();
+        const fase = String(meta.fase || "").trim();
+        const key = `${jenjang}||${fase}`;
+        ui.key = key;
+        if (!jenjang || !fase) { cp046MapelClose(ctx); return; }
+        if (ui.timer) { try { clearTimeout(ui.timer); } catch {} }
+        const key0 = key;
+        ui.timer = setTimeout(async () => {
+          if (ui.abort) { try { ui.abort.abort(); } catch {} }
+          const ctrl = new AbortController();
+          ui.abort = ctrl;
+          try {
+            const resp = await fetch("api/cp046_mapel_search.php", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ jenjang, fase, q: ui.q, limit: 12 }),
+              signal: ctrl.signal,
+            });
+            if (!resp.ok) throw new Error("bad_response");
+            const data = await resp.json();
+            if (ui.abort !== ctrl) return;
+            if (ui.key !== key0) return;
+            if (!data?.ok || !Array.isArray(data?.results)) throw new Error("bad_payload");
+            ui.items = data.results;
+            ui.open = true;
+            cp046MapelRenderBox(ctx, ui.items);
+          } catch {
+            if (ui.abort === ctrl) { ui.items = []; ui.open = false; cp046MapelClose(ctx); }
+          }
+        }, 220);
+      };
 
       const focusByPath = (path) => {
         const p = String(path || "");
@@ -603,6 +778,9 @@ if (!isset($_SESSION['user_id'])) {
 
         if (!String(I.namaSekolah || "").trim()) return miss("Langkah 1 belum lengkap: isi Nama Sekolah dulu ya.", "identitas", "identity.namaSekolah");
         if (!String(I.jenjang || "").trim()) return miss("Langkah 1 belum lengkap: pilih Jenjang dulu ya.", "identitas", "identity.jenjang");
+        if (String(I.jenjang || "").trim() === "Kesetaraan" && !String(I.kesetaraanPaket || "").trim()) {
+          return miss("Langkah 1 belum lengkap: pilih Paket Kesetaraan dulu ya.", "identitas", "identity.kesetaraanPaket");
+        }
         if (!String(I.fase || "").trim()) return miss("Langkah 1 belum lengkap: pilih Fase dulu ya.", "identitas", "identity.fase");
         if (!String(I.kelas || "").trim()) return miss("Langkah 1 belum lengkap: isi Kelas dulu ya.", "identitas", "identity.kelas");
         if (!String(I.mataPelajaran || "").trim()) return miss("Langkah 1 belum lengkap: pilih Mata Pelajaran dulu ya.", "identitas", "identity.mataPelajaran");
@@ -640,13 +818,17 @@ if (!isset($_SESSION['user_id'])) {
         return m ? String(m[1]).toUpperCase() : null;
       };
       const expectedFaseLetter = (jenjang, kelasNum) => {
-        const j = String(jenjang || '').trim();
+        let j = String(jenjang || '').trim();
         const k = Number(kelasNum || 0);
         if (!k) return null;
+        if (j === 'Paket A') j = 'SD/MI';
+        if (j === 'Paket B') j = 'SMP/MTs';
+        if (j === 'Paket C') j = 'SMA/MA';
         if (j === 'SD/MI') return k <= 2 ? 'A' : (k <= 4 ? 'B' : (k <= 6 ? 'C' : null));
         if (j === 'SMP/MTs') return (k >= 7 && k <= 9) ? 'D' : null;
         if (j === 'SMA/MA') return k === 10 ? 'E' : ((k === 11 || k === 12) ? 'F' : null);
         if (j === 'SMK') return k === 10 ? 'E' : ((k === 11 || k === 12) ? 'F' : ((k >= 7 && k <= 9) ? 'D' : null));
+        if (j === 'SMK/MAK') return k === 10 ? 'E' : ((k === 11 || k === 12 || k === 13) ? 'F' : null);
         return null;
       };
 
@@ -939,7 +1121,50 @@ if (!isset($_SESSION['user_id'])) {
           return { doc, pageW, pageH, margin, footerY, maxW, getY: () => y, setY: (v) => { y = v; }, newPage, newPageIfNeeded, addCenter, addPara, addHanging, drawHeader };
         };
 
-        const items = Array.isArray(state.questions) ? state.questions : [];
+        const items0 = Array.isArray(state.questions) ? state.questions : [];
+        const imgCache = new Map();
+        const blobToDataUrl = (blob) => new Promise((resolve) => {
+          try {
+            const fr = new FileReader();
+            fr.onload = () => resolve(String(fr.result || ""));
+            fr.onerror = () => resolve("");
+            fr.readAsDataURL(blob);
+          } catch { resolve(""); }
+        });
+        const getImgDimensions = (dataUrl) => new Promise((resolve) => {
+          try {
+            const img = new Image();
+            img.onload = () => resolve({ w: Number(img.naturalWidth || img.width || 0) || 0, h: Number(img.naturalHeight || img.height || 0) || 0 });
+            img.onerror = () => resolve({ w: 0, h: 0 });
+            img.src = dataUrl;
+          } catch { resolve({ w: 0, h: 0 }); }
+        });
+        const loadPdfImage = async (src) => {
+          const s = String(src || "").trim();
+          if (!s) return null;
+          if (imgCache.has(s)) return imgCache.get(s);
+          let dataUrl = "";
+          try {
+            if (/^data:image\//i.test(s)) dataUrl = s;
+            else {
+              const resp = await fetch(s);
+              const blob = await resp.blob();
+              dataUrl = await blobToDataUrl(blob);
+            }
+          } catch { dataUrl = ""; }
+          if (!dataUrl) { imgCache.set(s, null); return null; }
+          const dim = await getImgDimensions(dataUrl);
+          const format = /^data:image\/jpeg/i.test(dataUrl) ? "JPEG" : "PNG";
+          const out = { dataUrl, format, w: dim.w || 300, h: dim.h || 300 };
+          imgCache.set(s, out);
+          return out;
+        };
+        const items = await Promise.all(items0.map(async (q) => {
+          if (!q || !q.image) return q;
+          const info = await loadPdfImage(q.image);
+          if (!info) return q;
+          return { ...q, _pdfImg: info };
+        }));
         const order = ["pg", "pg_kompleks", "menjodohkan", "isian", "uraian"];
         const titleMap = { pg: "PILIHAN GANDA", pg_kompleks: "PILIHAN GANDA KOMPLEKS", menjodohkan: "MENJODOHKAN", isian: "ISIAN SINGKAT", uraian: "URAIAN" };
         const subtitleMap = {
@@ -974,6 +1199,24 @@ if (!isset($_SESSION['user_id'])) {
               for (let i = 0; i < chunk.length; i++) {
                 const q = chunk[i] || {};
                 ctx.addHanging(`${startIndex + i + 1}.`, String(q.question || "").trim(), 12, "normal", 0, 8);
+                if (q._pdfImg) {
+                  try {
+                    const img = q._pdfImg;
+                    const x = ctx.margin + 30;
+                    const maxWimg = Math.max(120, ctx.maxW - 60);
+                    const ratio = Math.max(0.05, Number(img.w || 300) / Math.max(1, Number(img.h || 300)));
+                    let w = maxWimg;
+                    let h = Math.max(1, Math.round(w / ratio));
+                    const maxHimg = 220;
+                    if (h > maxHimg) {
+                      h = maxHimg;
+                      w = Math.max(1, Math.round(h * ratio));
+                    }
+                    ctx.newPageIfNeeded(h + 14);
+                    ctx.doc.addImage(String(img.dataUrl), String(img.format), x, ctx.getY(), w, h);
+                    ctx.setY(ctx.getY() + h + 10);
+                  } catch {}
+                }
 
                 if (q.type === "pg" || q.type === "pg_kompleks") {
                   const opts = Array.isArray(q.options) ? q.options : [];
@@ -2302,6 +2545,12 @@ if (!isset($_SESSION['user_id'])) {
         try {
           state.identity = state.identity || {};
           const I = state.identity;
+          if (String(I.jenjang || '').trim() === 'SMK') I.jenjang = 'SMK/MAK';
+          const pj = String(I.jenjang || '').trim();
+          if (pj === 'Paket A' || pj === 'Paket B' || pj === 'Paket C') {
+            I.kesetaraanPaket = pj;
+            I.jenjang = 'Kesetaraan';
+          }
           if (!String(I.topik_raw || "").trim() && !String(I.topik_ringkas || "").trim() && String(I.topik || "").trim()) {
             I.topik_raw = String(I.topik || "");
             I.topik_ringkas = String(I.topik || "");
@@ -2310,6 +2559,90 @@ if (!isset($_SESSION['user_id'])) {
             const rawTxt = String(I.topik_raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
             const firstLine = rawTxt.split("\n").map(s => s.trim()).filter(Boolean)[0] || "";
             I.topik_ringkas = (firstLine || rawTxt.slice(0, 180)).trim();
+          }
+        } catch {}
+        try {
+          if (state.lkpd && String(state.lkpd.jenjang || '').trim() === 'SMK') state.lkpd.jenjang = 'SMK/MAK';
+        } catch {}
+        try {
+          if (state.modulAjar && String(state.modulAjar.jenjang || '').trim() === 'SMK') state.modulAjar.jenjang = 'SMK/MAK';
+        } catch {}
+        try {
+          if (state.rpp && String(state.rpp.jenjang || '').trim() === 'SMK') state.rpp.jenjang = 'SMK/MAK';
+        } catch {}
+        try {
+          if (state.lkpd) {
+            const lj = String(state.lkpd.jenjang || '').trim();
+            if (lj === 'Paket A' || lj === 'Paket B' || lj === 'Paket C') {
+              state.lkpd.kesetaraanPaket = lj;
+              state.lkpd.jenjang = 'Kesetaraan';
+            }
+          }
+        } catch {}
+        try {
+          if (state.modulAjar) {
+            const mj = String(state.modulAjar.jenjang || '').trim();
+            if (mj === 'Paket A' || mj === 'Paket B' || mj === 'Paket C') {
+              state.modulAjar.kesetaraanPaket = mj;
+              state.modulAjar.jenjang = 'Kesetaraan';
+            }
+          }
+        } catch {}
+        try {
+          if (state.rpp) {
+            const rj = String(state.rpp.jenjang || '').trim();
+            if (rj === 'Paket A' || rj === 'Paket B' || rj === 'Paket C') {
+              state.rpp.kesetaraanPaket = rj;
+              state.rpp.jenjang = 'Kesetaraan';
+            }
+          }
+        } catch {}
+        try {
+          const I = state.identity || {};
+          const je = resolveJenjang(I.jenjang, I.kesetaraanPaket);
+          const faseOpts = MA_FASE_MAP[je] || [];
+          if (String(I.fase || '').trim() && !faseOpts.includes(String(I.fase || '').trim())) {
+            const fl = faseLetterFromLabel(I.fase);
+            const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+            if (opt) I.fase = opt;
+          }
+          if (!String(I.fase || '').trim()) {
+            const kn = parseKelasNumber(I.kelas);
+            const fl = expectedFaseLetter(je, kn);
+            const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+            if (opt) I.fase = opt;
+          }
+        } catch {}
+        try {
+          const L = state.lkpd || {};
+          const je = resolveJenjang(L.jenjang, L.kesetaraanPaket);
+          const faseOpts = MA_FASE_MAP[je] || [];
+          if (String(L.fase || '').trim() && !faseOpts.includes(String(L.fase || '').trim())) {
+            const fl = faseLetterFromLabel(L.fase);
+            const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+            if (opt) L.fase = opt;
+          }
+          if (!String(L.fase || '').trim()) {
+            const kn = parseKelasNumber(L.kelas);
+            const fl = expectedFaseLetter(je, kn);
+            const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+            if (opt) L.fase = opt;
+          }
+        } catch {}
+        try {
+          const R = state.rpp || {};
+          const je = resolveJenjang(R.jenjang, R.kesetaraanPaket);
+          const faseOpts = MA_FASE_MAP[je] || [];
+          if (String(R.fase || '').trim() && !faseOpts.includes(String(R.fase || '').trim())) {
+            const fl = faseLetterFromLabel(R.fase);
+            const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+            if (opt) R.fase = opt;
+          }
+          if (!String(R.fase || '').trim()) {
+            const kn = parseKelasNumber(R.kelas);
+            const fl = expectedFaseLetter(je, kn);
+            const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+            if (opt) R.fase = opt;
           }
         } catch {}
         try {
@@ -3156,6 +3489,9 @@ if (!isset($_SESSION['user_id'])) {
 
       const renderLKPD = () => {
         const L = state.lkpd || {};
+        const jenjangEfektif = resolveJenjang(L.jenjang, L.kesetaraanPaket);
+        const isKesetaraan = String(L.jenjang || "").trim() === "Kesetaraan";
+        const faseOpts = MA_FASE_MAP[jenjangEfektif] || [];
         const sumberTopikActive = L.sumber === "topik";
         const sumberUploadActive = L.sumber === "upload";
         const segBtn = (active, label, onclick) =>
@@ -3204,12 +3540,25 @@ if (!isset($_SESSION['user_id'])) {
                     `}
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  ${selectField("Jenjang", "lkpd.jenjang", L.jenjang, ["SD/MI", "SMP/MTs", "SMA/MA", "SMK"])}
-                  ${selectField("Fase", "lkpd.fase", L.fase, ["Fase A", "Fase B", "Fase C", "Fase D", "Fase E", "Fase F"])}
-                  ${selectField("Kelas", "lkpd.kelas", L.kelas, CLASS_OPTIONS[L.jenjang] || [])}
+                  <div class="flex flex-col gap-2">
+                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
+                    <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="lkpd.jenjang">
+                      <option value="">Pilih...</option>
+                      ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(L.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                    </select>
+                    <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
+                      <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
+                      <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="lkpd.kesetaraanPaket">
+                        <option value="">Pilih Paket...</option>
+                        ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(L.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                      </select>
+                    </div>
+                  </div>
+                  ${selectField("Fase", "lkpd.fase", L.fase, faseOpts)}
+                  ${selectField("Kelas", "lkpd.kelas", L.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  ${selectField("Mata Pelajaran", "lkpd.mataPelajaran", L.mataPelajaran, SUBJECT_OPTIONS[L.jenjang] || [])}
+                  ${selectField("Mata Pelajaran", "lkpd.mataPelajaran", L.mataPelajaran, SUBJECT_OPTIONS[jenjangEfektif] || [])}
                   ${selectField("Jenis Aktivitas", "lkpd.jenisAktivitas", L.jenisAktivitas, LKPD_ACTIVITY_OPTIONS)}
                   <div></div>
                 </div>
@@ -3496,7 +3845,12 @@ if (!isset($_SESSION['user_id'])) {
         "SMP/MTs": ["Fase D (Kelas 7–9)"],
         "SMA/MA":  ["Fase E (Kelas 10)","Fase F (Kelas 11–12)"],
         "SMK":     ["Fase D (Kelas 7–9)","Fase E (Kelas 10)","Fase F (Kelas 11–12)"],
+        "SMK/MAK": ["Fase E (Kelas 10)","Fase F (Kelas 11–12/13)"],
+        "Paket A": ["Fase A (Kelas 1–2)","Fase B (Kelas 3–4)","Fase C (Kelas 5–6)"],
+        "Paket B": ["Fase D (Kelas 7–9)"],
+        "Paket C": ["Fase E (Kelas 10)","Fase F (Kelas 11–12)"],
         "PAUD":    ["Fase Fondasi"],
+        "TK":      ["Fase Fondasi"],
       };
       const MA_MODEL = [
         "Project Based Learning (PjBL)",
@@ -3517,8 +3871,10 @@ if (!isset($_SESSION['user_id'])) {
 
       const renderModulAjar = () => {
         const M = state.modulAjar || {};
-        const faseOpts  = MA_FASE_MAP[M.jenjang] || [];
-        const kelasOpts = CLASS_OPTIONS[M.jenjang] || [];
+        const jenjangEfektif = resolveJenjang(M.jenjang, M.kesetaraanPaket);
+        const isKesetaraan = String(M.jenjang || "").trim() === "Kesetaraan";
+        const faseOpts  = MA_FASE_MAP[jenjangEfektif] || [];
+        const kelasOpts = CLASS_OPTIONS[jenjangEfektif] || [];
         const dimArr    = Array.isArray(M.dimensi) ? M.dimensi : [];
         const hasilAda  = !!M.hasil;
         const tab = state.modulAjarTab || (hasilAda ? 'modul' : 'informasi');
@@ -3653,12 +4009,29 @@ if (!isset($_SESSION['user_id'])) {
               </div>
               <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
                 ${mkSel('Kurikulum','kurikulum',M.kurikulum,kurikulumOpts)}
-                ${mkSel('Jenjang','jenjang',M.jenjang,['SD/MI','SMP/MTs','SMA/MA','SMK','PAUD'])}
+                <div class="flex flex-col gap-2">
+                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
+                  <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
+                    data-ma-key="jenjang"
+                    onchange="window.__sp.setMA('jenjang',this.value,true)">
+                    <option value="">— Pilih —</option>
+                    ${['PAUD','TK','SD/MI','SMP/MTs','SMA/MA','SMK/MAK','Kesetaraan'].map(o=>`<option value="${safeText(o)}" ${String(o)===String(M.jenjang||'')?'selected':''}>${safeText(o)}</option>`).join('')}
+                  </select>
+                  <div class="${isKesetaraan ? "" : "hidden"} flex flex-col gap-2 mt-2">
+                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
+                    <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
+                      data-ma-key="kesetaraanPaket"
+                      onchange="window.__sp.setMA('kesetaraanPaket',this.value,true)">
+                      <option value="">— Pilih Paket —</option>
+                      ${KES_PAKET_OPTIONS.map(o=>`<option value="${safeText(o)}" ${String(o)===String(M.kesetaraanPaket||'')?'selected':''}>${safeText(o)}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>
                 ${mkSel('Fase','fase',M.fase,faseOpts)}
               </div>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
                 ${mkSel('Kelas','kelas',M.kelas,kelasOpts)}
-                ${mkInp('Mata Pelajaran','mapel',M.mapel,'Contoh: Bahasa Indonesia, Matematika, IPAS')}
+                ${mkSel('Mata Pelajaran','mapel',M.mapel,(SUBJECT_OPTIONS[jenjangEfektif] || []))}
               </div>
             </div>
           </div>
@@ -4664,6 +5037,9 @@ if (!isset($_SESSION['user_id'])) {
         const namaGuru = String(M.namaGuru || '').trim();
         const institusi = String(M.institusi || '').trim();
         const jenjang = String(M.jenjang || '').trim();
+        const kesPaket = String(M.kesetaraanPaket || '').trim();
+        const jenjangDisplay = displayJenjang(jenjang, kesPaket);
+        const jenjangEfektif = resolveJenjang(jenjang, kesPaket);
         const mapel = String(M.mapel || '').trim();
         const judul = String(M.judulModul || '').trim();
         const jumlah = String(M.jumlahPertemuan || '').trim();
@@ -4673,6 +5049,7 @@ if (!isset($_SESSION['user_id'])) {
         if (!namaGuru) { failMA('informasi', 'Langkah 1 belum lengkap: isi Nama Guru dulu ya.', 'namaGuru'); return; }
         if (!institusi) { failMA('informasi', 'Langkah 1 belum lengkap: isi Nama Institusi dulu ya.', 'institusi'); return; }
         if (!jenjang) { failMA('informasi', 'Langkah 1 belum lengkap: pilih Jenjang dulu ya.', 'jenjang'); return; }
+        if (jenjang === 'Kesetaraan' && !kesPaket) { failMA('informasi', 'Langkah 1 belum lengkap: pilih Paket Kesetaraan dulu ya.', 'kesetaraanPaket'); return; }
         if (!mapel) { failMA('informasi', 'Langkah 1 belum lengkap: isi Mata Pelajaran dulu ya.', 'mapel'); return; }
         if (!judul) { failMA('detail', 'Langkah 2 belum lengkap: isi Materi Pokok / Judul Modul dulu ya.', 'judulModul'); return; }
         if (!jumlah) { failMA('detail', 'Langkah 2 belum lengkap: pilih Jumlah Pertemuan dulu ya.', 'jumlahPertemuan'); return; }
@@ -4827,6 +5204,29 @@ ATURAN REVISI:
 ${!isKBC ? '\n5) Hapus semua bagian/penyebutan KBC jika ada pada baseline.' : ''}`
           : `Buatkan Modul Ajar LENGKAP dengan data berikut:`;
 
+        const extra = [];
+        let cp046PagesText = "";
+        if (!isK13 && String(M.fase || '').trim()) {
+          try {
+            const ctrlCp = new AbortController();
+            const timerCp = setTimeout(()=>ctrlCp.abort(), 45000);
+            const respCp = await fetch("api/cp046_rpp_context.php", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ docType: "modul_ajar", jenjang: jenjangEfektif, fase: M.fase, mapel, mapel_slug: String(M.mapel_cp046_slug || ""), materi: judul, kurikulum: kurikulumLabel }),
+              signal: ctrlCp.signal,
+            });
+            clearTimeout(timerCp);
+            if (respCp.ok) {
+              const ctx = await respCp.json();
+              const block = String(ctx?.block || "").trim();
+              const pages = Array.isArray(ctx?.pages) ? ctx.pages.map(x => Number(x)).filter(x => Number.isFinite(x) && x > 0) : [];
+              if (pages.length) cp046PagesText = pages.sort((a,b)=>a-b).join(", ");
+              if (ctx?.ok && block) extra.unshift(block);
+            }
+          } catch {}
+        }
+
         const usr = `${revisionLead}
 
 === DATA INPUT ===
@@ -4835,7 +5235,7 @@ Institusi         : ${M.institusi}
 Tahun             : ${new Date().getFullYear()}
 Kurikulum         : ${kurikulumLabel}
 Pendekatan        : ${pendekatanLabel}
-Jenjang           : ${M.jenjang}
+Jenjang           : ${jenjangDisplay}
 Kelas             : ${M.kelas||'-'}
 Fase              : ${M.fase||'-'}
 Mata Pelajaran    : ${M.mapel}
@@ -4849,6 +5249,7 @@ Mode Supervisi    : ${modeSupervisiLabel}
 =================
 
 ${approachRules}
+${extra.length ? `\n\n${extra.join('\n\n')}\n` : ''}
 
 Hasilkan Modul Ajar dengan SEMUA bagian berikut secara LENGKAP dan DETAIL:
 
@@ -4956,7 +5357,27 @@ ${baselineModulAjar}
             return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
           };
           const finalText = isKBC ? text : stripKbcFromModulAjar(text);
-          state.modulAjar.hasil = finalText;
+          const ensureCp046InDaftarPustaka = (raw, pagesText) => {
+            const src = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            if (/\bCP046\b/i.test(src)) return src;
+            const p = String(pagesText || 'X').trim() || 'X';
+            const refLine = `- Kementerian Pendidikan, Kebudayaan, Riset, dan Teknologi. (2022). Capaian Pembelajaran (CP046). (CP046 hal. ${p}).`;
+            const lines = src.split('\n');
+            let idx = -1;
+            for (let i = 0; i < lines.length; i++) {
+              const t = String(lines[i] || '').trim();
+              if (/^###\s*7\.\s*Daftar\s+Pustaka\b/i.test(t) || /^###\s*Daftar\s+Pustaka\b/i.test(t)) { idx = i; break; }
+            }
+            if (idx >= 0) {
+              let insertAt = idx + 1;
+              while (insertAt < lines.length && String(lines[insertAt] || '').trim() === '') insertAt++;
+              lines.splice(insertAt, 0, refLine);
+              return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+            }
+            return `${src.trim()}\n\n### 7. Daftar Pustaka\n${refLine}\n`;
+          };
+          const finalText2 = ensureCp046InDaftarPustaka(finalText, cp046PagesText);
+          state.modulAjar.hasil = finalText2;
           state.modulAjar.isGenerating = false;
           saveDebounced(true);
           render();
@@ -4967,7 +5388,7 @@ ${baselineModulAjar}
             const title = `Modul Ajar - ${M.mapel || ''} - ${M.judulModul || ''}`.trim();
             const snapshot = {
               identity: { jenjang: M.jenjang||'', kelas: M.kelas||'', mataPelajaran: M.mapel||'' },
-              modulAjar: { ...M, hasil: finalText },
+              modulAjar: { ...M, hasil: finalText2 },
               questions: []
             };
             await fetch("api/soal_user.php", {
@@ -5319,6 +5740,11 @@ ${baselineModulAjar}
 
       const renderRPP = () => {
         const R = (state.rpp && typeof state.rpp === 'object') ? state.rpp : {};
+        const isKesetaraan = String(R.jenjang || '').trim() === 'Kesetaraan';
+        const jenjangDisplay = displayJenjang(R.jenjang, R.kesetaraanPaket);
+        const jenjangEfektif = resolveJenjang(R.jenjang, R.kesetaraanPaket);
+        const faseOpts = (MA_FASE_MAP[jenjangEfektif] || []).map(v => ({ v, l: v }));
+        const kelasOpts = (CLASS_OPTIONS[jenjangEfektif] || []).map(v => ({ v, l: v }));
         const hasilAda = !!R.hasil;
         const tab = state.rppTab || (hasilAda ? 'rpp' : 'informasi');
         const rppInsertPageBreakMarkers = (text) => {
@@ -5339,7 +5765,8 @@ ${baselineModulAjar}
           const mapel = String(R.mata_pelajaran || '').trim();
           const materi = String(R.materi || '').trim();
           const kelas = String(R.kelas || '').trim();
-          const jenjang = String(R.jenjang || '').trim();
+          const fase = String(R.fase || '').trim();
+          const jenjang = displayJenjang(R.jenjang, R.kesetaraanPaket);
           const kurikulum = String(R.kurikulum || '').trim();
           const pendekatan = String(R.pendekatan || '').trim();
           const format = String(R.format || '').trim();
@@ -5350,6 +5777,7 @@ ${baselineModulAjar}
           const sub = [mapel, kelas, materi].filter(Boolean).join(' · ');
           const rows = [
             ['Jenjang', jenjang || '-'],
+            ['Fase', fase || '-'],
             ['Kelas', kelas || '-'],
             ['Mata Pelajaran', mapel || '-'],
             ['Materi / Topik', materi || '-'],
@@ -5442,10 +5870,13 @@ ${baselineModulAjar}
           { v: 'panjang', l: 'Panjang (Lengkap + Rubrik)' },
         ];
         const jenjangOpts = [
-          { v: 'SD', l: 'SD/MI' },
-          { v: 'SMP', l: 'SMP/MTs' },
-          { v: 'SMA', l: 'SMA/MA' },
-          { v: 'SMK', l: 'SMK' },
+          { v: 'PAUD', l: 'PAUD' },
+          { v: 'TK', l: 'TK' },
+          { v: 'SD/MI', l: 'SD/MI' },
+          { v: 'SMP/MTs', l: 'SMP/MTs' },
+          { v: 'SMA/MA', l: 'SMA/MA' },
+          { v: 'SMK/MAK', l: 'SMK/MAK' },
+          { v: 'Kesetaraan', l: 'Kesetaraan' },
         ];
 
         const helpOnClick = tab === 'informasi'
@@ -5510,11 +5941,39 @@ ${baselineModulAjar}
                 </button>
               </div>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                ${mkSel('Jenjang','jenjang',R.jenjang,jenjangOpts)}
-                ${mkInp('Kelas','kelas',R.kelas,'Contoh: VII / 7 / X')}
+                <div class="flex flex-col gap-2">
+                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
+                  <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
+                    data-rpp-key="jenjang"
+                    onchange="window.__sp.setRPP('jenjang',this.value,true)">
+                    <option value="">— Pilih —</option>
+                    ${jenjangOpts.map(o=>`<option value="${safeText(o.v)}" ${String(o.v)===String(R.jenjang||'')?'selected':''}>${safeText(o.l)}</option>`).join('')}
+                  </select>
+                  <div class="${isKesetaraan ? "" : "hidden"} flex flex-col gap-2 mt-2">
+                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
+                    <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
+                      data-rpp-key="kesetaraanPaket"
+                      onchange="window.__sp.setRPP('kesetaraanPaket',this.value,true)">
+                      <option value="">— Pilih Paket —</option>
+                      ${KES_PAKET_OPTIONS.map(o=>`<option value="${safeText(o)}" ${String(o)===String(R.kesetaraanPaket||'')?'selected':''}>${safeText(o)}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>
+                ${mkSel('Fase','fase',R.fase,faseOpts)}
               </div>
               <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                ${mkInp('Mata Pelajaran','mata_pelajaran',R.mata_pelajaran,'Contoh: IPAS / Matematika')}
+                ${mkSel('Kelas','kelas',R.kelas,kelasOpts)}
+                <div></div>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                ${mkSel('Mata Pelajaran','mata_pelajaran',R.mata_pelajaran,(() => {
+                  const je = resolveJenjang(R.jenjang, R.kesetaraanPaket);
+                  const list = SUBJECT_OPTIONS[je] || [];
+                  const out = list.map(v => ({ v, l: v }));
+                  const cur = String(R.mata_pelajaran || '').trim();
+                  if (cur && !list.includes(cur)) out.unshift({ v: cur, l: cur });
+                  return out;
+                })())}
                 ${mkInp('Materi / Topik','materi',R.materi,'Contoh: Listrik Statis')}
               </div>
               <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
@@ -5655,6 +6114,23 @@ ${baselineModulAjar}
       function setRPP(key, value, persist) {
         state.rpp = state.rpp || {};
         state.rpp[key] = value;
+        if (key === 'jenjang' || key === 'kesetaraanPaket' || key === 'fase') {
+          state.rpp.mapel_cp046_slug = '';
+        }
+        if (key === 'jenjang' || key === 'kesetaraanPaket') {
+          const R = state.rpp || {};
+          const je = resolveJenjang(R.jenjang, R.kesetaraanPaket);
+          const faseOpts = MA_FASE_MAP[je] || [];
+          const kelasOpts = CLASS_OPTIONS[je] || [];
+          if (faseOpts.length === 1) R.fase = faseOpts[0];
+          else if (R.fase && !faseOpts.includes(R.fase)) {
+            const fl = faseLetterFromLabel(R.fase);
+            const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+            R.fase = opt || '';
+          }
+          if (kelasOpts.length === 1) R.kelas = kelasOpts[0];
+          else if (R.kelas && !kelasOpts.includes(R.kelas)) R.kelas = '';
+        }
         if (persist) {
           saveDebounced(true);
           render();
@@ -5675,7 +6151,10 @@ ${baselineModulAjar}
           return el ? String(el.value || '') : '';
         };
         const jenjang = String(R.jenjang || getRppDomValue('jenjang') || '').trim();
-        const kelas = String(R.kelas || '').trim();
+        const kesPaket = String(R.kesetaraanPaket || getRppDomValue('kesetaraanPaket') || '').trim();
+        const jenjangEfektif = resolveJenjang(jenjang, kesPaket);
+        const fase = String(R.fase || getRppDomValue('fase') || '').trim();
+        const kelas = String(R.kelas || getRppDomValue('kelas') || '').trim();
         const mapel = String(R.mata_pelajaran || '').trim();
         const materi = String(R.materi || '').trim();
         const kurikulum = String(R.kurikulum || '').trim();
@@ -5687,8 +6166,20 @@ ${baselineModulAjar}
           state.rpp.jenjang = jenjang;
           saveDebounced(false);
         }
+        if (!String(R.kesetaraanPaket || '').trim() && kesPaket) {
+          state.rpp = state.rpp || {};
+          state.rpp.kesetaraanPaket = kesPaket;
+          saveDebounced(false);
+        }
+        if (!String(R.fase || '').trim() && fase) {
+          state.rpp = state.rpp || {};
+          state.rpp.fase = fase;
+          saveDebounced(false);
+        }
         const missing = [];
         if (!jenjang) missing.push('Jenjang');
+        if (jenjang === 'Kesetaraan' && !kesPaket) missing.push('Paket Kesetaraan');
+        if (!fase) missing.push('Fase');
         if (!kelas) missing.push('Kelas');
         if (!mapel) missing.push('Mata Pelajaran');
         if (!materi) missing.push('Materi / Topik');
@@ -5760,7 +6251,22 @@ ${baselineModulAjar}
 - Kaitkan KI/KD/Indikator bila tersedia dari CP/TP/KD (opsional) yang ditempel.`
           : ``;
 
-        const usr = `Buatkan RPP dengan detail berikut:\n\nJenjang: ${jenjang}\nKelas: ${kelas}\nMata Pelajaran: ${mapel}\nMateri: ${materi}\nKurikulum: ${kurLabel}\nPendekatan: ${pendekatanLabel}\nFormat: ${format}\nAlokasi Waktu: ${alokasi}\nNama Sekolah: ${String(R.nama_sekolah || '').trim()}\nNama Guru: ${String(R.nama_guru || '').trim()}\n\nKetentuan:\n- ${formatInstr}\n- ${pendekatanInstr}\n- ${sintaks}\n${k13Rules ? `- ${k13Rules.replace(/\n/g,'\n')}\n` : ''}- ${approachRules.replace(/\n/g,'\n')}\n- Sertakan penilaian autentik: sikap, pengetahuan, keterampilan.\n- Output harus rapi (gunakan heading dan tabel bila perlu).\n- Rubrik Penilaian WAJIB dalam bentuk tabel Markdown saja (bukan bullet):\n  - Sikap: tabel | Skor | Kriteria |\n  - Pengetahuan: tabel | Rentang Nilai | Kriteria |\n  - Keterampilan: tabel | Rentang Nilai | Kriteria |\n- PENTING: Jangan tulis ulang judul dan identitas/metadata seperti:\n  Sekolah:, Kelas/Semester:, Mata Pelajaran:, Materi:, Alokasi Waktu:, Nama Guru:.\n  Mulai langsung dari isi RPP (mis. Tujuan Pembelajaran / Komponen Inti / Kegiatan Pembelajaran).\n${extra.length ? '\n' + extra.join('\n\n') : ''}\n\nOutput HARUS langsung berupa RPP.`;
+        if (!isK13) {
+          try {
+            const respCp = await fetch("api/cp046_rpp_context.php", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ jenjang: jenjangEfektif, fase, mapel, mapel_slug: String(R.mapel_cp046_slug || ""), materi, kurikulum: kurLabel }),
+            });
+            if (respCp.ok) {
+              const ctx = await respCp.json();
+              const block = String(ctx?.block || "").trim();
+              if (ctx?.ok && block) extra.unshift(block);
+            }
+          } catch {}
+        }
+
+        const usr = `Buatkan RPP dengan detail berikut:\n\nJenjang: ${displayJenjang(jenjang, kesPaket)}\nFase: ${fase}\nKelas: ${kelas}\nMata Pelajaran: ${mapel}\nMateri: ${materi}\nKurikulum: ${kurLabel}\nPendekatan: ${pendekatanLabel}\nFormat: ${format}\nAlokasi Waktu: ${alokasi}\nNama Sekolah: ${String(R.nama_sekolah || '').trim()}\nNama Guru: ${String(R.nama_guru || '').trim()}\n\nKetentuan:\n- ${formatInstr}\n- ${pendekatanInstr}\n- ${sintaks}\n${k13Rules ? `- ${k13Rules.replace(/\n/g,'\n')}\n` : ''}- ${approachRules.replace(/\n/g,'\n')}\n- Sertakan penilaian autentik: sikap, pengetahuan, keterampilan.\n- Output harus rapi (gunakan heading dan tabel bila perlu).\n- Rubrik Penilaian WAJIB dalam bentuk tabel Markdown saja (bukan bullet):\n  - Sikap: tabel | Skor | Kriteria |\n  - Pengetahuan: tabel | Rentang Nilai | Kriteria |\n  - Keterampilan: tabel | Rentang Nilai | Kriteria |\n- PENTING: Jangan tulis ulang judul dan identitas/metadata seperti:\n  Sekolah:, Kelas/Semester:, Mata Pelajaran:, Materi:, Alokasi Waktu:, Nama Guru:.\n  Mulai langsung dari isi RPP (mis. Tujuan Pembelajaran / Komponen Inti / Kegiatan Pembelajaran).\n${extra.length ? '\n' + extra.join('\n\n') : ''}\n\nOutput HARUS langsung berupa RPP.`;
 
         try {
           const ctrl = new AbortController();
@@ -6333,6 +6839,9 @@ ${baselineModulAjar}
       const renderIdentitas = () => {
         const i = state.identity;
         const p = state.paket;
+        const jenjangEfektif = resolveJenjang(i.jenjang, i.kesetaraanPaket);
+        const isKesetaraan = String(i.jenjang || "").trim() === "Kesetaraan";
+        const faseOpts = MA_FASE_MAP[jenjangEfektif] || [];
         return `
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="lg:col-span-2 bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
@@ -6388,12 +6897,25 @@ ${baselineModulAjar}
                   </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  ${selectField("Jenjang", "identity.jenjang", i.jenjang, ["SD/MI", "SMP/MTs", "SMA/MA", "SMK"])}
-                  ${selectField("Fase", "identity.fase", i.fase, ["Fase A", "Fase B", "Fase C", "Fase D", "Fase E", "Fase F"])}
-                  ${selectField("Kelas", "identity.kelas", i.kelas, CLASS_OPTIONS[i.jenjang] || [])}
+                  <div class="flex flex-col gap-2">
+                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
+                    <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="identity.jenjang">
+                      <option value="">Pilih...</option>
+                      ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(i.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                    </select>
+                    <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
+                      <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
+                      <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="identity.kesetaraanPaket">
+                        <option value="">Pilih Paket...</option>
+                        ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(i.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                      </select>
+                    </div>
+                  </div>
+                  ${selectField("Fase", "identity.fase", i.fase, faseOpts)}
+                  ${selectField("Kelas", "identity.kelas", i.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  ${selectField("Mata Pelajaran", "identity.mataPelajaran", i.mataPelajaran, SUBJECT_OPTIONS[i.jenjang] || [])}
+                  ${selectField("Mata Pelajaran", "identity.mataPelajaran", i.mataPelajaran, SUBJECT_OPTIONS[jenjangEfektif] || [])}
                   ${inputText("Semester (opsional)", "paket.semester", p.semester, "Contoh: Semester 2")}
                 </div>
                 <div class="grid grid-cols-1 gap-5">
@@ -8008,6 +8530,36 @@ ${baselineModulAjar}
 
         // loading UI will be rendered by computeView() based on _isGenerating flag
 
+        let cp046SoalBlock = "";
+        let cp046SoalPagesText = "";
+        try {
+          const jenjangResolved0 = resolveJenjang(state.identity.jenjang, state.identity.kesetaraanPaket);
+          const kelasNum0 = parseKelasNumber(state.identity.kelas);
+          const faseSel0 = faseLetterFromLabel(state.identity.fase);
+          const faseExp0 = expectedFaseLetter(jenjangResolved0, kelasNum0);
+          const faseEfektif0 = faseExp0 ? `Fase ${faseExp0}` : (faseSel0 ? `Fase ${faseSel0}` : String(state.identity.fase || ''));
+          const mapel0 = String(state.identity.mataPelajaran || "").trim();
+          const materiHint0 = identityTopikDisplay(state.identity) || String(state.paket?.judul || "").trim();
+          if (jenjangResolved0 && faseEfektif0 && mapel0) {
+            const respCp = await fetch("api/cp046_rpp_context.php", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ docType: "soal", jenjang: jenjangResolved0, fase: faseEfektif0, mapel: mapel0, materi: materiHint0, kurikulum: "Kurikulum Merdeka" }),
+            });
+            if (respCp.ok) {
+              const ctx = await respCp.json();
+              if (ctx?.ok && String(ctx?.block || "").trim()) {
+                cp046SoalBlock = String(ctx.block || "").trim();
+                const pages = Array.isArray(ctx?.pages) ? ctx.pages.map(x => Number(x)).filter(x => Number.isFinite(x) && x > 0) : [];
+                if (pages.length) cp046SoalPagesText = pages.sort((a,b)=>a-b).join(", ");
+                state.cp046 = state.cp046 || {};
+                state.cp046.soal = { jenjang: ctx.jenjang, fase: ctx.fase, mapel_slug: ctx.mapel_slug, pages: ctx.pages, cp_file: ctx.cp_file };
+                saveDebounced(false);
+              }
+            }
+          }
+        } catch {}
+
         const total = state.sections.reduce((acc, s) => {
           const isObjective = ["pg", "pg_kompleks", "menjodohkan"].includes(s.bentuk);
           const isEssay = ["isian", "uraian"].includes(s.bentuk);
@@ -8041,17 +8593,19 @@ ${baselineModulAjar}
           const topikRaw = String(state.identity.topik_raw || "").trim();
           const topikRawClip = topikRaw ? topikRaw.slice(0, 12000) : "";
           const topikDisplay = identityTopikDisplay(state.identity);
+          const jenjangDisplay = displayJenjang(state.identity.jenjang, state.identity.kesetaraanPaket);
+          const jenjangResolved = resolveJenjang(state.identity.jenjang, state.identity.kesetaraanPaket);
           const topikText = topikDisplay
-            ? `tema ${topikDisplay} untuk ${state.identity.mataPelajaran} tingkat ${state.identity.jenjang} kelas ${state.identity.kelas}`
-            : `berbagai tema/topik yang sesuai untuk ${state.identity.mataPelajaran} tingkat ${state.identity.jenjang} kelas ${state.identity.kelas}`;
+            ? `tema ${topikDisplay} untuk ${state.identity.mataPelajaran} tingkat ${jenjangDisplay} kelas ${state.identity.kelas}`
+            : `berbagai tema/topik yang sesuai untuk ${state.identity.mataPelajaran} tingkat ${jenjangDisplay} kelas ${state.identity.kelas}`;
 
           const kelasNum = parseKelasNumber(state.identity.kelas);
           const faseSel = faseLetterFromLabel(state.identity.fase);
-          const faseExp = expectedFaseLetter(state.identity.jenjang, kelasNum);
+          const faseExp = expectedFaseLetter(jenjangResolved, kelasNum);
           const faseEfektif = faseExp ? `Fase ${faseExp}` : (faseSel ? `Fase ${faseSel}` : String(state.identity.fase || ''));
-          const jenjangEfektif = String(state.identity.jenjang || '').trim();
+          const jenjangEfektif = String(jenjangResolved || '').trim();
           const mapelEfektif = String(state.identity.mataPelajaran || '').trim();
-          const isSMA = jenjangEfektif === 'SMA/MA' || jenjangEfektif === 'SMK';
+          const isSMA = jenjangEfektif === 'SMA/MA' || jenjangEfektif === 'SMK' || jenjangEfektif === 'SMK/MAK';
           const isPancasila = /pancasila/i.test(mapelEfektif);
           const isKelasAtas = Number(kelasNum || 0) >= 11;
           const levelRules = isSMA && isPancasila && isKelasAtas
@@ -8132,10 +8686,11 @@ Kembalikan JSON persis: {"items": [...]}`;
 Buatlah daftar soal untuk BAGIAN: ${bagianLabel}.
 
 KONTEKS:
-Jenjang: ${state.identity.jenjang} ${faseEfektif ? faseEfektif : state.identity.fase} Kelas ${state.identity.kelas}
+Jenjang: ${displayJenjang(state.identity.jenjang, state.identity.kesetaraanPaket)} ${faseEfektif ? faseEfektif : state.identity.fase} Kelas ${state.identity.kelas}
 Mapel: ${state.identity.mataPelajaran}
 Sumber Materi Mentah (WAJIB jadi dasar utama soal):${topikRawClip ? `\n<<<\n${topikRawClip}\n>>>` : " -"}
 ${levelRules ? `\n${levelRules}\n` : ''}
+${cp046SoalBlock ? `\n${cp046SoalBlock}\n` : ''}
 
 KETENTUAN KESESUAIAN LEVEL (WAJIB):
 - Soal harus sesuai jenjang/fase/kelas yang dipilih. Jika materi mentah terlalu dasar atau terlalu tinggi, sesuaikan kedalaman dan kompleksitasnya agar tetap tepat level.
@@ -8181,7 +8736,11 @@ ${outputSchema}`;
               let items = Array.isArray(res?.items) ? res.items : [];
               if (items.length > ask) items = items.slice(0, ask);
               for (const item of items) {
-                const q = normalizeQuestion(item, sec);
+                let q = normalizeQuestion(item, sec);
+                if (cp046SoalPagesText && !/CP046/i.test(String(q.indikator || ""))) {
+                  const suf = `(CP046 hal. ${cp046SoalPagesText})`;
+                  q = { ...q, indikator: String(q.indikator || "").trim() ? `${String(q.indikator).trim()} ${suf}` : suf };
+                }
                 if (!q.question) continue;
                 state.questions.push(q);
                 needed--;
@@ -8449,6 +9008,52 @@ ${out}`;
             setByPath(path, v);
             if (state.soalError) state.soalError = null;
             autoFillPaket();
+            try {
+              if (path === 'identity.jenjang' || path === 'identity.kesetaraanPaket' || path === 'identity.kelas') {
+                const I = state.identity || {};
+                const je = resolveJenjang(I.jenjang, I.kesetaraanPaket);
+                const faseOpts = MA_FASE_MAP[je] || [];
+                const kelasOpts = CLASS_OPTIONS[je] || [];
+                const mapelOpts = SUBJECT_OPTIONS[je] || [];
+                if (faseOpts.length === 1) I.fase = faseOpts[0];
+                else if (I.fase && !faseOpts.includes(I.fase)) {
+                  const fl = faseLetterFromLabel(I.fase);
+                  const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+                  I.fase = opt || '';
+                }
+                if (kelasOpts.length === 1) I.kelas = kelasOpts[0];
+                else if (I.kelas && !kelasOpts.includes(I.kelas)) I.kelas = '';
+                if (I.mataPelajaran && !mapelOpts.includes(I.mataPelajaran)) I.mataPelajaran = '';
+                if (path === 'identity.kelas') {
+                  const kn = parseKelasNumber(I.kelas);
+                  const fl = expectedFaseLetter(je, kn);
+                  const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+                  if (opt) I.fase = opt;
+                }
+              }
+              if (path === 'lkpd.jenjang' || path === 'lkpd.kesetaraanPaket' || path === 'lkpd.kelas') {
+                const L = state.lkpd || {};
+                const je = resolveJenjang(L.jenjang, L.kesetaraanPaket);
+                const faseOpts = MA_FASE_MAP[je] || [];
+                const kelasOpts = CLASS_OPTIONS[je] || [];
+                const mapelOpts = SUBJECT_OPTIONS[je] || [];
+                if (faseOpts.length === 1) L.fase = faseOpts[0];
+                else if (L.fase && !faseOpts.includes(L.fase)) {
+                  const fl = faseLetterFromLabel(L.fase);
+                  const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+                  L.fase = opt || '';
+                }
+                if (kelasOpts.length === 1) L.kelas = kelasOpts[0];
+                else if (L.kelas && !kelasOpts.includes(L.kelas)) L.kelas = '';
+                if (L.mataPelajaran && !mapelOpts.includes(L.mataPelajaran)) L.mataPelajaran = '';
+                if (path === 'lkpd.kelas') {
+                  const kn = parseKelasNumber(L.kelas);
+                  const fl = expectedFaseLetter(je, kn);
+                  const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+                  if (opt) L.fase = opt;
+                }
+              }
+            } catch {}
           };
 
           node.addEventListener("input", updateValue);
@@ -8509,7 +9114,7 @@ ${out}`;
         const text = String(rawText || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
         if (!text) throw new Error("Teks kosong");
         const clipped = text.slice(0, 12000);
-        const prompt = `Ringkas materi berikut menjadi tema/topik untuk pembuatan paket soal.\n\nATURAN:\n- Output HARUS JSON.\n- Tema harus sesuai mapel/jenjang/kelas dari konteks.\n- Buat tema yang spesifik namun ringkas (maks 1–2 kalimat).\n\nOUTPUT JSON:\n{\n  "tema": "....",\n  "kata_kunci": ["...","...","..."]\n}\n\nKONTEKS:\n- Jenjang: ${String(state.identity?.jenjang || "-")}\n- Kelas: ${String(state.identity?.kelas || "-")}\n- Fase: ${String(state.identity?.fase || "-")}\n- Mapel: ${String(state.identity?.mataPelajaran || "-")}\n\nMATERI:\n${clipped}`;
+        const prompt = `Ringkas materi berikut menjadi tema/topik untuk pembuatan paket soal.\n\nATURAN:\n- Output HARUS JSON.\n- Tema harus sesuai mapel/jenjang/kelas dari konteks.\n- Buat tema yang spesifik namun ringkas (maks 1–2 kalimat).\n\nOUTPUT JSON:\n{\n  "tema": "....",\n  "kata_kunci": ["...","...","..."]\n}\n\nKONTEKS:\n- Jenjang: ${displayJenjang(state.identity?.jenjang, state.identity?.kesetaraanPaket) || "-"}\n- Kelas: ${String(state.identity?.kelas || "-")}\n- Fase: ${String(state.identity?.fase || "-")}\n- Mapel: ${String(state.identity?.mataPelajaran || "-")}\n\nMATERI:\n${clipped}`;
         const res = await callOpenAI(prompt);
         const tema = String(res?.tema || res?.topik || "").trim();
         const kata = Array.isArray(res?.kata_kunci) ? res.kata_kunci.map(x => String(x || "").trim()).filter(Boolean).slice(0, 7) : [];
@@ -8628,7 +9233,7 @@ ${out}`;
         const I = state.identity || {};
         const mapel = String(L.mataPelajaran || I.mataPelajaran || "-");
         const kelas = String(L.kelas || I.kelas || "-");
-        const jenjang = String(L.jenjang || I.jenjang || "-");
+        const jenjang = displayJenjang(L.jenjang || I.jenjang, (String(L.jenjang || "").trim() ? L.kesetaraanPaket : I.kesetaraanPaket)) || "-";
         const fase = String(L.fase || I.fase || "-");
         const topik = L.sumber === "upload" ? (L.materi ? L.materi.slice(0, 300) : "-") : (L.topik || "-");
         const aktivitas = String(L.jenisAktivitas || "Eksperimen / Praktikum");
@@ -10206,7 +10811,8 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
           if (!state.modulAjar) state.modulAjar = {};
           state.modulAjar[key] = val;
           if (state.modulAjarError) state.modulAjarError = null;
-          if (key === 'jenjang') { state.modulAjar.fase=''; state.modulAjar.kelas=''; }
+          if (key === 'jenjang') { state.modulAjar.fase=''; state.modulAjar.kelas=''; state.modulAjar.mapel=''; state.modulAjar.mapel_cp046_slug=''; }
+          if (key === 'fase' || key === 'mapel') { state.modulAjar.mapel_cp046_slug=''; }
           if (renderNow) {
             saveDebounced(true);
             render();
@@ -10226,10 +10832,24 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         openModulAjarFromDetail,
         buildModulAjar,
         exportModulAjarDocx,
+        cp046MapelInput,
+        cp046MapelBlur,
+        cp046MapelPick,
+        cp046MapelPickFromEl,
       };
 
       const btnThemeEl = el("btnTheme");
       if (btnThemeEl) btnThemeEl.addEventListener("click", toggleTheme);
+
+      document.addEventListener("mousedown", (e) => {
+        const tgt = e?.target;
+        const inDrop = tgt && tgt.closest ? tgt.closest("#cp046MapelDropdown_modulAjar, #cp046MapelDropdown_rpp") : null;
+        const inInp = tgt && tgt.closest ? tgt.closest('[data-ma-key="mapel"], [data-rpp-key="mata_pelajaran"]') : null;
+        if (!inDrop && !inInp) {
+          try { window.__sp.cp046MapelBlur('modulAjar'); } catch {}
+          try { window.__sp.cp046MapelBlur('rpp'); } catch {}
+        }
+      });
 
       document.addEventListener("click", (e) => {
         const t = e.target && e.target.closest ? e.target.closest("[data-action]") : null;
