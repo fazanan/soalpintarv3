@@ -330,7 +330,7 @@ $lines[] = "- Halaman rujukan yang dipakai: {$pagesText}.";
 $lines[] = $docType === 'modul_ajar'
   ? "- WAJIB: di bagian '### 7. Daftar Pustaka' tulis minimal 1 entri yang memuat teks persis: CP046 hal. {$pagesText}."
   : ($docType === 'soal'
-    ? "- WAJIB: pada setiap butir soal, field 'indikator' memuat teks: (CP046 hal. {$pagesText})."
+    ? "- WAJIB: pada dokumen Kisi-Kisi, tambahkan catatan di bagian bawah halaman: sesuai dengan CP046 hal. {$pagesText}."
     : "- WAJIB: di akhir RPP buat subbagian 'Rujukan' dan tulis minimal 1 baris yang memuat teks persis: CP046 hal. {$pagesText}.");
 
 json_out(200, [

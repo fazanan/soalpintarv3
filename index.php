@@ -1121,6 +1121,14 @@ if (!isset($_SESSION['user_id'])) {
           return { doc, pageW, pageH, margin, footerY, maxW, getY: () => y, setY: (v) => { y = v; }, newPage, newPageIfNeeded, addCenter, addPara, addHanging, drawHeader };
         };
 
+        const cp046PagesForKisi = (() => {
+          const pages = state?.cp046?.soal?.pages;
+          const arr = Array.isArray(pages) ? pages.map(x => Number(x)).filter(x => Number.isFinite(x) && x > 0) : [];
+          if (!arr.length) return "";
+          arr.sort((a,b)=>a-b);
+          return arr.join(", ");
+        })();
+
         const items0 = Array.isArray(state.questions) ? state.questions : [];
         const imgCache = new Map();
         const blobToDataUrl = (blob) => new Promise((resolve) => {
@@ -1393,6 +1401,9 @@ if (!isset($_SESSION['user_id'])) {
             ctx.doc.setFont("times", "normal");
             ctx.doc.setFontSize(9);
             ctx.doc.setTextColor(0, 0, 0);
+            if (cp046PagesForKisi) {
+              ctx.doc.text(`Catatan: sesuai dengan CP046 hal. ${cp046PagesForKisi}`, ctx.pageW / 2, ctx.footerY - 12, { align: "center" });
+            }
             const footer = `${String(state.identity.mataPelajaran || "")} — ${String(state.identity.namaSekolah || "")} | Halaman ${p}`;
             ctx.doc.text(footer, ctx.pageW / 2, ctx.footerY, { align: "center" });
           }
@@ -5359,8 +5370,9 @@ ${baselineModulAjar}
           const finalText = isKBC ? text : stripKbcFromModulAjar(text);
           const ensureCp046InDaftarPustaka = (raw, pagesText) => {
             const src = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            if (!String(pagesText || '').trim()) return src;
             if (/\bCP046\b/i.test(src)) return src;
-            const p = String(pagesText || 'X').trim() || 'X';
+            const p = String(pagesText || '').trim();
             const refLine = `- Kementerian Pendidikan, Kebudayaan, Riset, dan Teknologi. (2022). Capaian Pembelajaran (CP046). (CP046 hal. ${p}).`;
             const lines = src.split('\n');
             let idx = -1;
@@ -8736,11 +8748,7 @@ ${outputSchema}`;
               let items = Array.isArray(res?.items) ? res.items : [];
               if (items.length > ask) items = items.slice(0, ask);
               for (const item of items) {
-                let q = normalizeQuestion(item, sec);
-                if (cp046SoalPagesText && !/CP046/i.test(String(q.indikator || ""))) {
-                  const suf = `(CP046 hal. ${cp046SoalPagesText})`;
-                  q = { ...q, indikator: String(q.indikator || "").trim() ? `${String(q.indikator).trim()} ${suf}` : suf };
-                }
+                const q = normalizeQuestion(item, sec);
                 if (!q.question) continue;
                 state.questions.push(q);
                 needed--;
@@ -10184,6 +10192,20 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               }));
               content.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [tableHeader, ...rows] }));
               content.push(new Paragraph({ children: [], spacing: { after: 240 } }));
+            }
+
+            const cp046PagesForKisi = (() => {
+              const pages = state?.cp046?.soal?.pages;
+              const arr = Array.isArray(pages) ? pages.map(x => Number(x)).filter(x => Number.isFinite(x) && x > 0) : [];
+              if (!arr.length) return '';
+              arr.sort((a,b)=>a-b);
+              return arr.join(', ');
+            })();
+            if (cp046PagesForKisi) {
+              content.push(new Paragraph({
+                children: [new TextRun({ text: `Catatan: sesuai dengan CP046 hal. ${cp046PagesForKisi}`, italics: true, size: 18 })],
+                spacing: { before: 100, after: 0 }
+              }));
             }
   
             const doc = new Document({
