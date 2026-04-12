@@ -7,6 +7,8 @@ if (!isset($_SESSION['user_id'])) {
   echo json_encode(['error' => 'Unauthorized']);
   exit;
 }
+$user_id = (int)($_SESSION['user_id'] ?? 0);
+session_write_close();
 
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../db.php';
@@ -18,25 +20,34 @@ function read_json_input(): array {
 }
 
 function has_column(mysqli $db, string $table, string $column): bool {
+  static $cache = [];
   $table = $db->real_escape_string($table);
   $column = $db->real_escape_string($column);
+  $k = $table . ':' . $column;
+  if (array_key_exists($k, $cache)) return (bool)$cache[$k];
   $sql = "SHOW COLUMNS FROM `$table` LIKE '$column'";
   if ($res = $db->query($sql)) {
     $ok = $res->num_rows > 0;
     $res->close();
+    $cache[$k] = $ok;
     return $ok;
   }
+  $cache[$k] = false;
   return false;
 }
 
 function table_exists(mysqli $db, string $table): bool {
+  static $cache = [];
   $table = $db->real_escape_string($table);
+  if (array_key_exists($table, $cache)) return (bool)$cache[$table];
   $sql = "SHOW TABLES LIKE '$table'";
   if ($res = $db->query($sql)) {
     $ok = $res->num_rows > 0;
     $res->close();
+    $cache[$table] = $ok;
     return $ok;
   }
+  $cache[$table] = false;
   return false;
 }
 
@@ -285,7 +296,6 @@ function proxy_image(mysqli $db, array $payload, int $user_id) {
 
 $data = read_json_input();
 $type = (string)($data['type'] ?? 'chat');
-$user_id = (int)($_SESSION['user_id'] ?? 0);
 
 if ($type === 'chat') {
   proxy_chat($mysqli, $data, $user_id);

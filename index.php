@@ -4,6 +4,7 @@ if (!isset($_SESSION['user_id'])) {
   header('Location: login.php');
   exit;
 }
+session_write_close();
 ?>
 <!DOCTYPE html>
 <html lang="id" class="custom-scrollbar">
@@ -1487,7 +1488,7 @@ if (!isset($_SESSION['user_id'])) {
       }
       async function refreshCreditLimit(doRender = false) {
         try {
-          const r = await fetch("api/openai_proxy.php", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ type:"get_limits" }) });
+          const r = await fetch("api/openai_proxy.php", { method:"POST", headers:{"Content-Type":"application/json"}, credentials:"same-origin", body: JSON.stringify({ type:"get_limits" }) });
           if (r.ok) {
             const j = await r.json();
             state.limitInfo = j || {};
@@ -3024,11 +3025,16 @@ if (!isset($_SESSION['user_id'])) {
           const response = await fetch("api/openai_proxy.php", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
             body: JSON.stringify({ type: "chat", prompt, model: OPENAI_MODEL }),
             signal: controller.signal,
           });
           if (!response.ok) {
             const errText = await response.text();
+            if (response.status === 401) {
+              try { alert("Sesi login berakhir. Silakan login ulang."); } catch {}
+              try { window.location.href = "login.php"; } catch {}
+            }
             throw new Error(`Proxy Error ${response.status}: ${errText}`);
           }
           const data = await response.json();
@@ -3116,6 +3122,7 @@ if (!isset($_SESSION['user_id'])) {
           const response = await fetch("api/openai_proxy.php", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
             body: JSON.stringify({ type: "image", prompt: p, model, size })
           });
           if (!response.ok) {
@@ -5412,6 +5419,7 @@ ${baselineModulAjar}
           const resp = await fetch("api/openai_proxy.php", {
             method: "POST",
             headers: {"Content-Type":"application/json"},
+            credentials: "same-origin",
             body: JSON.stringify({ type:"modul_ajar", messages:[{role:"system",content:sys},{role:"user",content:usr}], model:OPENAI_MODEL }),
             signal: ctrl.signal,
           });
@@ -5515,6 +5523,7 @@ ${baselineModulAjar}
             await fetch("api/openai_proxy.php", {
               method: "POST",
               headers: {"Content-Type":"application/json"},
+              credentials: "same-origin",
               body: JSON.stringify({ type: "add_tokens", input_tokens: usageIn, output_tokens: usageOut })
             });
             const maCost = Number(state.limitConfig?.costs?.modul_ajar ?? 3);
@@ -5523,6 +5532,7 @@ ${baselineModulAjar}
               calls.push(fetch("api/openai_proxy.php", {
                 method: "POST",
                 headers: {"Content-Type":"application/json"},
+                credentials: "same-origin",
                 body: JSON.stringify({ type: "decrement_package" })
               }));
             }
@@ -6417,6 +6427,7 @@ ${baselineModulAjar}
           const resp = await fetch("api/openai_proxy.php", {
             method: "POST",
             headers: {"Content-Type":"application/json"},
+            credentials: "same-origin",
             body: JSON.stringify({ type:"rpp", messages:[{role:"system",content:sys},{role:"user",content:usr}], model:OPENAI_MODEL }),
             signal: ctrl.signal,
           });
@@ -6452,6 +6463,7 @@ ${baselineModulAjar}
                 const resp2 = await fetch("api/openai_proxy.php", {
                   method: "POST",
                   headers: {"Content-Type":"application/json"},
+                  credentials: "same-origin",
                   body: JSON.stringify({ type:"rpp", messages:[{role:"system",content:reviseSys},{role:"user",content:reviseUsr}], model:OPENAI_MODEL }),
                   signal: ctrl.signal,
                 });
@@ -6506,6 +6518,7 @@ ${baselineModulAjar}
             await fetch("api/openai_proxy.php", {
               method: "POST",
               headers: {"Content-Type":"application/json"},
+              credentials: "same-origin",
               body: JSON.stringify({ type: "add_tokens", input_tokens: usageIn, output_tokens: usageOut })
             });
             const rppCost = Number(state.limitConfig?.costs?.rpp ?? 2);
@@ -6514,6 +6527,7 @@ ${baselineModulAjar}
               calls.push(fetch("api/openai_proxy.php", {
                 method: "POST",
                 headers: {"Content-Type":"application/json"},
+                credentials: "same-origin",
                 body: JSON.stringify({ type: "decrement_package" })
               }));
             }
@@ -8434,7 +8448,7 @@ ${baselineModulAjar}
             try {
               const cost = Number(state.limitConfig?.costs?.publish_quiz ?? 3);
               const calls = [];
-              for (let i=0;i<cost;i++) calls.push(fetch("api/openai_proxy.php", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ type:"decrement_package" }) }));
+              for (let i=0;i<cost;i++) calls.push(fetch("api/openai_proxy.php", { method:"POST", headers:{"Content-Type":"application/json"}, credentials:"same-origin", body: JSON.stringify({ type:"decrement_package" }) }));
               await Promise.all(calls);
               try { await computeStats(); } catch {}
               logCreditUsage('Publish Quiz', cost, `Slug: ${String(js.slug||'')}`);
@@ -8683,7 +8697,7 @@ ${baselineModulAjar}
         autoFillPaket();
         // preflight limit check
         try {
-          const res = await fetch("api/openai_proxy.php", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ type: "get_limits" }) });
+          const res = await fetch("api/openai_proxy.php", { method: "POST", headers: {"Content-Type":"application/json"}, credentials:"same-origin", body: JSON.stringify({ type: "get_limits" }) });
           if (res.ok) {
             const limits = await res.json();
             if ((limits?.limitpaket ?? 0) < 2) {
@@ -8947,14 +8961,15 @@ ${outputSchema}`;
         if (actual === total) {
           try {
             await Promise.all([
-              fetch("api/openai_proxy.php", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ type: "decrement_package" }) }),
-              fetch("api/openai_proxy.php", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ type: "decrement_package" }) }),
+              fetch("api/openai_proxy.php", { method: "POST", headers: {"Content-Type":"application/json"}, credentials:"same-origin", body: JSON.stringify({ type: "decrement_package" }) }),
+              fetch("api/openai_proxy.php", { method: "POST", headers: {"Content-Type":"application/json"}, credentials:"same-origin", body: JSON.stringify({ type: "decrement_package" }) }),
             ]);
           } catch {}
           try {
             await fetch("api/openai_proxy.php", {
               method: "POST",
               headers: {"Content-Type":"application/json"},
+            credentials: "same-origin",
               body: JSON.stringify({ type: "add_tokens", input_tokens: pkgTokenIn, output_tokens: pkgTokenOut })
             });
           } catch {}
@@ -9103,7 +9118,7 @@ ${out}`;
         updateQuestionData(id, { _loadingImage: true, _imageError: null });
         try {
           try {
-            const res = await fetch("api/openai_proxy.php", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ type: "get_limits" }) });
+            const res = await fetch("api/openai_proxy.php", { method: "POST", headers: {"Content-Type":"application/json"}, credentials:"same-origin", body: JSON.stringify({ type: "get_limits" }) });
             if (res.ok) {
               const limits = await res.json();
               if ((limits?.limitgambar ?? 0) <= 0) {
@@ -9636,11 +9651,13 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
           await fetch("api/openai_proxy.php", {
             method: "POST",
             headers: {"Content-Type":"application/json"},
+            credentials: "same-origin",
             body: JSON.stringify({ type: "add_tokens", input_tokens: usageIn, output_tokens: usageOut })
           });
           await fetch("api/openai_proxy.php", {
             method: "POST",
             headers: {"Content-Type":"application/json"},
+            credentials: "same-origin",
             body: JSON.stringify({ type: "decrement_package" })
           });
           try { await computeStats(); } catch {}
