@@ -122,7 +122,7 @@ if (!isset($_SESSION['user_id'])) {
               </div>
             </div>
           </div>
-          <div id="limitSidebar" class="no-print -mt-1 text-[13px] font-semibold text-blue-700 dark:text-blue-300"></div>
+          <div id="limitSidebar" class="hidden no-print -mt-1 text-[13px] font-semibold text-blue-700 dark:text-blue-300"></div>
           <div id="nav" class="flex flex-col gap-1"></div>
           <div class="h-px bg-border-light dark:bg-border-dark my-2"></div>
           <button
@@ -257,6 +257,32 @@ if (!isset($_SESSION['user_id'])) {
         </div>
       </div>
     </div>
+
+    <div id="usagePolicyModal" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.6); z-index:70;">
+      <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[780px] max-h-[85vh] overflow-auto">
+        <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+          <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">policy</span> Ketentuan Penggunaan</div>
+          <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeUsagePolicy(true)">&times;</button>
+        </div>
+        <div class="p-5 space-y-4 text-sm leading-relaxed">
+          <div class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
+            <div class="font-bold text-amber-700 dark:text-amber-300 mb-1">Mohon dibaca dan dipatuhi</div>
+            <div class="text-amber-800/90 dark:text-amber-200">
+              Aplikasi Guru Pintar ditujukan untuk membantu Bapak/Ibu menyusun dokumen pembelajaran untuk kebutuhan mengajar Bapak/Ibu sendiri.
+            </div>
+          </div>
+          <ul class="list-disc pl-5 space-y-2">
+            <li>Dilarang menggunakan semua fitur maupun hasil dokumen dari aplikasi ini untuk membuatkan dokumen pembelajaran bagi guru lain.</li>
+            <li>Dilarang membagikan, menjual, memperbanyak, atau mendistribusikan hasil dokumen aplikasi ini untuk kepentingan pihak lain.</li>
+            <li>Gunakan secara bertanggung jawab, sesuai etika profesi pendidik, dan patuhi aturan sekolah serta regulasi yang berlaku.</li>
+          </ul>
+          <div class="flex flex-col sm:flex-row gap-3 sm:justify-end pt-2">
+            <a class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold" href="logout.php">Keluar</a>
+            <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.closeUsagePolicy(true)">Saya Mengerti</button>
+          </div>
+        </div>
+      </div>
+    </div>
     
 
     <input id="filePicker" type="file" accept="image/*" class="hidden" />
@@ -290,7 +316,6 @@ if (!isset($_SESSION['user_id'])) {
         { id: "quiz", label: "Quiz", icon: "quiz" },
         { id: "lkpd", label: "LKPD", icon: "assignment" },
         { id: "rekap", label: "Rekap Nilai", icon: "summarize" },
-        { id: "limit", label: "Kredit Limit", icon: "account_balance_wallet" },
         { id: "riwayat", label: "Riwayat", icon: "history" },
       ];
 
@@ -329,6 +354,7 @@ if (!isset($_SESSION['user_id'])) {
           "Bahasa Arab",
           "Pendidikan Pancasila",
           "Bahasa Indonesia",
+          "Bahasa Indramayu",
           "Bahasa Jawa",
           "Matematika",
           "Ilmu Pengetahuan Alam dan Sosial (IPAS)",
@@ -356,6 +382,7 @@ if (!isset($_SESSION['user_id'])) {
           "Bahasa Arab",
           "Pendidikan Pancasila",
           "Bahasa Indonesia",
+          "Bahasa Indramayu",
           "Bahasa Jawa",
           "Matematika",
           "Ilmu Pengetahuan Alam (IPA)",
@@ -385,6 +412,7 @@ if (!isset($_SESSION['user_id'])) {
           "Bahasa Arab",
           "Pendidikan Pancasila",
           "Bahasa Indonesia",
+          "Bahasa Indramayu",
           "Bahasa Jawa",
           "Matematika",
           "Bahasa Inggris",
@@ -417,6 +445,7 @@ if (!isset($_SESSION['user_id'])) {
           "Bahasa Arab",
           "Pendidikan Pancasila",
           "Bahasa Indonesia",
+          "Bahasa Indramayu",
           "Bahasa Jawa",
           "Matematika",
           "Bahasa Inggris",
@@ -896,18 +925,31 @@ if (!isset($_SESSION['user_id'])) {
       `;
 
       const computeStats = async () => {
-        const banner = el("limitSidebar");
-        if (!banner) return;
+        return;
+      };
+
+      const openUsagePolicy = () => {
+        const m = el("usagePolicyModal");
+        if (!m) return;
+        m.classList.remove("hidden");
+        m.style.display = "flex";
+      };
+      const closeUsagePolicy = (ack = false) => {
+        const m = el("usagePolicyModal");
+        if (m) {
+          m.classList.add("hidden");
+          m.style.display = "none";
+        }
+        if (ack) {
+          try { localStorage.setItem(APP_KEY + ":usage_policy_ack", "1"); } catch {}
+        }
+      };
+      const ensureUsagePolicyAck = () => {
         try {
-          const res = await fetch("api/openai_proxy.php", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ type: "get_limits" }) });
-          if (res.ok) {
-            const lim = await res.json();
-            const total = Number(lim?.initial_limitpaket ?? 300);
-            const sisa = Number(lim?.limitpaket ?? 0);
-            const terpakai = Math.max(0, total - sisa);
-            banner.textContent = `limit terpakai ${terpakai} • sisa limit ${sisa}`;
-          }
+          const ok = localStorage.getItem(APP_KEY + ":usage_policy_ack");
+          if (ok === "1") return;
         } catch {}
+        openUsagePolicy();
       };
 
       const setView = (id) => {
@@ -3890,7 +3932,7 @@ if (!isset($_SESSION['user_id'])) {
         const hasilAda  = !!M.hasil;
         const tab = state.modulAjarTab || (hasilAda ? 'modul' : 'informasi');
         const maErr = state.modulAjarError;
-        const pendekatanOpts = ['Standar','Deep Learning','Berbasis Cinta (KBC)','Deep Learning + KBC'];
+        const pendekatanOpts = ['Standar','CTL (Contextual Teaching and Learning)','Deep Learning','Deep Learning + CTL','Berbasis Cinta (KBC)','Deep Learning + KBC'];
         if (M.pendekatan && !pendekatanOpts.includes(M.pendekatan)) pendekatanOpts.unshift(M.pendekatan);
         const kurikulumOpts = ['Kurikulum Merdeka','Kurikulum 2013 (K13)'];
         if (M.kurikulum && !kurikulumOpts.includes(M.kurikulum)) kurikulumOpts.unshift(M.kurikulum);
@@ -5080,6 +5122,8 @@ if (!isset($_SESSION['user_id'])) {
         const isDL = /deep\s*learning/i.test(pendekatanLabel);
         const isKBC = /\bKBC\b/i.test(pendekatanLabel) || /berbasis cinta/i.test(pendekatanLabel);
         const isDandK = isDL && isKBC;
+        const isCTL = /\bCTL\b/i.test(pendekatanLabel) || /contextual\s+teaching\s+and\s+learning/i.test(pendekatanLabel);
+        const isDLCTL = isDL && isCTL && !isKBC;
 
         const noKbcCleanupRule = !isKBC
           ? `CATATAN PENTING (TANPA KBC):
@@ -5094,7 +5138,17 @@ if (!isset($_SESSION['user_id'])) {
 - Di SETIAP pertemuan sisipkan minimal 1 aktivitas KBC yang konkret dan tertulis jelas (etika komunikasi/empati/gotong royong/kepedulian lingkungan/refleksi syukur/niat belajar).
 - Pertanyaan pemantik: open-ended dan mengandung dimensi nilai tanpa menggurui.
 - Asesmen: rubrik gabungan (kognitif + proses + karakter/KBC), skala 1–4, indikator dapat diamati.`
-          : isDL
+          : isDLCTL
+            ? `ARAH PENDEKATAN (DEEP LEARNING + CTL):
+- Wajib ada konteks nyata/masalah pemantik yang konsisten dari awal hingga penutup.
+- Di SETIAP pertemuan wajib ada urutan eksplisit: Eksplorasi → Analisis → Refleksi.
+- Di SETIAP pertemuan wajib ada elemen Mindful, Meaningful, Joyful (tulis eksplisit di kegiatan pembelajaran).
+- Wajib memuat komponen CTL secara eksplisit dan aplikatif: Konstruktivisme, Inkuiri, Bertanya (Questioning), Learning Community, Modeling, Refleksi, Penilaian Autentik.
+- Kegiatan Inti harus berorientasi penyelidikan: mengamati konteks, merumuskan pertanyaan, mengumpulkan data/percobaan sederhana, menganalisis, menyimpulkan, mengomunikasikan.
+- Asesmen harus autentik (proses + produk/kinerja/portofolio) + rubrik skala 1–4 yang siap dipakai guru.
+- WAJIB ada subbagian "### Pendekatan CTL (Contextual Teaching and Learning)" yang merangkum 7 komponen CTL dan implementasinya pada modul ini.
+${noKbcCleanupRule}`
+            : isDL
             ? `ARAH PENDEKATAN (DEEP LEARNING):
 - Di SETIAP pertemuan wajib ada urutan eksplisit: Eksplorasi → Analisis → Refleksi.
 - Di SETIAP pertemuan wajib ada elemen Mindful, Meaningful, Joyful (tulis eksplisit di kegiatan pembelajaran).
@@ -5107,6 +5161,14 @@ ${noKbcCleanupRule}`
 - Di SETIAP pertemuan sisipkan minimal 1 aktivitas KBC yang konkret dan tertulis jelas.
 - Asesmen: tambah observasi sikap/kolaborasi + refleksi nilai (tetap skala 1–4, indikator dapat diamati).
 - Hindari bahasa menggurui; tetap formal namun hangat.`
+              : isCTL
+                ? `ARAH PENDEKATAN (CTL / CONTEXTUAL TEACHING AND LEARNING):
+- Wajib ada konteks nyata/masalah pemantik yang dekat dengan kehidupan peserta didik (rumah/sekolah/lingkungan/sosial/teknologi) dan konsisten dari awal hingga penutup.
+- Wajib memuat komponen CTL secara eksplisit dan aplikatif: Konstruktivisme, Inkuiri, Bertanya (Questioning), Learning Community, Modeling, Refleksi, Penilaian Autentik.
+- Kegiatan Inti harus berorientasi penyelidikan: mengamati konteks, merumuskan pertanyaan, mengumpulkan data/percobaan sederhana, menganalisis, menyimpulkan, mengomunikasikan.
+- Asesmen harus autentik: menilai proses dan produk (kinerja/produk/portofolio) + rubrik 1–4 yang dapat dipakai guru.
+- Pertanyaan Pemantik dan Refleksi harus memandu peserta didik mengaitkan konsep dengan konteks nyata (mengapa/bagaimana) dan rencana penerapan.`
+                + `\n- WAJIB ada subbagian "### Pendekatan CTL (Contextual Teaching and Learning)" yang merangkum 7 komponen CTL dan implementasinya pada modul ini.`
               : `ARAH PENDEKATAN (STANDAR):
 - Kegiatan pembelajaran instruksional, terstruktur, dan terukur (contoh → latihan terbimbing → latihan mandiri).
 - Asesmen ringkas namun jelas (diagnostik/formatif/sumatif) dan rubrik skala 1–4 yang mudah dipakai.
@@ -5182,6 +5244,12 @@ Pastikan masing-masing punya durasi dan aktivitas yang konkret.`;
         const kbcKegiatan = isKBC
           ? `
 Khusus KBC: Pada SETIAP pertemuan, sisipkan minimal 1 aktivitas/strategi yang mencerminkan unsur KBC (misalnya: afirmasi/niat belajar, praktik empati, gotong royong, kepedulian lingkungan, etika komunikasi, refleksi rasa syukur). Pastikan tertulis eksplisit di deskripsi kegiatan.`
+          : ``;
+
+        const ctlKegiatan = isCTL
+          ? `
+Khusus CTL: Pada SETIAP pertemuan, wajib ada urutan yang tampak jelas: (1) pemantik konteks nyata, (2) inkuiri/eksplorasi data, (3) diskusi/learning community, (4) modeling (contoh/produk/format), (5) presentasi/komunikasi hasil, (6) refleksi, (7) tindak lanjut/penerapan.
+Di kolom "Catatan" pada tabel kegiatan, tuliskan tag komponen CTL yang muncul pada langkah tersebut (gunakan tag persis): [Konstruktivisme], [Inkuiri], [Questioning], [Learning Community], [Modeling], [Refleksi], [Penilaian Autentik]. Pastikan ketujuh komponen muncul pada modul ini.`
           : ``;
 
         const identifikasiKesiapan = `
@@ -5296,6 +5364,7 @@ c. Sumatif (Akhir) — produk/instrumen penilaian
 ### 5. Kegiatan Pembelajaran
 ${instrKegiatan}
 ${kbcKegiatan}
+${ctlKegiatan}
 
 ### 6. Refleksi
 2–3 pertanyaan refleksi untuk Peserta Didik dan 2–3 untuk Pendidik.
@@ -5367,7 +5436,42 @@ ${baselineModulAjar}
             }
             return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
           };
-          const finalText = isKBC ? text : stripKbcFromModulAjar(text);
+          const ensureCtlInModulAjar = (raw) => {
+            if (!isCTL) return String(raw || '');
+            const src0 = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const hasCtl = /\bCTL\b/i.test(src0) || /konstruktivisme/i.test(src0) || /learning community/i.test(src0) || /\[Konstruktivisme\]/i.test(src0);
+            if (hasCtl) return src0;
+            const block = [
+              '### Pendekatan CTL (Contextual Teaching and Learning)',
+              'Ringkas implementasi CTL pada modul ini (wajib ada dan aplikatif):',
+              '| Komponen CTL | Implementasi Praktis di Modul Ini |',
+              '|---|---|',
+              '| Konstruktivisme | Aktivasi pengetahuan awal, mengaitkan konsep dengan konteks nyata, peserta didik menyusun pemahaman lewat kegiatan. |',
+              '| Inkuiri | Peserta didik melakukan penyelidikan sederhana: merumuskan masalah, mengumpulkan data, menganalisis, menyimpulkan. |',
+              '| Questioning | Pertanyaan pemantik (guru) + pertanyaan investigasi (peserta didik) ditulis eksplisit. |',
+              '| Learning Community | Diskusi pasangan/kelompok, berbagi temuan, saling umpan balik dengan peran yang jelas. |',
+              '| Modeling | Guru memberi contoh produk/format/strategi (contoh jawaban, contoh tabel, contoh prosedur, contoh rubrik). |',
+              '| Refleksi | Refleksi peserta didik dan pendidik yang mengaitkan konsep dengan konteks nyata dan perbaikan berikutnya. |',
+              '| Penilaian Autentik | Penilaian proses + produk/kinerja/portofolio dengan rubrik skala 1–4. |',
+              '',
+              'Catatan: Pada tabel kegiatan per pertemuan, tuliskan tag CTL di kolom "Catatan": [Konstruktivisme], [Inkuiri], [Questioning], [Learning Community], [Modeling], [Refleksi], [Penilaian Autentik].',
+            ].join('\n');
+            const lines = src0.split('\n');
+            let idx = -1;
+            for (let i = 0; i < lines.length; i++) {
+              const t = String(lines[i] || '').trim();
+              if (/^##\s*B\.\s*KOMPONEN\s+INTI\b/i.test(t) || /^##\s*KOMPONEN\s+INTI\b/i.test(t)) { idx = i; break; }
+            }
+            if (idx >= 0) {
+              let insertAt = idx + 1;
+              while (insertAt < lines.length && String(lines[insertAt] || '').trim() === '') insertAt++;
+              lines.splice(insertAt, 0, block, '');
+              return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+            }
+            return `${src0.trim()}\n\n${block}\n`;
+          };
+          const finalText0 = isKBC ? text : stripKbcFromModulAjar(text);
+          const finalText = ensureCtlInModulAjar(finalText0);
           const ensureCp046InDaftarPustaka = (raw, pagesText) => {
             const src = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             if (!String(pagesText || '').trim()) return src;
@@ -5869,7 +5973,9 @@ ${baselineModulAjar}
 
         const pendekatanOpts = [
           { v: 'Standar', l: 'Standar' },
+          { v: 'CTL (Contextual Teaching and Learning)', l: 'CTL (Contextual Teaching and Learning)' },
           { v: 'Deep Learning', l: 'Deep Learning' },
+          { v: 'Deep Learning + CTL', l: 'Deep Learning + CTL' },
           { v: 'Berbasis Cinta (KBC)', l: 'Berbasis Cinta (KBC)' },
           { v: 'Deep Learning + KBC', l: 'Deep Learning + KBC' },
         ];
@@ -6224,14 +6330,20 @@ ${baselineModulAjar}
         const isDL = /deep\s*learning/i.test(pendekatanLabel);
         const isKBC = /\bKBC\b/i.test(pendekatanLabel) || /berbasis\s+cinta/i.test(pendekatanLabel);
         const isDandK = isDL && isKBC;
+        const isCTL = /\bCTL\b/i.test(pendekatanLabel) || /contextual\s+teaching\s+and\s+learning/i.test(pendekatanLabel);
+        const isDLCTL = isDL && isCTL && !isKBC;
 
         const pendekatanInstr = isDandK
           ? 'Pendekatan Deep Learning + KBC.'
+          : isDLCTL
+            ? 'Pendekatan Deep Learning + CTL.'
           : isDL
             ? 'Pendekatan Deep Learning.'
             : isKBC
               ? 'Pendekatan Berbasis Cinta (KBC).'
-              : 'Pendekatan Standar.';
+              : isCTL
+                ? 'Pendekatan CTL (Contextual Teaching and Learning).'
+                : 'Pendekatan Standar.';
 
         const approachRules = isDandK
           ? `ATURAN PENDEKATAN (DEEP LEARNING + KBC) — WAJIB DIPATUHI:
@@ -6239,6 +6351,17 @@ ${baselineModulAjar}
 - Di setiap pertemuan wajib ada elemen Mindful, Meaningful, Joyful yang ditulis eksplisit (gunakan tag: [Mindful], [Meaningful], [Joyful]).
 - Wajib ada integrasi KBC yang eksplisit dalam kegiatan, asesmen, dan refleksi (jangan menggurui).
 - Wajib ada subbagian "Unsur KBC" dan "Implementasi KBC" (ringkas, konkret).`
+          : isDLCTL
+            ? `ATURAN PENDEKATAN (DEEP LEARNING + CTL) — WAJIB DIPATUHI:
+- Wajib ada konteks nyata/masalah pemantik di awal, dan konteks itu dipakai konsisten sampai akhir.
+- Di bagian Kegiatan Pembelajaran, wajib ada urutan eksplisit: Eksplorasi → Analisis → Refleksi.
+- Di setiap pertemuan wajib ada elemen Mindful, Meaningful, Joyful yang ditulis eksplisit (gunakan tag: [Mindful], [Meaningful], [Joyful]).
+- Wajib memuat komponen CTL: Konstruktivisme, Inkuiri, Questioning, Learning Community, Modeling, Refleksi, Penilaian Autentik.
+- Kegiatan Inti berorientasi inkuiri: mengamati konteks → merumuskan pertanyaan → mengumpulkan data/percobaan sederhana → menganalisis → menyimpulkan → mengomunikasikan.
+- Asesmen harus autentik (proses + produk/kinerja) dan rubrik dalam tabel (skala 1–4) yang siap dipakai guru.
+- Refleksi peserta didik harus mengaitkan konsep dengan penerapan di konteks nyata (mengapa/bagaimana).
+- Di Kegiatan Pembelajaran, beri tag komponen CTL pada aktivitas (gunakan tag persis): [Konstruktivisme], [Inkuiri], [Questioning], [Learning Community], [Modeling], [Refleksi], [Penilaian Autentik]. Pastikan ketujuh komponen muncul.
+- Dilarang menambahkan KBC sama sekali (jangan tulis "KBC", "Berbasis Cinta", "Unsur KBC", "Implementasi KBC").`
           : isDL
             ? `ATURAN PENDEKATAN (DEEP LEARNING) — WAJIB DIPATUHI:
 - Di bagian Kegiatan Pembelajaran, wajib ada urutan eksplisit: Eksplorasi → Analisis → Refleksi.
@@ -6249,7 +6372,15 @@ ${baselineModulAjar}
 - Wajib ada subbagian "Unsur KBC" dan "Implementasi KBC" (ringkas, konkret, kontekstual).
 - Di Kegiatan Pembelajaran wajib ada aktivitas KBC yang eksplisit (mis. etika komunikasi, empati, gotong royong, kepedulian lingkungan, refleksi syukur/niat belajar).
 - Rubrik/asesmen memuat indikator sikap/kolaborasi yang dapat diamati (tidak menggurui).`
-              : `ATURAN PENDEKATAN (STANDAR) — WAJIB DIPATUHI:
+              : isCTL
+                ? `ATURAN PENDEKATAN (CTL / CONTEXTUAL TEACHING AND LEARNING) — WAJIB DIPATUHI:
+- Wajib ada konteks nyata/masalah pemantik di awal, dan konteks itu dipakai konsisten sampai akhir.
+- Wajib memuat komponen CTL: Konstruktivisme, Inkuiri, Questioning, Learning Community, Modeling, Refleksi, Penilaian Autentik.
+- Kegiatan Inti berorientasi inkuiri: mengamati konteks → merumuskan pertanyaan → mengumpulkan data/percobaan sederhana → menganalisis → menyimpulkan → mengomunikasikan.
+- Asesmen harus autentik (proses + produk/kinerja) dan rubrik dalam tabel (skala 1–4) yang siap dipakai guru.
+- Refleksi peserta didik harus mengaitkan konsep dengan penerapan di konteks nyata (mengapa/bagaimana).`
+                + `\n- Di Kegiatan Pembelajaran, beri tag komponen CTL pada aktivitas (gunakan tag persis): [Konstruktivisme], [Inkuiri], [Questioning], [Learning Community], [Modeling], [Refleksi], [Penilaian Autentik]. Pastikan ketujuh komponen muncul.`
+                : `ATURAN PENDEKATAN (STANDAR) — WAJIB DIPATUHI:
 - Kegiatan pembelajaran instruksional, terstruktur, dan terukur (contoh → latihan terbimbing → latihan mandiri).
 - Dilarang menambahkan KBC sama sekali (jangan tulis "KBC", "Berbasis Cinta", "Unsur KBC", "Implementasi KBC").`;
 
@@ -6332,6 +6463,32 @@ ${baselineModulAjar}
               } catch {}
             }
           }
+          const ensureCtlInRpp = (raw) => {
+            const src0 = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            if (!isCTL) return src0;
+            const hasCtl = /\bCTL\b/i.test(src0) || /konstruktivisme/i.test(src0) || /learning community/i.test(src0) || /\[Konstruktivisme\]/i.test(src0);
+            if (hasCtl) return src0;
+            const block = [
+              '### Catatan Pendekatan CTL (Contextual Teaching and Learning)',
+              '- Konteks nyata/masalah pemantik digunakan konsisten pada seluruh kegiatan.',
+              '- Komponen CTL yang wajib tampak: Konstruktivisme, Inkuiri, Questioning, Learning Community, Modeling, Refleksi, Penilaian Autentik.',
+              '- Di Kegiatan Pembelajaran, beri tag di akhir baris aktivitas (gunakan tag persis): [Konstruktivisme], [Inkuiri], [Questioning], [Learning Community], [Modeling], [Refleksi], [Penilaian Autentik].',
+              '- Asesmen autentik menilai proses dan produk/kinerja; rubrik skala 1–4 dalam tabel.',
+            ].join('\n');
+            const lines = src0.split('\n');
+            let idx = -1;
+            for (let i = 0; i < lines.length; i++) {
+              const t = String(lines[i] || '').trim();
+              if (/^##\s*Kegiatan\b/i.test(t) || /^###\s*Kegiatan\b/i.test(t)) { idx = i; break; }
+              if (/^###\s*Kegiatan\s+Pembelajaran\b/i.test(t)) { idx = i; break; }
+            }
+            if (idx >= 0) {
+              lines.splice(idx, 0, block, '');
+              return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+            }
+            return `${block}\n\n${src0.trim()}`.trim();
+          };
+          if (isCTL) finalText = ensureCtlInRpp(finalText);
           state.rpp.hasil = finalText;
           state.rpp.isGenerating = false;
           saveDebounced(true);
@@ -6790,7 +6947,7 @@ ${baselineModulAjar}
         if (state.activeView === "rpp") return renderRPP();
         if (state.activeView === "quiz") return renderQuizLanding();
         if (state.activeView === "rekap") return renderRekap();
-        if (state.activeView === "limit") return renderLimit();
+        if (state.activeView === "limit") { state.activeView = "preview"; return ""; }
         if (state.activeView === "riwayat") return renderRiwayat();
         return "";
       };
@@ -10828,6 +10985,8 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         updateSection,
         pickLogo,
         clearLogo,
+        openUsagePolicy,
+        closeUsagePolicy,
         // Modul Ajar
         setMA: (key, val, renderNow = false) => {
           if (!state.modulAjar) state.modulAjar = {};
@@ -11201,6 +11360,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         autoFillPaket();
       }
       render();
+      ensureUsagePolicyAck();
     </script>
   </body>
 </html>
