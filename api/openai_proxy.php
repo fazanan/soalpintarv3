@@ -306,6 +306,9 @@ if ($type === 'modul_ajar') {
   @set_time_limit(0);
   $messages = $data['messages'] ?? [];
   $model    = (string)($data['model'] ?? 'gpt-4o-mini');
+  $maxTokens = (int)($data['max_tokens'] ?? 12000);
+  if ($maxTokens < 1200) $maxTokens = 1200;
+  if ($maxTokens > 12000) $maxTokens = 12000;
   if (empty($messages)) {
     http_response_code(400); echo json_encode(['error'=>'Messages kosong']); exit;
   }
@@ -320,7 +323,7 @@ if ($type === 'modul_ajar') {
     'model'       => $model,
     'messages'    => $messages,
     'temperature' => 0.7,
-    'max_tokens'  => 12000,
+    'max_tokens'  => $maxTokens,
   ], JSON_UNESCAPED_UNICODE);
   $ch = curl_init($url);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -330,6 +333,7 @@ if ($type === 'modul_ajar') {
   ]);
   curl_setopt($ch, CURLOPT_POST, true);
   curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
   curl_setopt($ch, CURLOPT_TIMEOUT, 240);
   $result = curl_exec($ch);
   $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);

@@ -5416,13 +5416,24 @@ ${baselineModulAjar}
           const pertemuan = Math.max(1, Number(M.jumlahPertemuan || 1) || 1);
           const timeoutMs = Math.min(600000, 150000 + pertemuan * 60000);
           const timer = setTimeout(()=>ctrl.abort(), timeoutMs);
-          const resp = await fetch("api/openai_proxy.php", {
+          const postBody = (maxTokens) => JSON.stringify({ type:"modul_ajar", messages:[{role:"system",content:sys},{role:"user",content:usr}], model:OPENAI_MODEL, max_tokens: maxTokens });
+          let resp = await fetch("api/openai_proxy.php", {
             method: "POST",
             headers: {"Content-Type":"application/json"},
             credentials: "same-origin",
-            body: JSON.stringify({ type:"modul_ajar", messages:[{role:"system",content:sys},{role:"user",content:usr}], model:OPENAI_MODEL }),
+            body: postBody(12000),
             signal: ctrl.signal,
           });
+          if (!resp.ok && (resp.status === 502 || resp.status === 503 || resp.status === 504)) {
+            try { await new Promise(r => setTimeout(r, 1200)); } catch {}
+            resp = await fetch("api/openai_proxy.php", {
+              method: "POST",
+              headers: {"Content-Type":"application/json"},
+              credentials: "same-origin",
+              body: postBody(8000),
+              signal: ctrl.signal,
+            });
+          }
           clearTimeout(timer);
           if (!resp.ok) throw new Error(`Proxy ${resp.status}: ${await resp.text()}`);
           const data = await resp.json();
