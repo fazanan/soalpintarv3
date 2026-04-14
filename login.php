@@ -4,7 +4,8 @@ if (isset($_SESSION['user_id'])) {
   header('Location: index.php');
   exit;
 }
-$err = isset($_GET['e']) ? 'Login gagal' : '';
+$e = isset($_GET['e']) ? (string)$_GET['e'] : '';
+$err = $e === 'busy' ? 'Akun sedang digunakan di perangkat lain. Silakan logout dari perangkat tersebut atau tunggu beberapa saat.' : ($e ? 'Login gagal' : '');
 ?>
 <!DOCTYPE html>
 <html lang="id">

@@ -8,6 +8,15 @@ if (!isset($_SESSION['user_id'])) {
   exit;
 }
 $user_id = (int)($_SESSION['user_id'] ?? 0);
+require_once __DIR__ . '/../auth_lock.php';
+$sid = session_id();
+if ($user_id > 0 && $sid && (string)($_SESSION['role'] ?? '') !== 'admin') {
+  if (!auth_lock_touch($user_id, $sid)) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized']);
+    exit;
+  }
+}
 session_write_close();
 
 header('Content-Type: application/json; charset=utf-8');

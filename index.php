@@ -4,6 +4,17 @@ if (!isset($_SESSION['user_id'])) {
   header('Location: login.php');
   exit;
 }
+require_once __DIR__ . '/auth_lock.php';
+$__uid = (int)($_SESSION['user_id'] ?? 0);
+$__sid = session_id();
+if ($__uid > 0 && $__sid && (string)($_SESSION['role'] ?? '') !== 'admin') {
+  if (!auth_lock_touch($__uid, $__sid)) {
+    $_SESSION = [];
+    session_destroy();
+    header('Location: login.php?e=busy');
+    exit;
+  }
+}
 session_write_close();
 ?>
 <!DOCTYPE html>
@@ -310,6 +321,7 @@ session_write_close();
       const OPENAI_TIMEOUT_MS = 55000;
       const GEN_BATCH_SIZE = 10;
       const GEN_MAX_ATTEMPTS = 5;
+      const MA_MAX_PERTEMUAN = 4;
       const VIEWS = [
         { id: "preview", label: "Buat Soal", icon: "description" },
         { id: "modul_ajar", label: "Modul Ajar", icon: "menu_book" },
@@ -2640,6 +2652,8 @@ session_write_close();
               state.modulAjar.kesetaraanPaket = mj;
               state.modulAjar.jenjang = 'Kesetaraan';
             }
+            const jp = Number(state.modulAjar.jumlahPertemuan || 0);
+            if (Number.isFinite(jp) && jp > MA_MAX_PERTEMUAN) state.modulAjar.jumlahPertemuan = String(MA_MAX_PERTEMUAN);
           }
         } catch {}
         try {
@@ -4131,7 +4145,7 @@ session_write_close();
                 ${mkInp('Materi Pokok / Judul Modul','judulModul',M.judulModul,'Contoh: Pengenalan Bunyi dan Kosa Kata')}
               </div>
               <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                ${mkSel('Jumlah Pertemuan','jumlahPertemuan',M.jumlahPertemuan,['1','2','3','4','5','6','7','8','9','10','11','12'])}
+                ${mkSel('Jumlah Pertemuan','jumlahPertemuan',M.jumlahPertemuan,Array.from({ length: MA_MAX_PERTEMUAN }, (_, i) => String(i + 1)))}
                 ${mkInp('Durasi per Pertemuan (menit)','durasi',M.durasi,'Contoh: 50')}
                 ${mkInp('Jumlah Peserta Didik','jumlahSiswa',M.jumlahSiswa,'Contoh: 30')}
               </div>
@@ -5413,7 +5427,7 @@ ${baselineModulAjar}
 
         try {
           const ctrl = new AbortController();
-          const pertemuan = Math.max(1, Number(M.jumlahPertemuan || 1) || 1);
+          const pertemuan = Math.min(MA_MAX_PERTEMUAN, Math.max(1, Number(M.jumlahPertemuan || 1) || 1));
           const timeoutMs = Math.min(600000, 150000 + pertemuan * 60000);
           const timer = setTimeout(()=>ctrl.abort(), timeoutMs);
           const postBody = (maxTokens) => JSON.stringify({ type:"modul_ajar", messages:[{role:"system",content:sys},{role:"user",content:usr}], model:OPENAI_MODEL, max_tokens: maxTokens });

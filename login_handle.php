@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once __DIR__ . '/auth_lock.php';
 require __DIR__ . '/db.php';
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   header('Location: login.php');
@@ -76,6 +77,20 @@ if ($stmt) {
   $stmt->execute();
   $stmt->bind_result($id, $dbUsername, $hash, $role, $accessQuiz, $accessRekap);
   if ($stmt->fetch() && password_verify($p, $hash)) {
+    session_regenerate_id(true);
+    $sid = session_id();
+    $isAdminLogin = (string)$role === 'admin';
+    if ($isAdminLogin) {
+      auth_lock_release((int)$id, null);
+    } else {
+      if (auth_lock_busy((int)$id, $sid)) {
+        $_SESSION = [];
+        session_destroy();
+        header('Location: login.php?e=busy');
+        exit;
+      }
+      auth_lock_acquire((int)$id, $sid);
+    }
     $_SESSION['user_id'] = $id;
     $_SESSION['username'] = $dbUsername ?: ($isEmail ? $uEmail : $u);
     $_SESSION['role'] = $role ?: 'user';
@@ -92,6 +107,20 @@ if ($stmt) {
   $stmt2->execute();
   $stmt2->bind_result($id2, $dbUsername2, $hash2, $role2);
   if ($stmt2->fetch() && password_verify($p, $hash2)) {
+    session_regenerate_id(true);
+    $sid = session_id();
+    $isAdminLogin2 = (string)$role2 === 'admin';
+    if ($isAdminLogin2) {
+      auth_lock_release((int)$id2, null);
+    } else {
+      if (auth_lock_busy((int)$id2, $sid)) {
+        $_SESSION = [];
+        session_destroy();
+        header('Location: login.php?e=busy');
+        exit;
+      }
+      auth_lock_acquire((int)$id2, $sid);
+    }
     $_SESSION['user_id'] = $id2;
     $_SESSION['username'] = $dbUsername2 ?: ($isEmail ? $uEmail : $u);
     $_SESSION['role'] = $role2 ?: 'user';
