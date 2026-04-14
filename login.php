@@ -24,7 +24,7 @@ $err = $e === 'busy' ? 'Akun sedang digunakan di perangkat lain. Silakan logout 
       <div class="text-2xl font-extrabold"><span class="text-sky-600">Guru</span>Pintar</div>
       <div class="text-xs text-slate-500">Sahabat Pendidik Indonesia</div>
     </div>
-    <div class="mb-4 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded p-3">
+    <div class="mb-4 text-xs font-semibold text-amber-900 bg-amber-50 border-2 border-amber-300 rounded-lg p-3 text-center shadow-sm">
       Satu akun hanya boleh digunakan di 1 perangkat dan oleh 1 guru terdaftar!
     </div>
     <?php if ($err): ?>
