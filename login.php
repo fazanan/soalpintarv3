@@ -24,6 +24,9 @@ $err = $e === 'busy' ? 'Akun sedang digunakan di perangkat lain. Silakan logout 
       <div class="text-2xl font-extrabold"><span class="text-sky-600">Guru</span>Pintar</div>
       <div class="text-xs text-slate-500">Sahabat Pendidik Indonesia</div>
     </div>
+    <div class="mb-4 text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded p-3">
+      Satu akun hanya boleh digunakan di 1 perangkat dan oleh 1 guru terdaftar!
+    </div>
     <?php if ($err): ?>
       <div class="mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded p-3"><?=$err?></div>
     <?php endif; ?>
@@ -38,6 +41,11 @@ $err = $e === 'busy' ? 'Akun sedang digunakan di perangkat lain. Silakan logout 
       </div>
       <button class="w-full bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg py-2">Masuk</button>
     </form>
+    <div class="mt-5 text-xs text-slate-600 text-center">
+      Ingin bantu guru lain menggunakan aplikasi ini?<br>
+      Klik link berikut:
+      <a class="text-sky-700 underline font-semibold" href="https://aplikasigurupintar.my.id/affiliate" target="_blank" rel="noopener">Saya Mau Dapatkan Komisinya.</a>
+    </div>
   </div>
 </body>
 </html>
