@@ -10,7 +10,7 @@ function auth_lock_path(int $userId): string {
 }
 
 function auth_lock_ttl_seconds(): int {
-  return 8 * 3600;
+  return 15 * 60;
 }
 
 function auth_lock_ensure_dir(): void {
@@ -64,4 +64,3 @@ function auth_lock_release(int $userId, ?string $sessionId = null): void {
   }
   @unlink($path);
 }
-

@@ -65,6 +65,21 @@ session_write_close();
         },
       };
     </script>
+    <script>
+      (function () {
+        const ping = async () => {
+          try {
+            const res = await fetch("api/openai_proxy.php?ping=1", { credentials: "same-origin" });
+            if (res.status === 401) window.location.href = "login.php?e=busy";
+          } catch (e) {}
+        };
+        ping();
+        setInterval(ping, 120000);
+        document.addEventListener("visibilitychange", () => {
+          if (!document.hidden) ping();
+        });
+      })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>

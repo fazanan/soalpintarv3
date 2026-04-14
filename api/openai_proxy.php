@@ -19,6 +19,12 @@ if ($user_id > 0 && $sid && (string)($_SESSION['role'] ?? '') !== 'admin') {
 }
 session_write_close();
 
+if (isset($_GET['ping'])) {
+  header('Content-Type: application/json; charset=utf-8');
+  echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../db.php';
 

@@ -5,6 +5,7 @@ if (!isset($_SESSION['user_id']) || ($_SESSION['role'] ?? 'user') !== 'admin') {
   exit;
 }
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/auth_lock.php';
 
 $message = '';
 $error = '';
@@ -158,6 +159,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($stmt->execute()) $message = 'Pengguna dihapus.';
       else $error = 'Gagal menghapus pengguna.';
       $stmt->close();
+    }
+  }
+  if ($action === 'force_logout') {
+    $id = (int)post('id', '0');
+    if ($id <= 0) {
+      $error = 'ID pengguna tidak valid.';
+    } else {
+      auth_lock_release($id, null);
+      $message = 'Pengguna berhasil dipaksa logout.';
     }
   }
 }
@@ -342,6 +352,11 @@ if ($stmt) {
                     <button type="button" class="btn-row-edit inline-flex items-center justify-center w-9 h-9 rounded border bg-white hover:bg-gray-50" title="Edit batas" aria-label="Edit batas" data-id="<?php echo (int)$u['id']; ?>">✏️</button>
                     <button type="button" class="btn-row-role inline-flex items-center justify-center w-9 h-9 rounded border bg-white hover:bg-gray-50" title="Set role" aria-label="Set role" data-id="<?php echo (int)$u['id']; ?>">👤</button>
                     <button type="button" class="btn-row-resetpwd inline-flex items-center justify-center w-9 h-9 rounded border bg-white hover:bg-gray-50" title="Reset password" aria-label="Reset password" data-id="<?php echo (int)$u['id']; ?>">🔑</button>
+                    <form method="post" class="inline-block" onsubmit="return confirm('Paksa logout pengguna ini?')">
+                      <input type="hidden" name="action" value="force_logout">
+                      <input type="hidden" name="id" value="<?php echo (int)$u['id']; ?>">
+                      <button class="inline-flex items-center justify-center w-9 h-9 rounded border border-amber-300 text-amber-700 bg-white hover:bg-amber-50" title="Force logout" aria-label="Force logout">🚪</button>
+                    </form>
                     <?php if ($u['id'] != ($_SESSION['user_id'] ?? 0)): ?>
                       <form method="post" class="inline-block" onsubmit="return confirm('Hapus pengguna ini?')">
                         <input type="hidden" name="action" value="delete_user">
