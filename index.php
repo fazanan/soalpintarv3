@@ -5,15 +5,184 @@ if (!isset($_SESSION['user_id'])) {
   exit;
 }
 require_once __DIR__ . '/auth_lock.php';
+require_once __DIR__ . '/db.php';
 $__uid = (int)($_SESSION['user_id'] ?? 0);
 $__sid = session_id();
-if ($__uid > 0 && $__sid && (string)($_SESSION['role'] ?? '') !== 'admin') {
+$__role = (string)($_SESSION['role'] ?? 'user');
+
+function stmt_bind_params(mysqli_stmt $stmt, string $types, array $values): void {
+  $bind = [];
+  $bind[] = $types;
+  foreach ($values as $i => $v) {
+    $bind[] = &$values[$i];
+  }
+  call_user_func_array([$stmt, 'bind_param'], $bind);
+}
+
+function normalize_nama(string $s): string {
+  $s = trim((string)preg_replace('/\s+/', ' ', $s));
+  if ($s === '') return '';
+  if (function_exists('mb_strtolower') && function_exists('mb_convert_case')) {
+    $s = mb_strtolower($s, 'UTF-8');
+    return mb_convert_case($s, MB_CASE_TITLE, 'UTF-8');
+  }
+  return ucwords(strtolower($s));
+}
+
+if ($__uid > 0 && $__sid && $__role !== 'admin') {
   if (!auth_lock_touch($__uid, $__sid)) {
     $_SESSION = [];
     session_destroy();
     header('Location: login.php?e=busy');
     exit;
   }
+}
+
+if (isset($_GET['ajax']) && (string)$_GET['ajax'] === 'profile_update') {
+  header('Content-Type: application/json; charset=utf-8');
+  if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['ok' => false, 'message' => 'Method not allowed'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $nama = normalize_nama(isset($_POST['nama']) ? trim((string)$_POST['nama']) : '');
+  $jenjang = isset($_POST['jenjang']) ? trim((string)$_POST['jenjang']) : '';
+  $namaSekolah = isset($_POST['nama_sekolah']) ? trim((string)$_POST['nama_sekolah']) : '';
+  $noHp = isset($_POST['no_hp']) ? trim((string)$_POST['no_hp']) : '';
+  $noHp = trim((string)preg_replace('/[^0-9+()\\-\\s]/', '', $noHp));
+
+  if ($nama === '' || $jenjang === '' || $namaSekolah === '' || $noHp === '') {
+    http_response_code(422);
+    echo json_encode(['ok' => false, 'message' => 'Mohon lengkapi Nama, Jenjang, Nama Sekolah, dan No HP.'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  if (strlen($nama) > 120 || strlen($jenjang) > 20 || strlen($namaSekolah) > 160 || strlen($noHp) > 32) {
+    http_response_code(422);
+    echo json_encode(['ok' => false, 'message' => 'Data terlalu panjang.'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $hasNamaCol = false;
+  $hasJenjangCol = false;
+  $hasNamaSekolahCol = false;
+  $hasNoHpCol = false;
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'nama'")) { $hasNamaCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'jenjang'")) { $hasJenjangCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'nama_sekolah'")) { $hasNamaSekolahCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'no_hp'")) { $hasNoHpCol = $rs->num_rows > 0; $rs->close(); }
+
+  if (!$hasNoHpCol) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'message' => 'Penyimpanan No HP belum aktif di server. Silakan hubungi admin.'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+
+  $digits = preg_replace('/\\D+/', '', $noHp);
+  $candPhones = [];
+  if ($digits !== '') {
+    if (substr($digits, 0, 1) === '0') {
+      $candPhones[] = $digits;
+      $candPhones[] = '62' . substr($digits, 1);
+    } elseif (substr($digits, 0, 2) === '62') {
+      $candPhones[] = $digits;
+      $candPhones[] = '0' . substr($digits, 2);
+    } elseif (substr($digits, 0, 1) === '8') {
+      $candPhones[] = '0' . $digits;
+      $candPhones[] = '62' . $digits;
+      $candPhones[] = $digits;
+    } else {
+      $candPhones[] = $digits;
+    }
+    $candPhones = array_values(array_unique(array_filter($candPhones, function ($x) { return $x !== ''; })));
+    $candPhones = array_slice($candPhones, 0, 4);
+  }
+  if (count($candPhones) > 0) {
+    $phoneExpr = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(no_hp,' ',''),'-',''),'(',''),')',''),'+','')";
+    $ph = implode(',', array_fill(0, count($candPhones), '?'));
+    $check = $mysqli->prepare("SELECT id FROM users WHERE id<>? AND ($phoneExpr IN ($ph)) LIMIT 1");
+    $typesC = 'i' . str_repeat('s', count($candPhones));
+    $valsC = array_merge([$__uid], $candPhones);
+    stmt_bind_params($check, $typesC, $valsC);
+    $check->execute();
+    $check->store_result();
+    if ($check->num_rows > 0) {
+      http_response_code(409);
+      echo json_encode(['ok' => false, 'message' => 'Nomor HP tersebut sudah terdaftar pada akun lain. Silakan gunakan nomor yang berbeda atau hubungi admin jika ini nomor Bapak/Ibu.'], JSON_UNESCAPED_UNICODE);
+      $check->close();
+      exit;
+    }
+    $check->close();
+  }
+
+  $sets = [];
+  $types = '';
+  $values = [];
+  if ($hasNamaCol) { $sets[] = 'nama=?'; $types .= 's'; $values[] = $nama; }
+  if ($hasJenjangCol) { $sets[] = 'jenjang=?'; $types .= 's'; $values[] = $jenjang; }
+  if ($hasNamaSekolahCol) { $sets[] = 'nama_sekolah=?'; $types .= 's'; $values[] = $namaSekolah; }
+  $sets[] = 'no_hp=?'; $types .= 's'; $values[] = $noHp;
+  if (!$sets) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'message' => 'Kolom profil belum tersedia di database.'], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+  $values[] = $__uid; $types .= 'i';
+
+  $sql = "UPDATE users SET " . implode(',', $sets) . " WHERE id=?";
+  $stmt = $mysqli->prepare($sql);
+  stmt_bind_params($stmt, $types, $values);
+  if (!$stmt->execute()) {
+    http_response_code(500);
+    echo json_encode(['ok' => false, 'message' => 'Gagal menyimpan profil.'], JSON_UNESCAPED_UNICODE);
+    $stmt->close();
+    exit;
+  }
+  $stmt->close();
+
+  $_SESSION['nama'] = $nama;
+  $_SESSION['jenjang'] = $jenjang;
+  $_SESSION['nama_sekolah'] = $namaSekolah;
+  $_SESSION['no_hp'] = $noHp;
+  session_write_close();
+  echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+  exit;
+}
+
+$__userProfile = [
+  'nama' => (string)($_SESSION['nama'] ?? ''),
+  'jenjang' => (string)($_SESSION['jenjang'] ?? ''),
+  'nama_sekolah' => (string)($_SESSION['nama_sekolah'] ?? ''),
+  'no_hp' => (string)($_SESSION['no_hp'] ?? ''),
+];
+if ($__uid > 0) {
+  $hasNamaCol = false;
+  $hasJenjangCol = false;
+  $hasNamaSekolahCol = false;
+  $hasNoHpCol = false;
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'nama'")) { $hasNamaCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'jenjang'")) { $hasJenjangCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'nama_sekolah'")) { $hasNamaSekolahCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'no_hp'")) { $hasNoHpCol = $rs->num_rows > 0; $rs->close(); }
+  $selNama = $hasNamaCol ? 'nama' : "''";
+  $selJenjang = $hasJenjangCol ? 'jenjang' : "''";
+  $selSekolah = $hasNamaSekolahCol ? 'nama_sekolah' : "''";
+  $selNoHp = $hasNoHpCol ? 'no_hp' : "''";
+  $stmt = $mysqli->prepare("SELECT ($selNama) AS nama, ($selJenjang) AS jenjang, ($selSekolah) AS nama_sekolah, ($selNoHp) AS no_hp FROM users WHERE id=? LIMIT 1");
+  $stmt->bind_param('i', $__uid);
+  if ($stmt->execute()) {
+    $namaDb = '';
+    $jenjangDb = '';
+    $sekolahDb = '';
+    $noHpDb = '';
+    $stmt->bind_result($namaDb, $jenjangDb, $sekolahDb, $noHpDb);
+    if ($stmt->fetch()) {
+      if (trim((string)$namaDb) !== '') $__userProfile['nama'] = (string)$namaDb;
+      if (trim((string)$jenjangDb) !== '') $__userProfile['jenjang'] = (string)$jenjangDb;
+      if (trim((string)$sekolahDb) !== '') $__userProfile['nama_sekolah'] = (string)$sekolahDb;
+      if (trim((string)$noHpDb) !== '') $__userProfile['no_hp'] = (string)$noHpDb;
+    }
+  }
+  $stmt->close();
 }
 session_write_close();
 ?>
@@ -312,6 +481,54 @@ session_write_close();
     </div>
     
 
+    <div id="profileRequiredModal" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/40 p-4">
+      <div class="w-full max-w-lg bg-white dark:bg-surface-dark rounded-2xl border border-border-light dark:border-border-dark shadow-paper overflow-hidden">
+        <div class="p-5 border-b border-border-light dark:border-border-dark">
+          <div class="font-bold text-lg">Lengkapi Profil</div>
+          <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">
+            Lengkapi sekali saja agar penggunaan aplikasi lebih cepat dan nyaman.
+          </div>
+        </div>
+        <div class="p-5 space-y-4">
+          <div class="rounded-lg border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-900/20 p-4 text-sm text-blue-900 dark:text-blue-200">
+            Dengan melengkapi data ini, aplikasi bisa mengisi otomatis Nama Guru, Nama Sekolah, dan Jenjang pada dokumen (Modul Ajar/RPP/dll) sehingga Bapak/Ibu tidak perlu mengetik berulang-ulang.
+          </div>
+          <div id="profileRequiredError" class="hidden rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"></div>
+          <form id="profileRequiredForm" class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold mb-1">Nama</label>
+              <input id="profileNama" name="nama" type="text" class="w-full rounded-lg border h-11 px-3" placeholder="Nama lengkap" required>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-1">Jenjang</label>
+              <select id="profileJenjang" name="jenjang" class="w-full rounded-lg border h-11 px-3" required>
+                <option value="">- Pilih Jenjang -</option>
+                <option value="PAUD">PAUD</option>
+                <option value="TK">TK</option>
+                <option value="SD/MI">SD/MI</option>
+                <option value="SMP/MTs">SMP/MTs</option>
+                <option value="SMA/MA">SMA/MA</option>
+                <option value="SMK/MAK">SMK/MAK</option>
+                <option value="Kesetaraan">Kesetaraan</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-1">Nama Sekolah</label>
+              <input id="profileSekolah" name="nama_sekolah" type="text" class="w-full rounded-lg border h-11 px-3" placeholder="Nama sekolah" required>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold mb-1">No HP</label>
+              <input id="profileNoHp" name="no_hp" type="text" class="w-full rounded-lg border h-11 px-3" placeholder="Contoh: 08xxxx / 62xxxx" required>
+              <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-1">Data ini membantu validasi akun dan layanan bantuan jika diperlukan.</div>
+            </div>
+            <div class="flex items-center justify-end pt-2">
+              <button id="profileSaveBtn" class="inline-flex items-center justify-center h-11 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold shadow-sm transition-colors">Simpan & Lanjutkan</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
     <input id="filePicker" type="file" accept="image/*" class="hidden" />
     <input id="logoPicker" type="file" accept="image/*" class="hidden" />
     <input id="projectPicker" type="file" accept=".json" class="hidden" />
@@ -337,6 +554,8 @@ session_write_close();
       const HAS_BUAT_SOAL_ACCESS = IS_ADMIN || ACCESS_BUAT_SOAL;
       const HAS_MODUL_AJAR_ACCESS = IS_ADMIN || ACCESS_MODUL_AJAR;
       const HAS_RPP_ACCESS = IS_ADMIN || ACCESS_RPP;
+      const USER_PROFILE = <?php echo json_encode($__userProfile, JSON_UNESCAPED_UNICODE); ?>;
+      const LOGIN_NAME = <?php echo json_encode(trim((string)(($_SESSION['nama'] ?? '') !== '' ? $_SESSION['nama'] : ($_SESSION['username'] ?? ''))), JSON_UNESCAPED_UNICODE); ?>;
 
       const APP_KEY = "soalpintar:v1";
       const OPENAI_TIMEOUT_MS = 55000;
@@ -6903,7 +7122,16 @@ ${baselineModulAjar}
         `).join('');
 
         const extraNav =
-          `<div class="h-px bg-border-light dark:bg-border-dark my-2"></div>
+          `<div class="px-3 py-2 rounded-lg border border-border-light dark:border-border-dark bg-white/60 dark:bg-surface-dark/40">
+             <div class="flex items-center gap-2">
+               <span class="material-symbols-outlined text-[18px] text-text-sub-light dark:text-text-sub-dark">account_circle</span>
+               <div class="min-w-0">
+                 <div class="text-[11px] uppercase tracking-wide text-text-sub-light dark:text-text-sub-dark">Masuk sebagai</div>
+                 <div class="text-sm font-semibold truncate">${safeText(String((USER_PROFILE && USER_PROFILE.nama) ? USER_PROFILE.nama : (LOGIN_NAME || '')) || '')}</div>
+               </div>
+             </div>
+           </div>
+           <div class="h-px bg-border-light dark:bg-border-dark my-2"></div>
            ${baseBtn('dark_mode','Tema','', 'id="btnTheme" onclick="toggleTheme()"')}
            ${baseLink('profile.php','account_circle','Profil')}
            ${IS_ADMIN ? `
@@ -11529,14 +11757,108 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         }
         renderQuizContent();
       });
+      const applyUserProfileDefaults = () => {
+        const p = USER_PROFILE || {};
+        const nama = String(p.nama || "").trim();
+        const jenjang = String(p.jenjang || "").trim();
+        const sekolah = String(p.nama_sekolah || "").trim();
+        if (nama) {
+          try { if (state.modulAjar && !String(state.modulAjar.namaGuru || "").trim()) state.modulAjar.namaGuru = nama; } catch {}
+          try { if (state.rpp && !String(state.rpp.nama_guru || "").trim()) state.rpp.nama_guru = nama; } catch {}
+          try { if (state.identity && !String(state.identity.namaGuru || "").trim()) state.identity.namaGuru = nama; } catch {}
+        }
+        if (sekolah) {
+          try { if (state.modulAjar && !String(state.modulAjar.institusi || "").trim()) state.modulAjar.institusi = sekolah; } catch {}
+          try { if (state.rpp && !String(state.rpp.nama_sekolah || "").trim()) state.rpp.nama_sekolah = sekolah; } catch {}
+          try { if (state.identity && !String(state.identity.namaSekolah || "").trim()) state.identity.namaSekolah = sekolah; } catch {}
+        }
+        if (jenjang) {
+          try { if (state.modulAjar && !String(state.modulAjar.jenjang || "").trim()) state.modulAjar.jenjang = jenjang; } catch {}
+          try { if (state.rpp && !String(state.rpp.jenjang || "").trim()) state.rpp.jenjang = jenjang; } catch {}
+          try { if (state.identity && !String(state.identity.jenjang || "").trim()) state.identity.jenjang = jenjang; } catch {}
+        }
+      };
+      const ensureProfileComplete = () => {
+        const p = USER_PROFILE || {};
+        const nama = String(p.nama || "").trim();
+        const jenjang = String(p.jenjang || "").trim();
+        const sekolah = String(p.nama_sekolah || "").trim();
+        const noHp = String(p.no_hp || "").trim();
+        if (nama && jenjang && sekolah && noHp) return true;
+        const modal = el("profileRequiredModal");
+        const form = el("profileRequiredForm");
+        const err = el("profileRequiredError");
+        const inputNama = el("profileNama");
+        const inputJenjang = el("profileJenjang");
+        const inputSekolah = el("profileSekolah");
+        const inputNoHp = el("profileNoHp");
+        const btn = el("profileSaveBtn");
+        if (!modal || !form || !inputNama || !inputJenjang || !inputSekolah || !inputNoHp || !btn) return false;
+        inputNama.value = nama;
+        inputJenjang.value = jenjang;
+        inputSekolah.value = sekolah;
+        inputNoHp.value = noHp;
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+        try { document.body.style.overflow = "hidden"; } catch {}
+        if (err) { err.classList.add("hidden"); err.textContent = ""; }
+        setTimeout(() => {
+          if (!inputNama.value.trim()) inputNama.focus();
+          else if (!inputJenjang.value.trim()) inputJenjang.focus();
+          else if (!inputSekolah.value.trim()) inputSekolah.focus();
+          else inputNoHp.focus();
+        }, 0);
+        if (!form.__bound) {
+          form.__bound = true;
+          document.addEventListener("keydown", (e) => {
+            if (!modal.classList.contains("hidden") && e.key === "Escape") { e.preventDefault(); e.stopPropagation(); }
+          }, true);
+          form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const vNama = String(inputNama.value || "").trim();
+            const vJenjang = String(inputJenjang.value || "").trim();
+            const vSekolah = String(inputSekolah.value || "").trim();
+            const vNoHp = String(inputNoHp.value || "").trim();
+            if (!vNama || !vJenjang || !vSekolah || !vNoHp) {
+              if (err) { err.textContent = "Mohon lengkapi semua data agar fitur bisa terisi otomatis."; err.classList.remove("hidden"); }
+              return;
+            }
+            btn.disabled = true;
+            btn.classList.add("opacity-70");
+            try {
+              const fd = new FormData();
+              fd.append("nama", vNama);
+              fd.append("jenjang", vJenjang);
+              fd.append("nama_sekolah", vSekolah);
+              fd.append("no_hp", vNoHp);
+              const res = await fetch("index.php?ajax=profile_update", { method: "POST", credentials: "same-origin", body: fd });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok || !data || data.ok !== true) {
+                const msg = (data && data.message) ? String(data.message) : "Gagal menyimpan profil.";
+                if (err) { err.textContent = msg; err.classList.remove("hidden"); }
+                btn.disabled = false;
+                btn.classList.remove("opacity-70");
+                return;
+              }
+              window.location.reload();
+            } catch (ex) {
+              if (err) { err.textContent = "Gagal menyimpan profil. Coba lagi ya."; err.classList.remove("hidden"); }
+              btn.disabled = false;
+              btn.classList.remove("opacity-70");
+            }
+          });
+        }
+        return false;
+      };
       if (load()) {
         applyTheme();
       } else {
         applyTheme();
         autoFillPaket();
       }
+      applyUserProfileDefaults();
       render();
-      ensureUsagePolicyAck();
+      if (ensureProfileComplete()) ensureUsagePolicyAck();
     </script>
   </body>
 </html>

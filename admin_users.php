@@ -16,6 +16,9 @@ $hasAccessRekapCol = false;
 $hasAccessBuatSoalCol = false;
 $hasAccessModulAjarCol = false;
 $hasAccessRppCol = false;
+$hasNamaCol = false;
+$hasJenjangCol = false;
+$hasNamaSekolahCol = false;
 try {
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_quiz'")) { $hasAccessQuizCol = $rs->num_rows > 0; $rs->close(); }
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_rekap_nilai'")) { $hasAccessRekapCol = $rs->num_rows > 0; $rs->close(); }
@@ -24,6 +27,9 @@ try {
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_rpp'")) { $hasAccessRppCol = $rs->num_rows > 0; $rs->close(); }
   $hasAccessCols = $hasAccessQuizCol || $hasAccessRekapCol || $hasAccessBuatSoalCol || $hasAccessModulAjarCol || $hasAccessRppCol;
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'no_hp'")) { $hasNoHpCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'nama'")) { $hasNamaCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'jenjang'")) { $hasJenjangCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'nama_sekolah'")) { $hasNamaSekolahCol = $rs->num_rows > 0; $rs->close(); }
 } catch (mysqli_sql_exception $e) {
   $hasAccessCols = false;
   $hasNoHpCol = false;
@@ -32,6 +38,9 @@ try {
   $hasAccessBuatSoalCol = false;
   $hasAccessModulAjarCol = false;
   $hasAccessRppCol = false;
+  $hasNamaCol = false;
+  $hasJenjangCol = false;
+  $hasNamaSekolahCol = false;
 }
 
 function post($k, $default = '') {
@@ -47,10 +56,23 @@ function stmt_bind_params(mysqli_stmt $stmt, string $types, array $values): void
   call_user_func_array([$stmt, 'bind_param'], $bind);
 }
 
+function normalize_nama(string $s): string {
+  $s = trim((string)preg_replace('/\s+/', ' ', $s));
+  if ($s === '') return '';
+  if (function_exists('mb_strtolower') && function_exists('mb_convert_case')) {
+    $s = mb_strtolower($s, 'UTF-8');
+    return mb_convert_case($s, MB_CASE_TITLE, 'UTF-8');
+  }
+  return ucwords(strtolower($s));
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = post('action');
   if ($action === 'create_user') {
     $username = post('username', '');
+    $nama = normalize_nama(post('nama', ''));
+    $jenjang = post('jenjang', '');
+    $namaSekolah = post('nama_sekolah', '');
     $noHp = post('no_hp', '');
     $noHp = trim((string)preg_replace('/[^0-9+()\\-\\s]/', '', $noHp));
     $password = post('password', '');
@@ -68,6 +90,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($username === '' || $password === '') {
       $error = 'Username dan password wajib diisi.';
+    } elseif (strlen($nama) > 120) {
+      $error = 'Nama terlalu panjang.';
+    } elseif (strlen($jenjang) > 20) {
+      $error = 'Jenjang terlalu panjang.';
+    } elseif (strlen($namaSekolah) > 160) {
+      $error = 'Nama sekolah terlalu panjang.';
     } elseif (strlen($noHp) > 32) {
       $error = 'No HP terlalu panjang.';
     } elseif (strlen($username) > 100) {
@@ -79,6 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cols = ['username'];
         $types = 's';
         $values = [$username];
+        if ($hasNamaCol) { $cols[] = 'nama'; $types .= 's'; $values[] = $nama; }
+        if ($hasJenjangCol) { $cols[] = 'jenjang'; $types .= 's'; $values[] = $jenjang; }
+        if ($hasNamaSekolahCol) { $cols[] = 'nama_sekolah'; $types .= 's'; $values[] = $namaSekolah; }
         if ($hasNoHpCol) { $cols[] = 'no_hp'; $types .= 's'; $values[] = $noHp; }
         $cols[] = 'password'; $types .= 's'; $values[] = $hash;
         $cols[] = 'role'; $types .= 's'; $values[] = $role;
@@ -120,6 +151,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
   if ($action === 'update_limits') {
     $id = (int)post('id', '0');
+    $nama = normalize_nama(post('nama', ''));
+    $jenjang = post('jenjang', '');
+    $namaSekolah = post('nama_sekolah', '');
     $noHp = post('no_hp', '');
     $noHp = trim((string)preg_replace('/[^0-9+()\\-\\s]/', '', $noHp));
     $lp = (int)max(0, (int)post('limitpaket', '0'));
@@ -129,7 +163,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accessBuatSoal = isset($_POST['access_buat_soal']) ? 1 : 0;
     $accessModulAjar = isset($_POST['access_modul_ajar']) ? 1 : 0;
     $accessRpp = isset($_POST['access_rpp']) ? 1 : 0;
-    if (strlen($noHp) > 32) {
+    if (strlen($nama) > 120) {
+      $error = 'Nama terlalu panjang.';
+    } elseif (strlen($jenjang) > 20) {
+      $error = 'Jenjang terlalu panjang.';
+    } elseif (strlen($namaSekolah) > 160) {
+      $error = 'Nama sekolah terlalu panjang.';
+    } elseif (strlen($noHp) > 32) {
       $error = 'No HP terlalu panjang.';
     } else {
     $stmt = null;
@@ -137,6 +177,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $sets = [];
       $types = '';
       $values = [];
+      if ($hasNamaCol) { $sets[] = 'nama=?'; $types .= 's'; $values[] = $nama; }
+      if ($hasJenjangCol) { $sets[] = 'jenjang=?'; $types .= 's'; $values[] = $jenjang; }
+      if ($hasNamaSekolahCol) { $sets[] = 'nama_sekolah=?'; $types .= 's'; $values[] = $namaSekolah; }
       if ($hasNoHpCol) { $sets[] = 'no_hp=?'; $types .= 's'; $values[] = $noHp; }
       $sets[] = 'limitpaket=?'; $types .= 'i'; $values[] = $lp;
       $sets[] = 'limitgambar=?'; $types .= 'i'; $values[] = $lg;
@@ -246,12 +289,15 @@ $offset = ($page - 1) * $perPage;
 $stmt = null;
 try {
   $selNoHp = $hasNoHpCol ? 'no_hp' : "''";
+  $selNama = $hasNamaCol ? 'nama' : "''";
+  $selJenjang = $hasJenjangCol ? 'jenjang' : "''";
+  $selNamaSekolah = $hasNamaSekolahCol ? 'nama_sekolah' : "''";
   $selAQ = $hasAccessQuizCol ? 'access_quiz' : '1';
   $selAR = $hasAccessRekapCol ? 'access_rekap_nilai' : '1';
   $selABS = $hasAccessBuatSoalCol ? 'access_buat_soal' : '1';
   $selAMA = $hasAccessModulAjarCol ? 'access_modul_ajar' : '1';
   $selARPP = $hasAccessRppCol ? 'access_rpp' : '1';
-  $baseSelect = "SELECT id, username, ($selNoHp) AS no_hp, role, ($selAQ) AS access_quiz, ($selAR) AS access_rekap_nilai, ($selABS) AS access_buat_soal, ($selAMA) AS access_modul_ajar, ($selARPP) AS access_rpp, limitpaket, limitgambar, created_at FROM users";
+  $baseSelect = "SELECT id, username, ($selNama) AS nama, ($selJenjang) AS jenjang, ($selNamaSekolah) AS nama_sekolah, ($selNoHp) AS no_hp, role, ($selAQ) AS access_quiz, ($selAR) AS access_rekap_nilai, ($selABS) AS access_buat_soal, ($selAMA) AS access_modul_ajar, ($selARPP) AS access_rpp, limitpaket, limitgambar, created_at FROM users";
   if ($q !== '') {
     $like = '%' . $q . '%';
     if (ctype_digit($q)) {
@@ -329,6 +375,9 @@ if ($stmt) {
             <tr>
               <th class="border px-3 py-2 text-left">ID</th>
               <th class="border px-3 py-2 text-left">Username</th>
+              <th class="border px-3 py-2 text-left">Nama</th>
+              <th class="border px-3 py-2 text-left">Jenjang</th>
+              <th class="border px-3 py-2 text-left">Nama Sekolah</th>
               <th class="border px-3 py-2 text-left">No HP</th>
               <th class="border px-3 py-2 text-left">Role</th>
               <th class="border px-3 py-2 text-left">Akses Buat Soal</th>
@@ -344,9 +393,12 @@ if ($stmt) {
           </thead>
           <tbody>
             <?php foreach ($users as $u): ?>
-              <tr data-row="<?php echo (int)$u['id']; ?>" data-u="<?php echo htmlspecialchars($u['username']); ?>" data-hp="<?php echo htmlspecialchars($u['no_hp'] ?? ''); ?>" data-lp="<?php echo (int)($u['limitpaket'] ?? 0); ?>" data-lg="<?php echo (int)($u['limitgambar'] ?? 0); ?>" data-abs="<?php echo (int)($u['access_buat_soal'] ?? 1); ?>" data-ama="<?php echo (int)($u['access_modul_ajar'] ?? 1); ?>" data-arpp="<?php echo (int)($u['access_rpp'] ?? 1); ?>" data-aq="<?php echo (int)($u['access_quiz'] ?? 1); ?>" data-ar="<?php echo (int)($u['access_rekap_nilai'] ?? 1); ?>">
+              <tr data-row="<?php echo (int)$u['id']; ?>" data-u="<?php echo htmlspecialchars($u['username']); ?>" data-nama="<?php echo htmlspecialchars($u['nama'] ?? ''); ?>" data-jenjang="<?php echo htmlspecialchars($u['jenjang'] ?? ''); ?>" data-sekolah="<?php echo htmlspecialchars($u['nama_sekolah'] ?? ''); ?>" data-hp="<?php echo htmlspecialchars($u['no_hp'] ?? ''); ?>" data-role="<?php echo htmlspecialchars($u['role'] ?: 'user'); ?>" data-lp="<?php echo (int)($u['limitpaket'] ?? 0); ?>" data-lg="<?php echo (int)($u['limitgambar'] ?? 0); ?>" data-abs="<?php echo (int)($u['access_buat_soal'] ?? 1); ?>" data-ama="<?php echo (int)($u['access_modul_ajar'] ?? 1); ?>" data-arpp="<?php echo (int)($u['access_rpp'] ?? 1); ?>" data-aq="<?php echo (int)($u['access_quiz'] ?? 1); ?>" data-ar="<?php echo (int)($u['access_rekap_nilai'] ?? 1); ?>">
                 <td class="border px-3 py-2"><?php echo (int)$u['id']; ?></td>
                 <td class="border px-3 py-2"><?php echo htmlspecialchars($u['username']); ?></td>
+                <td class="border px-3 py-2"><?php echo htmlspecialchars($u['nama'] ?? ''); ?></td>
+                <td class="border px-3 py-2"><?php echo htmlspecialchars($u['jenjang'] ?? ''); ?></td>
+                <td class="border px-3 py-2"><?php echo htmlspecialchars($u['nama_sekolah'] ?? ''); ?></td>
                 <td class="border px-3 py-2"><?php echo htmlspecialchars($u['no_hp'] ?? ''); ?></td>
                 <td class="border px-3 py-2"><?php echo htmlspecialchars($u['role'] ?: 'user'); ?></td>
                 <td class="border px-3 py-2"><?php echo ((int)($u['access_buat_soal'] ?? 1) === 1) ? 'Aktif' : 'Nonaktif'; ?></td>
@@ -383,7 +435,7 @@ if ($stmt) {
               </tr>
             <?php endforeach; ?>
             <?php if (empty($users)): ?>
-              <tr><td colspan="13" class="border px-3 py-6 text-center text-gray-500">Belum ada pengguna.</td></tr>
+              <tr><td colspan="16" class="border px-3 py-6 text-center text-gray-500">Belum ada pengguna.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
@@ -424,6 +476,27 @@ if ($stmt) {
         <div>
           <label class="block text-sm font-medium mb-1">Username</label>
           <input id="modalUsername" type="text" class="w-full rounded border h-10 px-3 bg-gray-50" readonly>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Nama</label>
+          <input id="modalNama" name="nama" type="text" class="w-full rounded border h-10 px-3" placeholder="Nama lengkap">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Jenjang</label>
+          <select id="modalJenjang" name="jenjang" class="w-full rounded border h-10 px-3">
+            <option value="">- Pilih Jenjang -</option>
+            <option value="PAUD">PAUD</option>
+            <option value="TK">TK</option>
+            <option value="SD/MI">SD/MI</option>
+            <option value="SMP/MTs">SMP/MTs</option>
+            <option value="SMA/MA">SMA/MA</option>
+            <option value="SMK/MAK">SMK/MAK</option>
+            <option value="Kesetaraan">Kesetaraan</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Nama Sekolah</label>
+          <input id="modalNamaSekolah" name="nama_sekolah" type="text" class="w-full rounded border h-10 px-3" placeholder="Nama sekolah">
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">No HP</label>
@@ -523,6 +596,27 @@ if ($stmt) {
           <input id="createUsername" name="username" type="text" class="w-full rounded border h-10 px-3" required>
         </div>
         <div>
+          <label class="block text-sm font-medium mb-1">Nama</label>
+          <input id="createNama" name="nama" type="text" class="w-full rounded border h-10 px-3" placeholder="Nama lengkap">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Jenjang</label>
+          <select id="createJenjang" name="jenjang" class="w-full rounded border h-10 px-3">
+            <option value="">- Pilih Jenjang -</option>
+            <option value="PAUD">PAUD</option>
+            <option value="TK">TK</option>
+            <option value="SD/MI">SD/MI</option>
+            <option value="SMP/MTs">SMP/MTs</option>
+            <option value="SMA/MA">SMA/MA</option>
+            <option value="SMK/MAK">SMK/MAK</option>
+            <option value="Kesetaraan">Kesetaraan</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Nama Sekolah</label>
+          <input id="createNamaSekolah" name="nama_sekolah" type="text" class="w-full rounded border h-10 px-3" placeholder="Nama sekolah">
+        </div>
+        <div>
           <label class="block text-sm font-medium mb-1">No HP</label>
           <input id="createNoHp" name="no_hp" type="text" class="w-full rounded border h-10 px-3" placeholder="Contoh: 0812xxxxxxx">
         </div>
@@ -581,6 +675,9 @@ if ($stmt) {
     const form = document.getElementById('modalForm');
     const inputId = document.getElementById('modalUserId');
     const inputUsername = document.getElementById('modalUsername');
+    const inputNama = document.getElementById('modalNama');
+    const inputJenjang = document.getElementById('modalJenjang');
+    const inputSekolah = document.getElementById('modalNamaSekolah');
     const inputNoHp = document.getElementById('modalNoHp');
     const inputLP = document.getElementById('modalLimitPaket');
     const inputLG = document.getElementById('modalLimitGambar');
@@ -604,6 +701,9 @@ if ($stmt) {
     const createForm = document.getElementById('createForm');
     const btnCreateUser = document.getElementById('btnCreateUser');
     const createUsername = document.getElementById('createUsername');
+    const createNama = document.getElementById('createNama');
+    const createJenjang = document.getElementById('createJenjang');
+    const createSekolah = document.getElementById('createNamaSekolah');
     const createNoHp = document.getElementById('createNoHp');
     const createPassword = document.getElementById('createPassword');
     const createRole = document.getElementById('createRole');
@@ -618,6 +718,9 @@ if ($stmt) {
     function openModalFromRow(row) {
       inputId.value = row.getAttribute('data-row');
       inputUsername.value = row.getAttribute('data-u') || '';
+      inputNama.value = row.getAttribute('data-nama') || '';
+      inputJenjang.value = row.getAttribute('data-jenjang') || '';
+      inputSekolah.value = row.getAttribute('data-sekolah') || '';
       inputNoHp.value = row.getAttribute('data-hp') || '';
       inputLP.value = row.getAttribute('data-lp') || '0';
       inputLG.value = row.getAttribute('data-lg') || '0';
@@ -636,7 +739,7 @@ if ($stmt) {
     function openRoleModalFromRow(row) {
       roleUserId.value = row.getAttribute('data-row');
       roleUsername.value = row.getAttribute('data-u') || '';
-      roleSelect.value = (row.querySelector('td:nth-child(4)')?.textContent || 'user').trim() === 'admin' ? 'admin' : 'user';
+      roleSelect.value = (row.getAttribute('data-role') || 'user').trim() === 'admin' ? 'admin' : 'user';
       roleModal.classList.remove('hidden');
       roleModal.classList.add('flex');
     }
@@ -657,6 +760,9 @@ if ($stmt) {
     }
     function openCreateModal() {
       createUsername.value = '';
+      createNama.value = '';
+      createJenjang.value = '';
+      createSekolah.value = '';
       createNoHp.value = '';
       createPassword.value = '';
       createRole.value = 'user';
