@@ -5167,13 +5167,20 @@ session_write_close();
 - Jika pada dokumen baseline masih ada "Unsur KBC", "Implementasi KBC", atau aktivitas KBC di kegiatan pembelajaran/refleksi/asesmen, hapus bagian tersebut sepenuhnya.`
           : ``;
 
+        const noCtlCleanupRule = !isCTL
+          ? `CATATAN PENTING (TANPA CTL):
+- Jangan menyebut istilah CTL atau "Contextual Teaching and Learning" sama sekali.
+- Jika pada dokumen baseline masih ada bagian "Pendekatan CTL", tabel "Komponen CTL", atau tag CTL seperti [Konstruktivisme], [Inkuiri], [Questioning], [Learning Community], [Modeling], [Refleksi], [Penilaian Autentik], hapus bagian tersebut sepenuhnya.`
+          : ``;
+
         const approachRules = isDandK
           ? `ARAH PENDEKATAN (DEEP LEARNING + KBC):
 - Di SETIAP pertemuan wajib ada urutan eksplisit: Eksplorasi → Analisis → Refleksi.
 - Di SETIAP pertemuan wajib ada elemen Mindful, Meaningful, Joyful (tulis eksplisit di kegiatan pembelajaran).
 - Di SETIAP pertemuan sisipkan minimal 1 aktivitas KBC yang konkret dan tertulis jelas (etika komunikasi/empati/gotong royong/kepedulian lingkungan/refleksi syukur/niat belajar).
 - Pertanyaan pemantik: open-ended dan mengandung dimensi nilai tanpa menggurui.
-- Asesmen: rubrik gabungan (kognitif + proses + karakter/KBC), skala 1–4, indikator dapat diamati.`
+- Asesmen: rubrik gabungan (kognitif + proses + karakter/KBC), skala 1–4, indikator dapat diamati.
+${noCtlCleanupRule}`
           : isDLCTL
             ? `ARAH PENDEKATAN (DEEP LEARNING + CTL):
 - Wajib ada konteks nyata/masalah pemantik yang konsisten dari awal hingga penutup.
@@ -5183,20 +5190,23 @@ session_write_close();
 - Kegiatan Inti harus berorientasi penyelidikan: mengamati konteks, merumuskan pertanyaan, mengumpulkan data/percobaan sederhana, menganalisis, menyimpulkan, mengomunikasikan.
 - Asesmen harus autentik (proses + produk/kinerja/portofolio) + rubrik skala 1–4 yang siap dipakai guru.
 - WAJIB ada subbagian "### Pendekatan CTL (Contextual Teaching and Learning)" yang merangkum 7 komponen CTL dan implementasinya pada modul ini.
-${noKbcCleanupRule}`
+${noKbcCleanupRule}
+${noCtlCleanupRule}`
             : isDL
             ? `ARAH PENDEKATAN (DEEP LEARNING):
 - Di SETIAP pertemuan wajib ada urutan eksplisit: Eksplorasi → Analisis → Refleksi.
 - Di SETIAP pertemuan wajib ada elemen Mindful, Meaningful, Joyful (tulis eksplisit di kegiatan pembelajaran).
 - Pertanyaan pemantik: open-ended, menuntut alasan (mengapa/bagaimana) dan konteks nyata.
 - Asesmen: menilai proses berpikir (bukti analisis/justifikasi), rubrik analitis skala 1–4.
-${noKbcCleanupRule}`
+${noKbcCleanupRule}
+${noCtlCleanupRule}`
             : isKBC
               ? `ARAH PENDEKATAN (KBC):
 - Tambahkan "Unsur KBC" dan "Implementasi KBC" secara eksplisit dan kontekstual.
 - Di SETIAP pertemuan sisipkan minimal 1 aktivitas KBC yang konkret dan tertulis jelas.
 - Asesmen: tambah observasi sikap/kolaborasi + refleksi nilai (tetap skala 1–4, indikator dapat diamati).
-- Hindari bahasa menggurui; tetap formal namun hangat.`
+- Hindari bahasa menggurui; tetap formal namun hangat.
+${noCtlCleanupRule}`
               : isCTL
                 ? `ARAH PENDEKATAN (CTL / CONTEXTUAL TEACHING AND LEARNING):
 - Wajib ada konteks nyata/masalah pemantik yang dekat dengan kehidupan peserta didik (rumah/sekolah/lingkungan/sosial/teknologi) dan konsisten dari awal hingga penutup.
@@ -5208,7 +5218,53 @@ ${noKbcCleanupRule}`
               : `ARAH PENDEKATAN (STANDAR):
 - Kegiatan pembelajaran instruksional, terstruktur, dan terukur (contoh → latihan terbimbing → latihan mandiri).
 - Asesmen ringkas namun jelas (diagnostik/formatif/sumatif) dan rubrik skala 1–4 yang mudah dipakai.
-${noKbcCleanupRule}`;
+${noKbcCleanupRule}
+${noCtlCleanupRule}`;
+
+        const modelLabel = String(M.modelPembelajaran || '').trim();
+        const isPjBL = /\bpjbl\b/i.test(modelLabel) || /project\s*based\s*learning/i.test(modelLabel);
+        const isPBL = /\bpbl\b/i.test(modelLabel) || /problem\s*based\s*learning/i.test(modelLabel);
+        const isInquiry = /inquiry\s*learning/i.test(modelLabel) || /inkuiri/i.test(modelLabel);
+        const isDiscovery = /discovery\s*learning/i.test(modelLabel);
+        const isDirect = /direct\s*learning/i.test(modelLabel) || /direct\s*instruction/i.test(modelLabel);
+        const isCoop = /cooperative\s*learning/i.test(modelLabel) || /kooperatif/i.test(modelLabel);
+
+        const modelRules = isPjBL
+          ? `ATURAN MODEL (PjBL / Project Based Learning):
+- Wajib ada subbagian "### Produk Proyek" yang menjelaskan produk/artefak, kriteria keberhasilan, dan standar minimal.
+- Kegiatan Inti per pertemuan wajib mengikuti sintaks PjBL (tulis fase sebagai label di kolom "Komponen" pada tabel), minimal memuat: Pertanyaan Mendasar/Challenge, Perencanaan Proyek, Penyusunan Jadwal, Monitoring Progres, Uji Hasil/Produk, Presentasi/Publikasi, Evaluasi & Refleksi.
+- LKPD wajib berbentuk LKPD Proyek: tujuan proyek, kriteria produk, bahan/alat, langkah kerja, pembagian peran, timeline, logbook, dan format pelaporan.
+- Asesmen sumatif utama adalah produk proyek + presentasi; rubrik wajib memuat aspek produk dan proses proyek (kolaborasi, manajemen waktu, dokumentasi).`
+          : isPBL
+            ? `ATURAN MODEL (PBL / Problem Based Learning):
+- Wajib ada subbagian "### Skenario Masalah" (kasus kontekstual) dan "### Keluaran Akhir" (bentuk solusi/argumen yang dinilai).
+- Kegiatan Inti per pertemuan wajib mengikuti sintaks PBL (tulis fase sebagai label di kolom "Komponen" pada tabel), minimal memuat: Orientasi Masalah, Organisasi Belajar, Penyelidikan/Investigasi, Pengembangan & Presentasi Solusi, Analisis & Evaluasi.
+- LKPD wajib berbentuk LKPD Investigasi Masalah: rumusan masalah, data/informasi, hipotesis/alternatif, analisis, keputusan/solusi, dan justifikasi.
+- Asesmen sumatif utama adalah kualitas solusi/argumentasi; rubrik wajib memuat aspek analisis masalah, bukti/data, kualitas solusi, argumentasi, dan refleksi.`
+            : isInquiry
+              ? `ATURAN MODEL (Inquiry Learning):
+- Kegiatan Inti wajib mengikuti alur inkuiri (tulis fase sebagai label di kolom "Komponen" pada tabel): Orientasi, Merumuskan Pertanyaan/Masalah, Merumuskan Hipotesis, Mengumpulkan Data, Menguji Hipotesis, Menyimpulkan, Mengomunikasikan.
+- LKPD wajib berformat inkuiri (pertanyaan, hipotesis, data, analisis, kesimpulan).
+- Asesmen menilai proses inkuiri dan kesimpulan berbasis data.`
+              : isDiscovery
+                ? `ATURAN MODEL (Discovery Learning):
+- Kegiatan Inti wajib mengikuti fase discovery (tulis fase sebagai label di kolom "Komponen" pada tabel): Stimulation, Problem Statement, Data Collection, Data Processing, Verification, Generalization.
+- LKPD berisi langkah discovery dan kolom temuan peserta didik.
+- Asesmen menilai temuan, generalisasi, dan pembuktian.`
+                : isDirect
+                  ? `ATURAN MODEL (Direct Instruction / Pembelajaran Langsung):
+- Kegiatan Inti wajib memuat urutan eksplisit: Modeling (contoh), Latihan Terbimbing, Umpan Balik, Latihan Mandiri, Penutup.
+- LKPD berisi latihan bertahap dari contoh ke mandiri.
+- Asesmen menilai ketepatan dan kemandirian.`
+                  : isCoop
+                    ? `ATURAN MODEL (Cooperative Learning):
+- Kegiatan Inti wajib memuat struktur kooperatif yang jelas (minimal 1 teknik dipilih dan ditulis eksplisit: Think-Pair-Share atau Jigsaw atau STAD).
+- Wajib tulis pembagian peran anggota (ketua, pencatat, penjaga waktu, penyaji) dan aturan kerja kelompok.
+- LKPD berisi tugas kelompok + bagian kontribusi individu.
+- Rubrik wajib memuat kolaborasi, komunikasi, kontribusi individu, dan kualitas hasil.`
+                    : `ATURAN MODEL (UMUM):
+- Kegiatan Inti wajib menuliskan fase-fase model "${M.modelPembelajaran}" secara eksplisit di tabel dan aktivitas harus konkret.
+- LKPD dan Rubrik harus konsisten dengan model yang dipilih.`;
 
         const sys = String(baselineModulAjar || '').trim()
           ? `Anda adalah editor kurikulum Indonesia. Tugas Anda adalah merevisi dokumen Modul Ajar yang sudah ada agar selaras dengan kurikulum dan pendekatan yang diminta, tanpa mengurangi kelengkapan dan tanpa mengubah struktur utama. Gunakan Bahasa Indonesia baku dan formal.`
@@ -5257,16 +5313,17 @@ Min. 4 indikator konkret dan terukur.`
   | Tahap | Komponen | Kegiatan (sangat detail) | Durasi (menit) | Catatan |
 - Isi baris-baris detail untuk:
   - Pendahuluan: Salam & doa, apersepsi, motivasi, penyampaian tujuan (boleh tambah 1–2 komponen lain bila perlu).
-  - Kegiatan Inti: langkah-langkah detail sesuai pendekatan & kurikulum.
+  - Kegiatan Inti: langkah-langkah detail sesuai pendekatan, model, & kurikulum.
   - Penutup: refleksi, rangkuman, tindak lanjut, salam & doa.
 - Kolom "Durasi (menit)" wajib angka. Total seluruh baris WAJIB = ${durLabel} untuk setiap pertemuan.
+- Kolom "Catatan" WAJIB memuat keterkaitan (agar nyambung): TP yang dituju (contoh: TP1,TP3); bukti/produk (contoh: laporan/lembar kerja/presentasi); dan referensi LKPD (contoh: LKPD-1, LKPD-3).
 - Jangan gunakan bullet simbol (●/○/•/) di dalam tabel. Jika perlu pemecahan, pakai kalimat yang dipisah dengan titik koma.`;
 
           const intiK13 = `Untuk Kegiatan Inti (K13), gunakan alur saintifik 5M sebagai baris-baris dalam tabel dengan urutan:
 Mengamati → Menanya → Mencoba/Mengeksplorasi → Mengasosiasi/Menalar → Mengomunikasikan.
 Pastikan masing-masing punya durasi dan aktivitas yang konkret.`;
 
-          const intiMerdeka = `Untuk Kegiatan Inti, sesuaikan dengan model "${M.modelPembelajaran}" (tuliskan fase-fase model secara eksplisit), dan buat aktivitas yang konkret.`;
+          const intiMerdeka = `Untuk Kegiatan Inti, wajib mengikuti sintaks model "${M.modelPembelajaran}" dan menuliskan fase-fase model secara eksplisit sebagai label di kolom "Komponen" pada baris-baris Kegiatan Inti. Aktivitas harus konkret (apa yang dilakukan guru & peserta didik, data/lembar kerja yang dipakai, output yang dihasilkan).`;
 
           const dlRules = `Khusus Deep Learning:
 - Di Kegiatan Inti, wajib ada baris eksplisit: Eksplorasi, Analisis, Refleksi (boleh dipetakan ke 5M untuk K13).
@@ -5301,7 +5358,7 @@ Gunakan format ini:
   - Kinestetik: 1 kalimat (aktivitas praktik/permainan/gerak).
 Pastikan bagian ini muncul setelah A. INFORMASI UMUM.`;
 
-        const bahanPendidik = `Untuk Pendidik: 3–4 paragraf panduan pedagogis sesuai pendekatan "${pendekatanLabel}" dan model "${M.modelPembelajaran}".`;
+        const bahanPendidik = `Untuk Pendidik: 3–4 paragraf panduan pedagogis sesuai pendekatan "${pendekatanLabel}" dan model "${M.modelPembelajaran}". Jangan menyebut pendekatan/model lain selain yang dipilih. Jika pendekatan bukan CTL, jangan menyebut CTL atau Contextual Teaching and Learning.`;
 
         const revisionLead = String(baselineModulAjar || '').trim()
           ? `Tolong lakukan REVISI TERARAH, bukan membuat ulang dari nol.
@@ -5364,7 +5421,11 @@ Mode Supervisi    : ${modeSupervisiLabel}
 =================
 
 ${approachRules}
-${extra.length ? `\n\n${extra.join('\n\n')}\n` : ''}
+${modelRules}
+${extra.length ? `
+
+${extra.join('\n\n')}
+` : ''}
 
 Hasilkan Modul Ajar dengan SEMUA bagian berikut secara LENGKAP dan DETAIL:
 
@@ -5385,9 +5446,22 @@ ${identifikasiKesiapan}
 ${supervisiB}
 
 ### 1. Tujuan Pembelajaran
-Min. 4 tujuan. Format: "Peserta didik mampu [kata kerja Bloom] [objek] [kondisi/kriteria]"
+Min. 4 tujuan. WAJIB beri kode TP (TP1, TP2, TP3, dst) dan tulis dengan format:
+- TP1: Peserta didik mampu [kata kerja Bloom] [objek] [kondisi/kriteria]
+- TP2: ...
+Pastikan semua TP terukur dan relevan dengan materi.
 
 ${supervisiC}
+
+### Pemetaan Tujuan–Asesmen–Kegiatan–Bukti (WAJIB)
+Buat tabel Markdown yang memetakan keterkaitan antar komponen agar dokumen nyambung.
+Format tabel:
+| Kode TP | Pertemuan & Kegiatan Kunci (Tahap/Komponen) | Bukti/Produk yang Dikumpulkan | Jenis Asesmen (Diagnostik/Form/Sum) | Aspek Rubrik yang Menilai |
+|---|---|---|---|---|
+Aturan:
+- Setiap TP wajib muncul minimal 1 baris.
+- Setiap pertemuan wajib mencantumkan bukti/produk yang jelas.
+- Bukti/produk harus konsisten dengan model pembelajaran yang dipilih.
 
 ### 3. Asesmen
 a. Diagnostik (Awal) — aktivitas konkret
@@ -5408,7 +5482,12 @@ ${ctlKegiatan}
 ## C. LAMPIRAN
 
 ### 1. LKPD
-Judul, Identitas siswa, Tujuan, Petunjuk, Alat dan Bahan, min. 5 Langkah Kegiatan, 3 Pertanyaan Refleksi, Kolom Kesimpulan.
+WAJIB konsisten dengan model pembelajaran yang dipilih dan nyambung dengan TP.
+Format:
+- Judul, Identitas siswa, Tujuan (sebutkan TP yang dituju), Petunjuk, Alat dan Bahan.
+- Langkah Kegiatan minimal 5 langkah, WAJIB diberi kode: LKPD-1, LKPD-2, LKPD-3, dst.
+- Setiap langkah LKPD wajib mencantumkan: aktivitas, output/bukti yang dihasilkan, dan kode TP yang didukung.
+- 3 Pertanyaan Refleksi dan Kolom Kesimpulan.
 
 ### 2. Pengayaan dan Remedial
 Pengayaan konkret. Remedial dengan strategi spesifik.
@@ -5426,6 +5505,9 @@ Min. 5 istilah kunci dengan definisi sesuai jenjang.
 ### 6. Rubrik Penilaian
 Tabel: Aspek | Skor 4 (Sangat Baik) | Skor 3 (Baik) | Skor 2 (Cukup) | Skor 1 (Perlu Bimbingan)
 Min. 5 aspek, deskripsi KONKRET dan DAPAT DIAMATI.
+Aturan nyambung:
+- Pada kolom "Aspek", WAJIB tulis keterkaitan TP (contoh: "Analisis masalah (TP2, TP3)" atau "Produk proyek (TP4)").
+- Aspek rubrik harus selaras dengan Bukti/Produk di tabel Pemetaan.
 
 ### 7. Daftar Pustaka
 Min. 3 referensi format APA (1 Kemendikbudristek, 1 buku pedagogi, 1 lainnya).
@@ -5484,6 +5566,16 @@ ${baselineModulAjar}
             }
             return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
           };
+          const stripCtlFromModulAjar = (raw) => {
+            let s = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            s = s.replace(/(^###\s*(Pendekatan|Catatan)\s+CTL[\s\S]*?)(?=^###\s|^##\s|\n##\s|$)/gmi, '');
+            s = s.replace(/\[(Konstruktivisme|Inkuiri|Questioning|Learning Community|Modeling|Refleksi|Penilaian Autentik)\]/gi, '');
+            s = s.replace(/[^\n.!?]*\bCTL\b[^\n.!?]*[.!?]?/gi, '');
+            s = s.replace(/[^\n.!?]*contextual\s+teaching\s+and\s+learning[^\n.!?]*[.!?]?/gi, '');
+            s = s.replace(/\n{3,}/g, '\n\n');
+            s = s.replace(/[ \t]{2,}/g, ' ');
+            return s.trim();
+          };
           const ensureCtlInModulAjar = (raw) => {
             if (!isCTL) return String(raw || '');
             const src0 = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -5519,7 +5611,8 @@ ${baselineModulAjar}
             return `${src0.trim()}\n\n${block}\n`;
           };
           const finalText0 = isKBC ? text : stripKbcFromModulAjar(text);
-          const finalText = ensureCtlInModulAjar(finalText0);
+          const finalText1 = ensureCtlInModulAjar(finalText0);
+          const finalText = isCTL ? finalText1 : stripCtlFromModulAjar(finalText1);
           const ensureCp046InDaftarPustaka = (raw, pagesText) => {
             const src = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             if (!String(pagesText || '').trim()) return src;
