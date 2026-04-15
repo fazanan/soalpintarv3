@@ -35,13 +35,28 @@ if (!$isEmail && $digits !== '') {
 }
 
 $hasNoHpCol = false;
+$hasAccessQuizCol = false;
+$hasAccessRekapCol = false;
+$hasAccessBuatSoalCol = false;
+$hasAccessModulAjarCol = false;
+$hasAccessRppCol = false;
 try {
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'no_hp'")) {
     $hasNoHpCol = $rs->num_rows > 0;
     $rs->close();
   }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_quiz'")) { $hasAccessQuizCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_rekap_nilai'")) { $hasAccessRekapCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_buat_soal'")) { $hasAccessBuatSoalCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_modul_ajar'")) { $hasAccessModulAjarCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_rpp'")) { $hasAccessRppCol = $rs->num_rows > 0; $rs->close(); }
 } catch (mysqli_sql_exception $e) {
   $hasNoHpCol = false;
+  $hasAccessQuizCol = false;
+  $hasAccessRekapCol = false;
+  $hasAccessBuatSoalCol = false;
+  $hasAccessModulAjarCol = false;
+  $hasAccessRppCol = false;
 }
 
 function stmt_bind_params(mysqli_stmt $stmt, string $types, array $values): void {
@@ -54,13 +69,18 @@ function stmt_bind_params(mysqli_stmt $stmt, string $types, array $values): void
 }
 
 $phoneExpr = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(no_hp,' ',''),'-',''),'(',''),')',''),'+','')";
+$exprAccessQuiz = $hasAccessQuizCol ? 'access_quiz' : '1';
+$exprAccessRekap = $hasAccessRekapCol ? 'access_rekap_nilai' : '1';
+$exprAccessBuatSoal = $hasAccessBuatSoalCol ? 'access_buat_soal' : '1';
+$exprAccessModulAjar = $hasAccessModulAjarCol ? 'access_modul_ajar' : '1';
+$exprAccessRpp = $hasAccessRppCol ? 'access_rpp' : '1';
 $stmt = null;
 try {
   if ($hasNoHpCol && !$isEmail && count($candPhones) > 0) {
     $ph = implode(',', array_fill(0, count($candPhones), '?'));
-    $stmt = $mysqli->prepare("SELECT id, username, password, role, access_quiz, access_rekap_nilai FROM users WHERE username = ? OR ($phoneExpr IN ($ph)) LIMIT 1");
+    $stmt = $mysqli->prepare("SELECT id, username, password, role, ($exprAccessQuiz) AS access_quiz, ($exprAccessRekap) AS access_rekap_nilai, ($exprAccessBuatSoal) AS access_buat_soal, ($exprAccessModulAjar) AS access_modul_ajar, ($exprAccessRpp) AS access_rpp FROM users WHERE username = ? OR ($phoneExpr IN ($ph)) LIMIT 1");
   } else {
-    $stmt = $mysqli->prepare('SELECT id, username, password, role, access_quiz, access_rekap_nilai FROM users WHERE username = ? LIMIT 1');
+    $stmt = $mysqli->prepare("SELECT id, username, password, role, ($exprAccessQuiz) AS access_quiz, ($exprAccessRekap) AS access_rekap_nilai, ($exprAccessBuatSoal) AS access_buat_soal, ($exprAccessModulAjar) AS access_modul_ajar, ($exprAccessRpp) AS access_rpp FROM users WHERE username = ? LIMIT 1");
   }
 } catch (mysqli_sql_exception $e) {
   $stmt = null;
@@ -75,7 +95,7 @@ if ($stmt) {
     $stmt->bind_param('s', $uLookup);
   }
   $stmt->execute();
-  $stmt->bind_result($id, $dbUsername, $hash, $role, $accessQuiz, $accessRekap);
+  $stmt->bind_result($id, $dbUsername, $hash, $role, $accessQuiz, $accessRekap, $accessBuatSoal, $accessModulAjar, $accessRpp);
   if ($stmt->fetch() && password_verify($p, $hash)) {
     session_regenerate_id(true);
     $sid = session_id();
@@ -94,8 +114,11 @@ if ($stmt) {
     $_SESSION['user_id'] = $id;
     $_SESSION['username'] = $dbUsername ?: ($isEmail ? $uEmail : $u);
     $_SESSION['role'] = $role ?: 'user';
-    $_SESSION['access_quiz'] = (int)$accessQuiz;
-    $_SESSION['access_rekap_nilai'] = (int)$accessRekap;
+    $_SESSION['access_quiz'] = $isAdminLogin ? 1 : (int)$accessQuiz;
+    $_SESSION['access_rekap_nilai'] = $isAdminLogin ? 1 : (int)$accessRekap;
+    $_SESSION['access_buat_soal'] = $isAdminLogin ? 1 : (int)$accessBuatSoal;
+    $_SESSION['access_modul_ajar'] = $isAdminLogin ? 1 : (int)$accessModulAjar;
+    $_SESSION['access_rpp'] = $isAdminLogin ? 1 : (int)$accessRpp;
     header('Location: index.php');
     exit;
   }
@@ -126,6 +149,9 @@ if ($stmt) {
     $_SESSION['role'] = $role2 ?: 'user';
     $_SESSION['access_quiz'] = 1;
     $_SESSION['access_rekap_nilai'] = 1;
+    $_SESSION['access_buat_soal'] = 1;
+    $_SESSION['access_modul_ajar'] = 1;
+    $_SESSION['access_rpp'] = 1;
     header('Location: index.php');
     exit;
   }

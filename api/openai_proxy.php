@@ -8,9 +8,13 @@ if (!isset($_SESSION['user_id'])) {
   exit;
 }
 $user_id = (int)($_SESSION['user_id'] ?? 0);
+$role = (string)($_SESSION['role'] ?? 'user');
+$access_buat_soal = (int)($_SESSION['access_buat_soal'] ?? 1);
+$access_modul_ajar = (int)($_SESSION['access_modul_ajar'] ?? 1);
+$access_rpp = (int)($_SESSION['access_rpp'] ?? 1);
 require_once __DIR__ . '/../auth_lock.php';
 $sid = session_id();
-if ($user_id > 0 && $sid && (string)($_SESSION['role'] ?? '') !== 'admin') {
+if ($user_id > 0 && $sid && $role !== 'admin') {
   if (!auth_lock_touch($user_id, $sid)) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
@@ -311,6 +315,24 @@ function proxy_image(mysqli $db, array $payload, int $user_id) {
 
 $data = read_json_input();
 $type = (string)($data['type'] ?? 'chat');
+
+if ($role !== 'admin') {
+  if ($type === 'chat' && $access_buat_soal === 0) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Forbidden']);
+    exit;
+  }
+  if ($type === 'modul_ajar' && $access_modul_ajar === 0) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Forbidden']);
+    exit;
+  }
+  if ($type === 'rpp' && $access_rpp === 0) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Forbidden']);
+    exit;
+  }
+}
 
 if ($type === 'chat') {
   proxy_chat($mysqli, $data, $user_id);

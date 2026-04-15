@@ -329,8 +329,14 @@ session_write_close();
       const IS_ADMIN = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : 'false'; ?>;
       const ACCESS_QUIZ = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_quiz']) && (int)$_SESSION['access_quiz'] === 0) ? 'false' : 'true'); ?>;
       const ACCESS_REKAP = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_rekap_nilai']) && (int)$_SESSION['access_rekap_nilai'] === 0) ? 'false' : 'true'); ?>;
+      const ACCESS_BUAT_SOAL = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_buat_soal']) && (int)$_SESSION['access_buat_soal'] === 0) ? 'false' : 'true'); ?>;
+      const ACCESS_MODUL_AJAR = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_modul_ajar']) && (int)$_SESSION['access_modul_ajar'] === 0) ? 'false' : 'true'); ?>;
+      const ACCESS_RPP = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_rpp']) && (int)$_SESSION['access_rpp'] === 0) ? 'false' : 'true'); ?>;
       const HAS_QUIZ_ACCESS = IS_ADMIN || ACCESS_QUIZ;
       const HAS_REKAP_ACCESS = IS_ADMIN || ACCESS_REKAP;
+      const HAS_BUAT_SOAL_ACCESS = IS_ADMIN || ACCESS_BUAT_SOAL;
+      const HAS_MODUL_AJAR_ACCESS = IS_ADMIN || ACCESS_MODUL_AJAR;
+      const HAS_RPP_ACCESS = IS_ADMIN || ACCESS_RPP;
 
       const APP_KEY = "soalpintar:v1";
       const OPENAI_TIMEOUT_MS = 55000;
@@ -474,6 +480,7 @@ session_write_close();
           "Pendidikan Agama Buddha dan Budi Pekerti",
           "Pendidikan Agama Khonghucu dan Budi Pekerti",
           "Bahasa Arab",
+          "Sejarah Kebudayaan Islam (SKI)",
           "Pendidikan Pancasila",
           "Bahasa Indonesia",
           "Bahasa Indramayu",
@@ -6957,6 +6964,19 @@ ${baselineModulAjar}
         </div>`;
 
       const computeView = () => {
+        const noAccessBox = (title) => `
+          <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
+            <div class="p-6 space-y-2">
+              <div class="text-xl font-bold">${safeText(title)}</div>
+              <div class="rounded-lg border border-amber-200 bg-amber-50 text-amber-900 p-4 text-sm">
+                Akses fitur ${safeText(title)} belum diaktifkan untuk akun Anda. Silakan upgrade paket atau hubungi Admin <a class="font-semibold underline text-blue-700" href="https://wa.me/6282174028646" target="_blank" rel="noopener">klik di sini</a>.
+              </div>
+            </div>
+          </div>
+        `;
+        if (state.activeView === "preview" && !HAS_BUAT_SOAL_ACCESS) return noAccessBox("Buat Soal");
+        if (state.activeView === "modul_ajar" && !HAS_MODUL_AJAR_ACCESS) return noAccessBox("Modul Ajar");
+        if (state.activeView === "rpp" && !HAS_RPP_ACCESS) return noAccessBox("RPP");
         if (state.activeView === "preview") {
           const helpOnClick = "window.__sp.openBuatSoalHelp()";
           const tutorialBtn = `
