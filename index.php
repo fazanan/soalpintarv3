@@ -387,6 +387,7 @@ session_write_close();
           "Matematika",
           "Ilmu Pengetahuan Alam dan Sosial (IPAS)",
           "Informatika",
+          "Koding dan Kecerdasan Artificial",
           "Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)",
           "Seni Musik",
           "Seni Rupa",
@@ -418,6 +419,7 @@ session_write_close();
           "Bahasa Inggris",
           "Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)",
           "Informatika",
+          "Koding dan Kecerdasan Artificial",
           "Seni Musik",
           "Seni Rupa",
           "Seni Teater",
@@ -453,6 +455,7 @@ session_write_close();
           "Sosiologi",
           "Antropologi",
           "Informatika",
+          "Koding dan Kecerdasan Artificial",
           "Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)",
           "Seni Musik",
           "Seni Rupa",
@@ -481,6 +484,7 @@ session_write_close();
           "Seni Budaya",
           "Pendidikan Jasmani, Olahraga, dan Kesehatan (PJOK)",
           "Informatika",
+          "Koding dan Kecerdasan Artificial",
           "Ilmu Pengetahuan Alam dan Sosial (IPAS)",
           "Dasar-dasar Program Keahlian",
           "Konsentrasi Keahlian",
@@ -490,9 +494,11 @@ session_write_close();
         ],
         "PAUD": [
           "PAUD (Fase Fondasi)",
+          "Koding dan Kecerdasan Artificial",
         ],
         "TK": [
           "PAUD (Fase Fondasi)",
+          "Koding dan Kecerdasan Artificial",
         ],
       };
       SUBJECT_OPTIONS["SMK/MAK"] = SUBJECT_OPTIONS["SMK"];
