@@ -12,9 +12,10 @@ $role = (string)($_SESSION['role'] ?? 'user');
 $access_buat_soal = (int)($_SESSION['access_buat_soal'] ?? 1);
 $access_modul_ajar = (int)($_SESSION['access_modul_ajar'] ?? 1);
 $access_rpp = (int)($_SESSION['access_rpp'] ?? 1);
+$isLockExempt = (int)($_SESSION['session_lock_exempt'] ?? 0) === 1;
 require_once __DIR__ . '/../auth_lock.php';
 $sid = session_id();
-if ($user_id > 0 && $sid && $role !== 'admin') {
+if ($user_id > 0 && $sid && $role !== 'admin' && !$isLockExempt) {
   if (!auth_lock_touch($user_id, $sid)) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);

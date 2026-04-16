@@ -112,16 +112,19 @@ if ($stmt) {
     session_regenerate_id(true);
     $sid = session_id();
     $isAdminLogin = (string)$role === 'admin';
+    $uname = trim(strtolower((string)($dbUsername ?: ($isEmail ? $uEmail : $u))));
+    $isDemoMulti = $uname === 'coba@gmail.com';
     if ($isAdminLogin) {
       auth_lock_release((int)$id, null);
     } else {
-      if (auth_lock_busy((int)$id, $sid)) {
+      if (!$isDemoMulti && auth_lock_busy((int)$id, $sid)) {
         $_SESSION = [];
         session_destroy();
         header('Location: login.php?e=busy');
         exit;
       }
-      auth_lock_acquire((int)$id, $sid);
+      if ($isDemoMulti) auth_lock_release((int)$id, null);
+      else auth_lock_acquire((int)$id, $sid);
     }
     $_SESSION['user_id'] = $id;
     $_SESSION['username'] = $dbUsername ?: ($isEmail ? $uEmail : $u);
@@ -134,6 +137,7 @@ if ($stmt) {
     $_SESSION['nama'] = (string)$nama;
     $_SESSION['jenjang'] = (string)$jenjang;
     $_SESSION['nama_sekolah'] = (string)$namaSekolah;
+    $_SESSION['session_lock_exempt'] = $isDemoMulti ? 1 : 0;
     header('Location: index.php');
     exit;
   }
@@ -148,16 +152,19 @@ if ($stmt) {
     session_regenerate_id(true);
     $sid = session_id();
     $isAdminLogin2 = (string)$role2 === 'admin';
+    $uname2 = trim(strtolower((string)($dbUsername2 ?: ($isEmail ? $uEmail : $u))));
+    $isDemoMulti2 = $uname2 === 'coba@gmail.com';
     if ($isAdminLogin2) {
       auth_lock_release((int)$id2, null);
     } else {
-      if (auth_lock_busy((int)$id2, $sid)) {
+      if (!$isDemoMulti2 && auth_lock_busy((int)$id2, $sid)) {
         $_SESSION = [];
         session_destroy();
         header('Location: login.php?e=busy');
         exit;
       }
-      auth_lock_acquire((int)$id2, $sid);
+      if ($isDemoMulti2) auth_lock_release((int)$id2, null);
+      else auth_lock_acquire((int)$id2, $sid);
     }
     $_SESSION['user_id'] = $id2;
     $_SESSION['username'] = $dbUsername2 ?: ($isEmail ? $uEmail : $u);
@@ -170,6 +177,7 @@ if ($stmt) {
     $_SESSION['nama'] = '';
     $_SESSION['jenjang'] = '';
     $_SESSION['nama_sekolah'] = '';
+    $_SESSION['session_lock_exempt'] = $isDemoMulti2 ? 1 : 0;
     header('Location: index.php');
     exit;
   }

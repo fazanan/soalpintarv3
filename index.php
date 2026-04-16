@@ -9,6 +9,7 @@ require_once __DIR__ . '/db.php';
 $__uid = (int)($_SESSION['user_id'] ?? 0);
 $__sid = session_id();
 $__role = (string)($_SESSION['role'] ?? 'user');
+$__isLockExempt = (int)($_SESSION['session_lock_exempt'] ?? 0) === 1;
 
 function stmt_bind_params(mysqli_stmt $stmt, string $types, array $values): void {
   $bind = [];
@@ -29,7 +30,7 @@ function normalize_nama(string $s): string {
   return ucwords(strtolower($s));
 }
 
-if ($__uid > 0 && $__sid && $__role !== 'admin') {
+if ($__uid > 0 && $__sid && $__role !== 'admin' && !$__isLockExempt) {
   if (!auth_lock_touch($__uid, $__sid)) {
     $_SESSION = [];
     session_destroy();
