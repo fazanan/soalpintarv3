@@ -1087,7 +1087,7 @@ session_write_close();
         if (!sections.length) return miss("Langkah 2 belum lengkap: tambah minimal 1 Bagian di Konfigurasi dulu ya.", "konfigurasi", "");
         const total = sections.reduce((acc, s) => {
           const bentuk = String(s?.bentuk || "");
-          const isObjective = ["pg", "pg_kompleks", "menjodohkan"].includes(bentuk);
+          const isObjective = ["pg", "benar_salah", "pg_kompleks", "menjodohkan"].includes(bentuk);
           const isEssay = ["isian", "uraian"].includes(bentuk);
           const jumlah = isObjective ? Number(s?.jumlahPG || 0) : isEssay ? Number(s?.jumlahIsian || 0) : 0;
           return acc + (Number.isFinite(jumlah) ? jumlah : 0);
@@ -1482,10 +1482,11 @@ session_write_close();
           if (!info) return q;
           return { ...q, _pdfImg: info };
         }));
-        const order = ["pg", "pg_kompleks", "menjodohkan", "isian", "uraian"];
-        const titleMap = { pg: "PILIHAN GANDA", pg_kompleks: "PILIHAN GANDA KOMPLEKS", menjodohkan: "MENJODOHKAN", isian: "ISIAN SINGKAT", uraian: "URAIAN" };
+        const order = ["pg", "benar_salah", "pg_kompleks", "menjodohkan", "isian", "uraian"];
+        const titleMap = { pg: "PILIHAN GANDA", benar_salah: "BENAR / SALAH", pg_kompleks: "PILIHAN GANDA KOMPLEKS", menjodohkan: "MENJODOHKAN", isian: "ISIAN SINGKAT", uraian: "URAIAN" };
         const subtitleMap = {
           pg: "Pilihlah salah satu jawaban yang paling tepat!",
+          benar_salah: "Pilihlah jawaban Benar atau Salah!",
           pg_kompleks: "Pilihlah jawaban yang benar (bisa lebih dari satu)!",
           menjodohkan: "Jodohkanlah pernyataan pada lajur kiri dengan jawaban pada lajur kanan!",
           isian: "Jawablah pertanyaan berikut dengan singkat dan tepat!",
@@ -1535,7 +1536,7 @@ session_write_close();
                   } catch {}
                 }
 
-                if (q.type === "pg" || q.type === "pg_kompleks") {
+                if (q.type === "pg" || q.type === "benar_salah" || q.type === "pg_kompleks") {
                   const opts = Array.isArray(q.options) ? q.options : [];
                   for (let oi = 0; oi < opts.length; oi++) {
                     ctx.addHanging(`${String.fromCharCode(65 + oi)}.`, String(opts[oi] || ""), 11, "normal", 30, 4);
@@ -1603,6 +1604,7 @@ session_write_close();
 
           const sections = [
             { type: "pg", title: "PILIHAN GANDA" },
+            { type: "benar_salah", title: "BENAR / SALAH" },
             { type: "pg_kompleks", title: "PILIHAN GANDA KOMPLEKS" },
             { type: "menjodohkan", title: "MENJODOHKAN" },
             { type: "isian", title: "ISIAN SINGKAT" },
@@ -1615,7 +1617,7 @@ session_write_close();
             const letter = String.fromCharCode(65 + sectionIndex++);
             ctx.addPara(`${letter}. ${sec.title}`, 12, "bold", 0, 10);
 
-            if (sec.type === "pg") {
+            if (sec.type === "pg" || sec.type === "benar_salah") {
               const cols = 5;
               const body = [];
               for (let i = 0; i < qs.length; i += cols) {
@@ -1624,7 +1626,12 @@ session_write_close();
                   const q = qs[i + j];
                   if (!q) { row.push(""); continue; }
                   let ansChar = "-";
-                  if (typeof q.answer === "number") ansChar = String.fromCharCode(65 + q.answer);
+                  if (sec.type === "benar_salah") {
+                    const idx = Number(q.answer);
+                    ansChar = idx === 1 ? "Salah" : "Benar";
+                  } else if (typeof q.answer === "number") {
+                    ansChar = String.fromCharCode(65 + q.answer);
+                  }
                   else if (typeof q.answer === "string") ansChar = q.answer;
                   row.push(`${i + j + 1}. ${ansChar}`);
                 }
@@ -1672,6 +1679,7 @@ session_write_close();
 
           const kisiSections = [
             { type: "pg", title: "PILIHAN GANDA", label: "PG" },
+            { type: "benar_salah", title: "BENAR / SALAH", label: "B/S" },
             { type: "pg_kompleks", title: "PILIHAN GANDA KOMPLEKS", label: "PG Komp" },
             { type: "menjodohkan", title: "MENJODOHKAN", label: "Jodoh" },
             { type: "isian", title: "ISIAN SINGKAT", label: "Isian" },
@@ -2842,7 +2850,7 @@ session_write_close();
         s[key] = value;
         if (state.soalError) state.soalError = null;
         if (key === "bentuk") {
-          const isObjective = ["pg", "pg_kompleks", "menjodohkan"].includes(value);
+          const isObjective = ["pg", "benar_salah", "pg_kompleks", "menjodohkan"].includes(value);
           const isEssay = ["isian", "uraian"].includes(value);
           if (isObjective) s.jumlahIsian = 0;
           if (isEssay) s.jumlahPG = 0;
@@ -3056,6 +3064,7 @@ session_write_close();
         const rawType = String(item?.type ?? "").toLowerCase();
         let type = "isian";
         if (rawType.includes("pg")) type = "pg";
+        if (rawType.includes("benar") || rawType.includes("salah") || rawType.includes("true_false") || rawType.includes("truefalse")) type = "benar_salah";
         if (rawType.includes("kompleks")) type = "pg_kompleks";
         if (rawType.includes("menjodohkan")) type = "menjodohkan";
         if (rawType.includes("uraian")) type = "uraian";
@@ -3074,13 +3083,22 @@ session_write_close();
         const options = Array.isArray(item?.options) ? item.options.map((x) => cleanOptionText(x)).filter(Boolean) : [];
         
         let cappedOptions = options;
-        if (type === "pg" || type === "pg_kompleks") {
+        if (type === "benar_salah") {
+             cappedOptions = ["Benar", "Salah"];
+        } else if (type === "pg" || type === "pg_kompleks") {
              const max = clamp(Number(sec?.opsiPG || 4), 3, 5);
              if (cappedOptions.length > max) cappedOptions = cappedOptions.slice(0, max);
         }
 
         let answer = item?.answer;
-        if (type === "pg") {
+        if (type === "benar_salah") {
+             const s = String(answer ?? '').trim().toLowerCase();
+             if (s === 'benar' || s === 'true' || s === 'b') answer = 0;
+             else if (s === 'salah' || s === 'false' || s === 's') answer = 1;
+             else answer = normalizeAnswerIndex(answer, cappedOptions);
+             if (!Number.isFinite(answer)) answer = 0;
+             answer = Number(answer) === 1 ? 1 : 0;
+        } else if (type === "pg") {
              answer = normalizeAnswerIndex(answer, cappedOptions);
         } else if (type === "pg_kompleks") {
              const toList = (val) => {
@@ -3585,7 +3603,7 @@ session_write_close();
                   ` : ``}
                   ${!q.image && !q.asciiDiagram && !q.svgSource && q._imageError ? `<div class="mb-4 text-xs px-2 py-1 rounded bg-red-100 text-red-700 inline-flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">error</span><span>${safeText(q._imageError)}</span></div>` : ""}
                   ${
-                    (q.type === "pg" || q.type === "pg_kompleks")
+                    (q.type === "pg" || q.type === "benar_salah" || q.type === "pg_kompleks")
                       ? `
                         <div class="grid grid-cols-1 gap-2 pl-1">
                           ${q.options.map((opt, oi) => `
@@ -3655,10 +3673,11 @@ session_write_close();
 
             <div class="space-y-6">
               ${(() => {
-                const order = ['pg','pg_kompleks','menjodohkan','isian','uraian'];
-                const titleMap = { pg: 'PILIHAN GANDA', pg_kompleks: 'PILIHAN GANDA KOMPLEKS', menjodohkan: 'MENJODOHKAN', isian: 'ISIAN SINGKAT', uraian: 'URAIAN' };
+                const order = ['pg','benar_salah','pg_kompleks','menjodohkan','isian','uraian'];
+                const titleMap = { pg: 'PILIHAN GANDA', benar_salah: 'BENAR / SALAH', pg_kompleks: 'PILIHAN GANDA KOMPLEKS', menjodohkan: 'MENJODOHKAN', isian: 'ISIAN SINGKAT', uraian: 'URAIAN' };
                 const subtitleMap = {
                   pg: 'Pilihlah salah satu jawaban yang paling tepat!',
+                  benar_salah: 'Pilihlah jawaban Benar atau Salah!',
                   pg_kompleks: 'Pilihlah jawaban yang benar (bisa lebih dari satu)!',
                   menjodohkan: 'Jodohkanlah pernyataan pada lajur kiri dengan jawaban pada lajur kanan!',
                   isian: 'Jawablah pertanyaan berikut dengan singkat dan tepat!',
@@ -3730,6 +3749,7 @@ session_write_close();
       const renderKunci = () => {
         const sections = [
           { type: 'pg', title: 'PILIHAN GANDA' },
+          { type: 'benar_salah', title: 'BENAR / SALAH' },
           { type: 'pg_kompleks', title: 'PILIHAN GANDA KOMPLEKS' },
           { type: 'menjodohkan', title: 'MENJODOHKAN' },
           { type: 'isian', title: 'ISIAN SINGKAT' },
@@ -3746,6 +3766,9 @@ session_write_close();
             let ans = '';
             if (sec.type === 'pg') {
               ans = typeof q.answer === 'number' ? String.fromCharCode(65 + q.answer) : String(q.answer ?? '');
+            } else if (sec.type === 'benar_salah') {
+              const idx = Number(q.answer);
+              ans = idx === 1 ? 'Salah' : 'Benar';
             } else if (sec.type === 'pg_kompleks') {
               if (Array.isArray(q.answer)) ans = q.answer.map(n => String.fromCharCode(65 + Number(n))).join(', ');
               else ans = String(q.answer ?? '');
@@ -3785,6 +3808,7 @@ session_write_close();
       const renderKisi = () => {
         const sections = [
           { type: 'pg', title: 'PILIHAN GANDA', label: 'PG' },
+          { type: 'benar_salah', title: 'BENAR / SALAH', label: 'B/S' },
           { type: 'pg_kompleks', title: 'PILIHAN GANDA KOMPLEKS', label: 'PG Komp' },
           { type: 'menjodohkan', title: 'MENJODOHKAN', label: 'Jodoh' },
           { type: 'isian', title: 'ISIAN SINGKAT', label: 'Isian' },
@@ -7894,9 +7918,9 @@ ${baselineModulAjar}
 
       const estimateTotalQuestions = () =>
         state.sections.reduce((acc, s) => {
-          if (s.bentuk === "pg") return acc + Number(s.jumlahPG || 0);
-          if (s.bentuk === "isian") return acc + Number(s.jumlahIsian || 0);
-          return acc + Number(s.jumlahPG || 0) + Number(s.jumlahIsian || 0);
+          const isObjective = ["pg", "benar_salah", "pg_kompleks", "menjodohkan"].includes(s.bentuk);
+          const isEssay = ["isian", "uraian"].includes(s.bentuk);
+          return acc + (isObjective ? Number(s.jumlahPG || 0) : isEssay ? Number(s.jumlahIsian || 0) : 0);
         }, 0);
 
       const renderKonfigurasi = () => `
@@ -7966,7 +7990,7 @@ ${baselineModulAjar}
         const diff = s.tingkatKesulitan || "campuran";
         const bloomPreset = s.cakupanBloom || "level_standar";
         
-        const isObjective = ["pg", "pg_kompleks", "menjodohkan"].includes(s.bentuk);
+        const isObjective = ["pg", "benar_salah", "pg_kompleks", "menjodohkan"].includes(s.bentuk);
         const isEssay = ["isian", "uraian"].includes(s.bentuk);
 
         return `
@@ -8017,6 +8041,7 @@ ${baselineModulAjar}
                     onchange="window.__sp.updateSection('${s.id}','bentuk',this.value)"
                   >
                     <option value="pg" ${s.bentuk === "pg" ? "selected" : ""}>Pilihan Ganda (Biasa)</option>
+                    <option value="benar_salah" ${s.bentuk === "benar_salah" ? "selected" : ""}>Benar / Salah</option>
                     <option value="pg_kompleks" ${s.bentuk === "pg_kompleks" ? "selected" : ""}>Pilihan Ganda Kompleks (Jawaban >1)</option>
                     <option value="menjodohkan" ${s.bentuk === "menjodohkan" ? "selected" : ""}>Menjodohkan</option>
                     <option value="isian" ${s.bentuk === "isian" ? "selected" : ""}>Uraian Singkat (Esai)</option>
@@ -8033,7 +8058,7 @@ ${baselineModulAjar}
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div class="flex flex-col gap-2 ${s.bentuk === "menjodohkan" || isEssay ? "hidden" : ""}">
+                <div class="flex flex-col gap-2 ${(s.bentuk === "pg" || s.bentuk === "pg_kompleks") ? "" : "hidden"}">
                   <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jumlah Opsi PG</label>
                   <select
                     class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
@@ -9428,7 +9453,7 @@ ${baselineModulAjar}
         } catch {}
 
         const total = state.sections.reduce((acc, s) => {
-          const isObjective = ["pg", "pg_kompleks", "menjodohkan"].includes(s.bentuk);
+          const isObjective = ["pg", "benar_salah", "pg_kompleks", "menjodohkan"].includes(s.bentuk);
           const isEssay = ["isian", "uraian"].includes(s.bentuk);
           return acc + (isObjective ? Number(s.jumlahPG || 0) : isEssay ? Number(s.jumlahIsian || 0) : 0);
         }, 0);
@@ -9442,7 +9467,7 @@ ${baselineModulAjar}
         let pkgTokenIn = 0;
         let pkgTokenOut = 0;
         for (const sec of state.sections) {
-          const isObjective = ["pg", "pg_kompleks", "menjodohkan"].includes(sec.bentuk);
+          const isObjective = ["pg", "benar_salah", "pg_kompleks", "menjodohkan"].includes(sec.bentuk);
           const isEssay = ["isian", "uraian"].includes(sec.bentuk);
           const jumlahPG = Number(sec.jumlahPG || 0);
           const jumlahIsian = Number(sec.jumlahIsian || 0);
@@ -9454,6 +9479,7 @@ ${baselineModulAjar}
           const bloomCodes = bloomPresets[bloomPreset]?.codes || ["C1", "C2", "C3", "C4"];
           const bloomLabel = bloomPresets[bloomPreset]?.label || bloomPreset;
           const bagianLabel = sec.bentuk === "pg" ? "Pilihan Ganda" :
+                              sec.bentuk === "benar_salah" ? "Benar/Salah" :
                               sec.bentuk === "pg_kompleks" ? "Pilihan Ganda Kompleks" :
                               sec.bentuk === "menjodohkan" ? "Menjodohkan" :
                               sec.bentuk === "isian" ? "Isian Singkat" : "Uraian";
@@ -9501,6 +9527,44 @@ ${baselineModulAjar}
     "pairs": [
       { "left": "...", "right": "..." }
     ],
+    "explanation": "...",
+    "difficulty": "...",
+    "bloom": "...",
+    "materi": "...",
+    "indikator": "...",
+    "asciiDiagram": "...",
+    "svgSource": "...",
+    "imagePrompt": "..."
+  }
+]
+Kembalikan JSON persis: {"items": [...]}`
+            : (sec.bentuk === "benar_salah")
+              ? `OUTPUT JSON (Array of Objects):
+[
+  {
+    "type": "benar_salah",
+    "question": "...",
+    "options": ["Benar", "Salah"],
+    "answer": 0,
+    "explanation": "...",
+    "difficulty": "...",
+    "bloom": "...",
+    "materi": "...",
+    "indikator": "...",
+    "asciiDiagram": "...",
+    "svgSource": "...",
+    "imagePrompt": "..."
+  }
+]
+Kembalikan JSON persis: {"items": [...]}`
+            : (sec.bentuk === "benar_salah")
+              ? `OUTPUT JSON (Array of Objects):
+[
+  {
+    "type": "benar_salah",
+    "question": "...",
+    "options": ["Benar", "Salah"],
+    "answer": 0,
     "explanation": "...",
     "difficulty": "...",
     "bloom": "...",
@@ -9572,6 +9636,7 @@ PARAMETER:
 
 ATURAN JAWABAN (WAJIB):
 - Jika tipe "pg": field "answer" harus 1 angka index 0-based (0=A, 1=B, dst).
+- Jika tipe "benar_salah": field "answer" harus 0 (Benar) atau 1 (Salah).
 - Jika tipe "pg_kompleks": field "answer" harus ARRAY angka index 0-based, MINIMAL 2 jawaban benar. Contoh: [0,2] berarti A dan C benar.
 - Jika tipe "menjodohkan": field "pairs" HARUS ada dan berisi ARRAY object { "left": "...", "right": "..." } (teks, bukan angka). Panjang pairs 4–8. Jangan output pasangan angka seperti "1-3" atau "0,3".
 
@@ -10688,6 +10753,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
             const questionParagraphs = [];
             const sections = [
               { type: 'pg', title: 'PILIHAN GANDA', subtitle: 'Pilihlah salah satu jawaban yang paling tepat!' },
+              { type: 'benar_salah', title: 'BENAR / SALAH', subtitle: 'Pilihlah jawaban Benar atau Salah!' },
               { type: 'pg_kompleks', title: 'PILIHAN GANDA KOMPLEKS', subtitle: 'Pilihlah jawaban yang benar (bisa lebih dari satu)!' },
               { type: 'menjodohkan', title: 'MENJODOHKAN', subtitle: 'Jodohkanlah pernyataan pada lajur kiri dengan jawaban pada lajur kanan!' },
               { type: 'isian', title: 'ISIAN SINGKAT', subtitle: 'Jawablah pertanyaan berikut dengan singkat dan tepat!' },
@@ -10728,7 +10794,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                     })
                   );
                 }
-                if (sec.type === 'pg' || sec.type === 'pg_kompleks') {
+                if (sec.type === 'pg' || sec.type === 'benar_salah' || sec.type === 'pg_kompleks') {
                   q.options.forEach((opt, idx) => {
                     questionParagraphs.push(
                       new Paragraph({
@@ -10947,6 +11013,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
             const content = [];
             const sections = [
               { type: 'pg', title: 'PILIHAN GANDA' },
+              { type: 'benar_salah', title: 'BENAR / SALAH' },
               { type: 'pg_kompleks', title: 'PILIHAN GANDA KOMPLEKS' },
               { type: 'menjodohkan', title: 'MENJODOHKAN' },
               { type: 'isian', title: 'ISIAN SINGKAT' },
@@ -10959,7 +11026,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                 const letter = String.fromCharCode(65 + sectionIndex);
                 sectionIndex++;
                 content.push(new Paragraph({ children: [new TextRun({ text: `${letter}. ${sec.title}`, bold: true })], spacing: { after: 200 } }));
-                if (sec.type === 'pg') {
+                if (sec.type === 'pg' || sec.type === 'benar_salah') {
                     const cols = 5;
                     const pgRows = [];
                     for(let i=0; i<items.length; i+=cols) {
@@ -10968,7 +11035,12 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                             if (i+j < items.length) {
                                 const q = items[i+j];
                                 let ansChar = "-";
-                                if (typeof q.answer === 'number') ansChar = String.fromCharCode(65 + q.answer);
+                                if (sec.type === 'benar_salah') {
+                                  const idx = Number(q.answer);
+                                  ansChar = idx === 1 ? 'Salah' : 'Benar';
+                                } else if (typeof q.answer === 'number') {
+                                  ansChar = String.fromCharCode(65 + q.answer);
+                                }
                                 else if (typeof q.answer === 'string') ansChar = q.answer;
                                 rowCells.push(new TableCell({
                                     children: [new Paragraph({ text: `${i+j+1}. ${ansChar}` })],
@@ -11154,6 +11226,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
             const content = [];
             const sections = [
               { type: 'pg', title: 'PILIHAN GANDA', label: 'PG' },
+              { type: 'benar_salah', title: 'BENAR / SALAH', label: 'B/S' },
               { type: 'pg_kompleks', title: 'PILIHAN GANDA KOMPLEKS', label: 'PG Komp' },
               { type: 'menjodohkan', title: 'MENJODOHKAN', label: 'Jodoh' },
               { type: 'isian', title: 'ISIAN SINGKAT', label: 'Isian' },
@@ -11398,6 +11471,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
             const questionParagraphs = [];
             const sections = [
               { type: 'pg', title: 'PILIHAN GANDA', subtitle: 'Pilihlah salah satu jawaban yang paling tepat!' },
+              { type: 'benar_salah', title: 'BENAR / SALAH', subtitle: 'Pilihlah jawaban Benar atau Salah!' },
               { type: 'pg_kompleks', title: 'PILIHAN GANDA KOMPLEKS', subtitle: 'Pilihlah jawaban yang benar (bisa lebih dari satu)!' },
               { type: 'menjodohkan', title: 'MENJODOHKAN', subtitle: 'Jodohkanlah pernyataan pada lajur kiri dengan jawaban pada lajur kanan!' },
               { type: 'isian', title: 'ISIAN SINGKAT', subtitle: 'Jawablah pertanyaan berikut dengan singkat dan tepat!' },
@@ -11438,7 +11512,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                     })
                   );
                 }
-                if (sec.type === 'pg' || sec.type === 'pg_kompleks') {
+                if (sec.type === 'pg' || sec.type === 'benar_salah' || sec.type === 'pg_kompleks') {
                   q.options.forEach((opt, idx) => {
                     questionParagraphs.push(
                       new Paragraph({
@@ -11578,6 +11652,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
             const content = [];
             const sections = [
               { type: 'pg', title: 'PILIHAN GANDA' },
+              { type: 'benar_salah', title: 'BENAR / SALAH' },
               { type: 'pg_kompleks', title: 'PILIHAN GANDA KOMPLEKS' },
               { type: 'menjodohkan', title: 'MENJODOHKAN' },
               { type: 'isian', title: 'ISIAN SINGKAT' },
@@ -11590,7 +11665,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               const letter = String.fromCharCode(65 + sectionIndex);
               sectionIndex++;
               content.push(new Paragraph({ children: [new TextRun({ text: `${letter}. ${sec.title}`, bold: true })], spacing: { after: 200 } }));
-              if (sec.type === 'pg') {
+              if (sec.type === 'pg' || sec.type === 'benar_salah') {
                 const cols = 5;
                 const pgRows = [];
                 for(let i=0; i<items.length; i+=cols) {
@@ -11599,7 +11674,12 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                     if (i+j < items.length) {
                       const q = items[i+j];
                       let ansChar = "-";
-                      if (typeof q.answer === 'number') ansChar = String.fromCharCode(65 + q.answer);
+                      if (sec.type === 'benar_salah') {
+                        const idx = Number(q.answer);
+                        ansChar = idx === 1 ? 'Salah' : 'Benar';
+                      } else if (typeof q.answer === 'number') {
+                        ansChar = String.fromCharCode(65 + q.answer);
+                      }
                       else if (typeof q.answer === 'string') ansChar = q.answer;
                       rowCells.push(new TableCell({
                         children: [new Paragraph({ text: `${i+j+1}. ${ansChar}` })],
