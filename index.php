@@ -3035,8 +3035,21 @@ session_write_close();
       };
 
       const normalizeQuestion = (item, sec) => {
+        const cleanInlineHtml = (input) => {
+          let t = String(input ?? "");
+          t = t
+            .replace(/<\s*sup\s*>([\s\S]*?)<\s*\/\s*sup\s*>/gi, (_m, g1) => `^${String(g1 ?? "").trim()}`)
+            .replace(/<\s*sub\s*>([\s\S]*?)<\s*\/\s*sub\s*>/gi, (_m, g1) => `_${String(g1 ?? "").trim()}`)
+            .replace(/<\s*\/\s*sup\s*>/gi, "")
+            .replace(/<\s*\/\s*sub\s*>/gi, "")
+            .replace(/<\s*sup\s*>/gi, "^")
+            .replace(/<\s*sub\s*>/gi, "_")
+            .replace(/<\/?[^>]+>/g, "");
+          t = t.replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+          return t;
+        };
         const cleanOptionText = (s) => {
-          let t = String(s ?? "").trim();
+          let t = cleanInlineHtml(s);
           t = t.replace(/^\s*\(?([A-Ea-e]|[1-9]|10)\)?\s*[\)\.\-:]\s*/,'');
           t = t.replace(/^\s*[A-Ea-e]\.\s+/,'');
           t = t.replace(/^\s*[A-Ea-e]\s*-\s+/,'');
@@ -3071,13 +3084,13 @@ session_write_close();
         if (rawType === "isian") type = "isian";
         if (sec?.bentuk) type = sec.bentuk;
         
-        const question = String(item?.question ?? "").trim();
-        const explanation = String(item?.explanation ?? "").trim();
-        const difficulty = String(item?.difficulty ?? "").trim();
-        const bloom = String(item?.bloom ?? "").trim();
-        const materi = String(item?.materi ?? "").trim();
-        const indikator = String(item?.indikator ?? "").trim();
-        const imagePrompt = String(item?.imagePrompt ?? "").trim();
+        const question = cleanInlineHtml(item?.question ?? "");
+        const explanation = cleanInlineHtml(item?.explanation ?? "");
+        const difficulty = cleanInlineHtml(item?.difficulty ?? "");
+        const bloom = cleanInlineHtml(item?.bloom ?? "");
+        const materi = cleanInlineHtml(item?.materi ?? "");
+        const indikator = cleanInlineHtml(item?.indikator ?? "");
+        const imagePrompt = cleanInlineHtml(item?.imagePrompt ?? "");
         let invalidMenjodohkan = false;
         
         const options = Array.isArray(item?.options) ? item.options.map((x) => cleanOptionText(x)).filter(Boolean) : [];
