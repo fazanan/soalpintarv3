@@ -4,6 +4,10 @@ if (!isset($_SESSION['user_id'])) {
   header('Location: login.php');
   exit;
 }
+if (trim(strtolower((string)($_SESSION['username'] ?? ''))) === 'coba@gmail.com') {
+  header('Location: index.php');
+  exit;
+}
 require_once __DIR__ . '/db.php';
 $userId = (int)($_SESSION['user_id'] ?? 0);
 $username = (string)($_SESSION['username'] ?? '');

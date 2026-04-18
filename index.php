@@ -535,8 +535,9 @@ session_write_close();
     <input id="projectPicker" type="file" accept=".json" class="hidden" />
     <input id="lkpdImgUpload" type="file" accept="image/*" class="hidden" />
     <input id="lkpdTxtUpload" type="file" accept=".txt,.md,.markdown,.csv,.json,.html,.htm" class="hidden" />
-    <input id="topikImgUpload" type="file" accept="image/*" class="hidden" />
+    <input id="topikImgUpload" type="file" accept="image/*" multiple class="hidden" />
     <input id="topikTxtUpload" type="file" accept=".txt,.md,.markdown,.csv,.json,.html,.htm" class="hidden" />
+    <input id="topikPdfUpload" type="file" accept="application/pdf" class="hidden" />
     <input id="rosterPicker" type="file" accept=".csv,.txt" class="hidden" />
     <input id="rekapExcelPicker" type="file" accept=".xlsx,.xls" class="hidden" />
     <input id="rekapPrintLogoPicker" type="file" accept="image/*" class="hidden" />
@@ -557,11 +558,12 @@ session_write_close();
       const HAS_RPP_ACCESS = IS_ADMIN || ACCESS_RPP;
       const USER_PROFILE = <?php echo json_encode($__userProfile, JSON_UNESCAPED_UNICODE); ?>;
       const LOGIN_NAME = <?php echo json_encode(trim((string)(($_SESSION['nama'] ?? '') !== '' ? $_SESSION['nama'] : ($_SESSION['username'] ?? ''))), JSON_UNESCAPED_UNICODE); ?>;
+      const IS_DEMO_USER = <?php echo (trim(strtolower((string)($_SESSION['username'] ?? ''))) === 'coba@gmail.com') ? 'true' : 'false'; ?>;
 
       const APP_KEY = "soalpintar:v1";
       const OPENAI_TIMEOUT_MS = 55000;
       const GEN_BATCH_SIZE = 10;
-      const GEN_MAX_ATTEMPTS = 5;
+      const GEN_MAX_ATTEMPTS = 12;
       const MA_MAX_PERTEMUAN = 4;
       const VIEWS = [
         { id: "preview", label: "Buat Soal", icon: "description" },
@@ -620,6 +622,7 @@ session_write_close();
           "Seni Teater",
           "Seni Tari",
           "Bahasa Inggris",
+          "Pendidikan Lingkungan Hidup",
           "Muatan Lokal",
           "Bimbingan Konseling",
         ],
@@ -651,6 +654,7 @@ session_write_close();
           "Seni Teater",
           "Seni Tari",
           "Prakarya",
+          "Pendidikan Lingkungan Hidup",
           "Muatan Lokal",
           "Bimbingan Konseling",
         ],
@@ -689,6 +693,7 @@ session_write_close();
           "Seni Tari",
           "Prakarya dan Kewirausahaan",
           "Bahasa Asing Lain",
+          "Pendidikan Lingkungan Hidup",
           "Muatan Lokal",
           "Bimbingan Konseling",
         ],
@@ -716,6 +721,7 @@ session_write_close();
           "Dasar-dasar Program Keahlian",
           "Konsentrasi Keahlian",
           "Projek Kreatif dan Kewirausahaan",
+          "Pendidikan Lingkungan Hidup",
           "Muatan Lokal",
           "Bimbingan Konseling",
         ],
@@ -790,7 +796,7 @@ session_write_close();
           pendekatan: "Standar",
           modelPembelajaran: "Project Based Learning (PjBL)",
           supervisi: false,
-          dimensi: [], hasil: "", isGenerating: false,
+          dimensi: [], hasil: "", isGenerating: false, isRefiningKegiatan: false, kegiatanRefinedOnce: false,
         },
         rpp: {
           jenjang: "",
@@ -2482,6 +2488,9 @@ session_write_close();
             for (let i = 0; i < lines.length; i++) {
               const line = lines[i] || '';
               if (line.trim() === '[[PAGE_BREAK]]') { out.push({ t: 'pb' }); continue; }
+              if (line.trim().match(/^---+$/)) { out.push({ t: 'hr' }); continue; }
+              const fullBold = line.match(/^\s*\*\*(.+?)\*\*\s*$/);
+              if (fullBold) { out.push({ t: 'h', l: 3, v: String(fullBold[1] || '').trim() }); continue; }
               if (line.match(/^\|[-|: ]+\|?$/)) continue; // separator
               if (line.trim().startsWith('|')) {
                 inTbl = true;
@@ -2506,7 +2515,21 @@ session_write_close();
               else if (line.match(/^[-•] /)) out.push({ t: 'ul', v: line.replace(/^[-•] /, '').replace(/\*\*(.+?)\*\*/g, '$1') });
               else if (line.match(/^\d+\. /)) {
                 const m = line.match(/^(\d+)\. (.*)/);
-                out.push({ t: 'ol', n: m ? m[1] : '', v: m ? m[2].replace(/\*\*(.+?)\*\*/g, '$1') : line });
+                const rest = m ? String(m[2] || '') : String(line || '');
+                const isBold = /\*\*(.+?)\*\*/.test(rest);
+                const v = rest.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1').trim();
+                const cont = [];
+                let k = i + 1;
+                while (k < lines.length) {
+                  const l = lines[k] || '';
+                  if (!l.trim()) break;
+                  if (l.trim().match(/^---+$/)) break;
+                  if (/^\s*\d+\.\s+/.test(l) || /^\s*[-•]\s+/.test(l) || /^\s*#{1,4}\s*/.test(l) || l.includes('|')) break;
+                  if (/^\s{2,}\S/.test(l)) { cont.push(l.trim()); k++; continue; }
+                  break;
+                }
+                out.push({ t: 'ol', n: m ? m[1] : '', v, bold: isBold, cont });
+                i = k - 1;
               } else out.push({ t: 'p', v: line.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1') });
             }
             if (inTbl) flushTbl();
@@ -2528,9 +2551,18 @@ session_write_close();
                 after();
                 continue;
               }
+              if (b.t === 'hr') { const after = sp(10, 10); newPageIfNeeded(20); doc.setDrawColor(150); doc.line(margin, y, pageW - margin, y); y += 10; after(); continue; }
               if (b.t === 'p') { const after = sp(3, 3); addWrapped(b.v, 11, false, false, 'left', 0, 14); after(); continue; }
               if (b.t === 'ul') { const after = sp(2, 2); addWrapped(`• ${b.v}`, 11, false, false, 'left', 24, 14); after(); continue; }
-              if (b.t === 'ol') { const after = sp(2, 2); addWrapped(`${b.n}. ${b.v}`, 11, false, false, 'left', 24, 14); after(); continue; }
+              if (b.t === 'ol') {
+                const after = sp(2, 2);
+                addWrapped(`${b.n}. ${b.v}`, 11, !!b.bold, false, 'left', 24, 14);
+                if (Array.isArray(b.cont) && b.cont.length) {
+                  for (const c of b.cont) addWrapped(String(c || ''), 11, false, false, 'left', 44, 14);
+                }
+                after();
+                continue;
+              }
               if (b.t === 'tbl') {
                 const after = sp(6, 6);
                 newPageIfNeeded(120);
@@ -4199,6 +4231,8 @@ session_write_close();
         const kelasOpts = CLASS_OPTIONS[jenjangEfektif] || [];
         const dimArr    = Array.isArray(M.dimensi) ? M.dimensi : [];
         const hasilAda  = !!M.hasil;
+        const isRefiningKegiatan = !!M.isRefiningKegiatan;
+        const kegiatanRefinedOnce = !!M.kegiatanRefinedOnce;
         const tab = state.modulAjarTab || (hasilAda ? 'modul' : 'informasi');
         const maErr = state.modulAjarError;
         const pendekatanOpts = ['Standar','CTL (Contextual Teaching and Learning)','Deep Learning','Deep Learning + CTL','Berbasis Cinta (KBC)','Deep Learning + KBC'];
@@ -4438,6 +4472,11 @@ session_write_close();
                       ${hasilAda ? `onclick="window.__sp.exportModulAjarPDF()"` : 'disabled'}>
                       <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
                       Download PDF
+                    </button>
+                    <button id="btnMADetailKegiatan" class="${(hasilAda && !isRefiningKegiatan && !M.isGenerating && !kegiatanRefinedOnce) ? 'inline-flex bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-primary border border-primary' : 'inline-flex bg-gray-200 text-gray-500 border border-gray-300 opacity-60 cursor-not-allowed'} items-center gap-2 h-9 px-4 rounded-lg text-sm font-bold"
+                      ${(hasilAda && !isRefiningKegiatan && !M.isGenerating && !kegiatanRefinedOnce) ? `onclick="window.__sp.refineModulAjarKegiatan()"` : 'disabled'}>
+                      <span class="material-symbols-outlined text-[18px]">edit_note</span>
+                      Perjelas Kegiatan
                     </button>
                   </div>
                 </div>
@@ -4733,11 +4772,26 @@ session_write_close();
       function maMarkdownToHtml(md) {
         if (!md) return '';
         const esc = (s) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const fmtInline = (raw) =>
+          esc(String(raw || ''))
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.+?)\*/g, '<em>$1</em>');
         const lines = md.split('\n');
         const parts = [];
         let i = 0;
         while (i < lines.length) {
           const line = lines[i];
+          if (/^\s*---+\s*$/.test(line)) {
+            parts.push('<hr class="ma-hr">');
+            i++;
+            continue;
+          }
+          const fullBold = line.match(/^\s*\*\*(.+?)\*\*\s*$/);
+          if (fullBold) {
+            parts.push(`<h2>${fmtInline(fullBold[0].trim())}</h2>`);
+            i++;
+            continue;
+          }
           const hasPipe = line.includes('|') && line.trim() !== '';
           if (hasPipe) {
             const next = lines[i + 1] || '';
@@ -4784,9 +4838,9 @@ session_write_close();
               const isMain = /^MODUL AJAR\b/i.test(text);
               parts.push(isMain ? `<h1 class="ma-title">${esc(text)}</h1>` : `<h1>${esc(text)}</h1>`);
             } else if (lvl === 3) {
-              parts.push(`<h2>${esc(text)}</h2>`);
+              parts.push(`<h2>${fmtInline(text)}</h2>`);
             } else {
-              parts.push(`<h3>${esc(text)}</h3>`);
+              parts.push(`<h3>${fmtInline(text)}</h3>`);
             }
             i++; 
             continue;
@@ -4801,7 +4855,7 @@ session_write_close();
             const isFollowingBullet = /^\s*[-•]\s+/.test(nextNonEmpty);
             if (!isFollowingNum && !isFollowingBullet) {
               const title = line.replace(numHeadRe, (_m, n, t) => `${n}. ${t}` );
-              parts.push(`<h2>${esc(title)}</h2>`);
+              parts.push(`<h2>${fmtInline(title)}</h2>`);
               i++;
               continue;
             }
@@ -4810,7 +4864,7 @@ session_write_close();
             let j = i;
             let html = '<ul>';
             while (j < lines.length && /^\s*[-•]\s+/.test(lines[j])) {
-              const txt = lines[j].replace(/^\s*[-•]\s+/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(.+?)\*/g, '<em>$1</em>');
+              const txt = fmtInline(lines[j].replace(/^\s*[-•]\s+/, ''));
               html += `<li>${txt}</li>`;
               j++;
             }
@@ -4823,9 +4877,26 @@ session_write_close();
             let j = i;
             let html = '<ol>';
             while (j < lines.length && /^\s*\d+\.\s+/.test(lines[j])) {
-              const txt = lines[j].replace(/^\s*\d+\.\s+/, '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\*(.+?)\*/g, '<em>$1</em>');
-              html += `<li>${txt}</li>`;
-              j++;
+              const title = fmtInline(lines[j].replace(/^\s*\d+\.\s+/, ''));
+              const cont = [];
+              let k = j + 1;
+              while (k < lines.length) {
+                const l = lines[k];
+                if (l.trim() === '') break;
+                if (/^\s*\d+\.\s+/.test(l) || /^\s*[-•]\s+/.test(l) || /^\s*#{1,4}\s*/.test(l) || l.includes('|') || /^\s*---+\s*$/.test(l)) break;
+                if (/^\s{2,}\S/.test(l)) {
+                  cont.push(fmtInline(l.replace(/^\s+/, '')));
+                  k++;
+                  continue;
+                }
+                break;
+              }
+              if (cont.length) {
+                html += `<li><div>${title}</div>${cont.map(x => `<div>${x}</div>`).join('')}</li>`;
+              } else {
+                html += `<li>${title}</li>`;
+              }
+              j = k;
             }
             html += '</ol>';
             parts.push(html);
@@ -4841,7 +4912,7 @@ session_write_close();
             para.push(l);
             j++;
           }
-          const ptxt = para.join(' ').replace(/\s+/g,' ').trim().replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>');
+          const ptxt = fmtInline(para.join(' ').replace(/\s+/g,' ').trim());
           parts.push(`<p>${ptxt}</p>`);
           i = j;
           continue;
@@ -4934,6 +5005,11 @@ session_write_close();
             const m = t.match(/Pertemuan\s+(\d+)\s*(?:\((\d+)\s*menit\))?/i);
             return { no: m ? Number(m[1]) : null, total: m && m[2] ? Number(m[2]) : null };
           };
+          const isKegiatanPembelajaranHeading = (line) => {
+            const t = String(line || '').trim();
+            if (!t) return false;
+            return /^(?:#{1,6}\s*)?(?:\*{0,2})?(?:\d+\.\s*)?Kegiatan\s+Pembelajaran\b/i.test(t);
+          };
           const isBoundary = (line) => {
             const t = String(line || '').trim();
             if (!t) return false;
@@ -4951,6 +5027,10 @@ session_write_close();
           const out = [];
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
+            if (isKegiatanPembelajaranHeading(line)) {
+              out.push('---', '', '**5. Kegiatan Pembelajaran**', '');
+              continue;
+            }
             if (!isPertemuan(line)) {
               out.push(line);
               continue;
@@ -4959,18 +5039,41 @@ session_write_close();
             let j = i + 1;
             while (j < lines.length && !isPertemuan(lines[j]) && !isBoundary(lines[j])) j++;
             const block = lines.slice(i + 1, j);
-            if (block.some((l) => /^\s*\|\s*Tahap\s*\|\s*Komponen\s*\|/i.test(String(l || '').trim()))) {
-              out.push(line);
-              out.push(...block);
-              i = j - 1;
-              continue;
-            }
 
             const stages = [
               { name: 'Pendahuluan', total: null, items: [] },
               { name: 'Kegiatan Inti', total: null, items: [] },
               { name: 'Penutup', total: null, items: [] },
             ];
+            const blockTextRaw = block.join('\n');
+            const legacySteps = [];
+            if (/\[Durasi:\s*\d+\s*menit\]/i.test(blockTextRaw)) {
+              const cleaned = blockTextRaw
+                .replace(/\\r\\n/g, '\n')
+                .replace(/\\r/g, '\n')
+                .replace(/\s+/g, ' ')
+                .replace(/\(\s*(\d+)\s*\)\s*/g, '\n($1) ')
+                .trim();
+              const tm = cleaned.match(/Kegiatan\s+Inti\s*\(\s*(\d+)\s*menit\s*\)/i);
+              if (tm) stages[1].total = Number(tm[1]);
+              const stepRe = /\((\d+)\)\s*\[Durasi:\s*(\d+)\s*menit\]\s*(?:\[Komponen:\s*([^\]]+)\]\s*)?([^()]+?)(?=\(\d+\)\s*\[Durasi:|$)/gi;
+              let m;
+              while ((m = stepRe.exec(cleaned)) !== null) {
+                const dur = Number(m[2]) || 0;
+                let komponen = String(m[3] || '').replace(/\[Komponen\]/gi, '').replace(/\s+/g, ' ').trim();
+                let detail = String(m[4] || '').replace(/\[Komponen[^\]]*\]/gi, '').replace(/\s+/g, ' ').trim();
+                if (!komponen) {
+                  const first = detail.split('.').map(s => s.trim()).filter(Boolean)[0] || '';
+                  komponen = (first || 'Langkah').slice(0, 60).trim();
+                } else {
+                  komponen = komponen.length > 80 ? komponen.slice(0, 80).trim() : komponen;
+                }
+                legacySteps.push({ komponen, detail, dur, catatan: '' });
+              }
+              if (legacySteps.length) {
+                stages[1].items = legacySteps;
+              }
+            }
             const stageIdx = (n) => {
               const key = String(n || '').toLowerCase().replace(/\s+/g, ' ').trim();
               if (key === 'pendahuluan') return 0;
@@ -4979,45 +5082,67 @@ session_write_close();
               return -1;
             };
             let curStage = -1;
-            for (let k = 0; k < block.length; k++) {
-              const raw = String(block[k] || '');
-              const t = raw.trim();
-              if (!t) continue;
-              const sm = t.match(stageRe);
-              if (sm) {
-                curStage = stageIdx(sm[1]);
-                if (curStage >= 0) stages[curStage].total = Number(sm[2]);
-                continue;
+            const hasTable = block.some((l) => /^\s*\|\s*Tahap\s*\|\s*Komponen\s*\|/i.test(String(l || '').trim()));
+            if (legacySteps.length) {
+            } else if (hasTable) {
+              for (let k = 0; k < block.length; k++) {
+                const t = String(block[k] || '').trim();
+                if (!t) continue;
+                if (!t.startsWith('|')) continue;
+                if (/^\|\s*-+\s*\|/i.test(t)) continue;
+                if (/^\|\s*Tahap\s*\|\s*Komponen\s*\|/i.test(t)) continue;
+                const cols = t.replace(/^\|/, '').replace(/\|$/, '').split('|').map(x => String(x || '').trim());
+                if (cols.length < 5) continue;
+                const tahap = cols[0];
+                const komponen = cols[1];
+                const detail = cols[2];
+                const dur = Number(String(cols[3] || '').replace(/[^\d]/g, '')) || 0;
+                const catatan = cols.slice(4).join(' | ').trim();
+                const si = stageIdx(tahap);
+                const idx = si >= 0 ? si : 1;
+                stages[idx].items.push({ komponen, detail, dur, catatan });
               }
-              const im = raw.match(itemRe);
-              if (!im) continue;
-              const content = String(im[1] || '').trim();
-              const compSplit = content.split(':');
-              let komponen = '';
-              let detail = '';
-              if (compSplit.length >= 2) {
-                komponen = compSplit.shift().trim();
-                detail = compSplit.join(':').trim();
-              } else {
-                komponen = content.length > 40 ? content.slice(0, 40).trim() : content;
-                detail = content;
+            } else {
+              for (let k = 0; k < block.length; k++) {
+                const raw = String(block[k] || '');
+                const t = raw.trim();
+                if (!t) continue;
+                const sm = t.match(stageRe);
+                if (sm) {
+                  curStage = stageIdx(sm[1]);
+                  if (curStage >= 0) stages[curStage].total = Number(sm[2]);
+                  continue;
+                }
+                const im = raw.match(itemRe);
+                if (!im) continue;
+                const content = String(im[1] || '').trim();
+                const compSplit = content.split(':');
+                let komponen = '';
+                let detail = '';
+                if (compSplit.length >= 2) {
+                  komponen = compSplit.shift().trim();
+                  detail = compSplit.join(':').trim();
+                } else {
+                  komponen = content.length > 40 ? content.slice(0, 40).trim() : content;
+                  detail = content;
+                }
+                let dur = null;
+                const dm = detail.match(/\((\d+)\s*menit\)/i);
+                if (dm) {
+                  dur = Number(dm[1]);
+                  detail = detail.replace(dm[0], '').trim();
+                }
+                const tags = [];
+                let m;
+                while ((m = mmjTagRe.exec(detail)) !== null) {
+                  const v = String(m[1] || '').trim();
+                  if (v && !tags.includes(v)) tags.push(v);
+                }
+                detail = detail.replace(mmjTagRe, '').replace(/\s+/g, ' ').trim();
+                const catatan = tags.length ? tags.join(' / ') : '';
+                if (curStage === -1) curStage = 1;
+                stages[curStage].items.push({ komponen, detail, dur, catatan });
               }
-              let dur = null;
-              const dm = detail.match(/\((\d+)\s*menit\)/i);
-              if (dm) {
-                dur = Number(dm[1]);
-                detail = detail.replace(dm[0], '').trim();
-              }
-              const tags = [];
-              let m;
-              while ((m = mmjTagRe.exec(detail)) !== null) {
-                const v = String(m[1] || '').trim();
-                if (v && !tags.includes(v)) tags.push(v);
-              }
-              detail = detail.replace(mmjTagRe, '').replace(/\s+/g, ' ').trim();
-              const catatan = tags.length ? tags.join(' / ') : '';
-              if (curStage === -1) curStage = 1;
-              stages[curStage].items.push({ komponen, detail, dur, catatan });
             }
 
             const knownStageTotals = stages.map(s => (typeof s.total === 'number' && !Number.isNaN(s.total) ? s.total : null));
@@ -5065,18 +5190,40 @@ session_write_close();
               ? pertemuanTotal
               : stages.flatMap(s => s.items).reduce((a, it) => a + (Number(it.dur) || 0), 0);
 
-            const heading = `#### Pertemuan ${hdr.no || ''}${finalTotal ? ` (${finalTotal} menit)` : ''}`.trim();
-            const tableLines = [
-              '| Tahap | Komponen | Kegiatan (sangat detail) | Durasi (menit) | Catatan |',
-              '| --- | --- | --- | ---: | --- |',
-            ];
-            stages.forEach((s) => {
+            out.push('---', '');
+            out.push(`**Pertemuan ${hdr.no || ''}${finalTotal ? ` (${finalTotal} menit)` : ''}**`.trim());
+            out.push('');
+
+            const renderStage = (stage, label) => {
+              const s = stage || { total: null, items: [] };
+              const sum = Array.isArray(s.items) ? s.items.reduce((a, it) => a + (Number(it.dur) || 0), 0) : 0;
+              const total = (typeof s.total === 'number' && !Number.isNaN(s.total)) ? s.total : sum;
+              if (!Array.isArray(s.items) || s.items.length === 0) return;
+              out.push(`**${label}${total ? ` (±${total} menit)` : ''}**`);
+              out.push('');
+              let idx = 1;
               s.items.forEach((it) => {
-                tableLines.push(`| ${esc(s.name)} | ${esc(it.komponen)} | ${esc(it.detail)} | ${Number(it.dur) || 0} | ${esc(it.catatan)} |`);
+                const dur = Number(it.dur) || 0;
+                let title = String(it.komponen || '').replace(/\s+/g, ' ').trim();
+                const detail = String(it.detail || '').replace(/\s+/g, ' ').trim();
+                if (!title) {
+                  const first = detail.split('.').map(s => s.trim()).filter(Boolean)[0] || '';
+                  title = (first || 'Langkah').slice(0, 60).trim();
+                }
+                const cat = String(it.catatan || '').replace(/\s+/g, ' ').trim();
+                out.push(`${idx}. **${title} (${dur} menit)**`);
+                out.push(`   ${detail}${cat ? ` (${cat})` : ''}`.trimEnd());
+                out.push('');
+                idx++;
               });
-            });
-            out.push(heading);
-            out.push(...tableLines);
+              out.push('');
+            };
+
+            renderStage(stages[0], 'Kegiatan Pendahuluan');
+            renderStage(stages[1], 'Kegiatan Inti');
+            renderStage(stages[2], 'Kegiatan Penutup');
+
+            out.push('---');
             out.push('');
             i = j - 1;
           }
@@ -5382,6 +5529,8 @@ session_write_close();
         state.modulAjarTab = "modul";
         state.modulAjarError = null;
         state.modulAjar.isGenerating = true;
+        state.modulAjar.isRefiningKegiatan = false;
+        state.modulAjar.kegiatanRefinedOnce = false;
         state.modulAjar.hasil = '';
         render();
 
@@ -5541,26 +5690,53 @@ Min. 4 indikator konkret dan terukur.`
           const dur = String(M.durasi || '').trim();
           const durLabel = dur ? `${dur} menit` : '... menit';
           const common = `FORMAT WAJIB (RAPI) untuk SETIAP pertemuan:
-- Tulis per pertemuan sebagai heading: "#### Pertemuan 1 (${durLabel})", "#### Pertemuan 2 (...)", dst sampai jumlah pertemuan terpenuhi.
-- Setelah heading, WAJIB buat tabel Markdown dengan kolom:
-  | Tahap | Komponen | Kegiatan (sangat detail) | Durasi (menit) | Catatan |
-- Isi baris-baris detail untuk:
-  - Pendahuluan: Salam & doa, apersepsi, motivasi, penyampaian tujuan (boleh tambah 1–2 komponen lain bila perlu).
-  - Kegiatan Inti: langkah-langkah detail sesuai pendekatan, model, & kurikulum.
-  - Penutup: refleksi, rangkuman, tindak lanjut, salam & doa.
-- Kolom "Durasi (menit)" wajib angka. Total seluruh baris WAJIB = ${durLabel} untuk setiap pertemuan.
-- Kolom "Catatan" WAJIB memuat keterkaitan (agar nyambung): TP yang dituju (contoh: TP1,TP3); bukti/produk (contoh: laporan/lembar kerja/presentasi); dan referensi LKPD (contoh: LKPD-1, LKPD-3).
-- Jangan gunakan bullet simbol (●/○/•/) di dalam tabel. Jika perlu pemecahan, pakai kalimat yang dipisah dengan titik koma.`;
+- Bagian ini WAJIB menggunakan format uraian seperti contoh (bukan tabel) dan TANPA tanda heading '#'.
+- Awali bagian ini dengan pemisah: '---' lalu judul tebal: '**5. Kegiatan Pembelajaran**'.
+- Untuk setiap pertemuan, WAJIB tulis 3 bagian: **Kegiatan Pendahuluan**, **Kegiatan Inti**, **Kegiatan Penutup**.
+- Format per pertemuan wajib seperti ini:
+  ---
+  **Pertemuan 1 (${durLabel})**
 
-          const intiK13 = `Untuk Kegiatan Inti (K13), gunakan alur saintifik 5M sebagai baris-baris dalam tabel dengan urutan:
+  **Kegiatan Pendahuluan (±... menit)**
+  1. **Orientasi (N menit)**
+     Uraian aktivitas guru & peserta didik secara detail dalam 1–2 kalimat.
+  2. ...
+
+  **Kegiatan Inti (±... menit)**
+  1. **Fase/Sintaks Model (N menit)**
+     Uraian aktivitas guru & peserta didik secara detail dalam 1–2 kalimat.
+  2. ...
+
+  **Kegiatan Penutup (±... menit)**
+  1. **Refleksi (N menit)**
+     Uraian aktivitas penutup secara jelas.
+  2. ...
+  ---
+- Ketentuan format:
+  - Gunakan penomoran '1.' '2.' dst (bukan bullet).
+  - Judul langkah WAJIB tebal dan memuat durasi dalam tanda kurung '(N menit)'.
+  - Baris uraian di bawahnya diindent 3 spasi.
+- Ketentuan isi:
+  - Kegiatan Pendahuluan minimal 4 langkah (mis. orientasi, apersepsi, motivasi, penyampaian tujuan/aturan main).
+  - Kegiatan Inti minimal 7 langkah dan judul langkah WAJIB mengikuti fase/sintaks model (mis. Stimulation, Problem Statement, Data Collection, Mengamati, Menanya, dst).
+  - Kegiatan Penutup minimal 3 langkah (mis. refleksi, rangkuman, tindak lanjut/penugasan, salam/doa).
+- Alokasi waktu:
+  - Total durasi Pendahuluan + Inti + Penutup untuk 1 pertemuan WAJIB = ${durLabel}.
+  - Setiap langkah WAJIB punya durasi angka (menit).
+- Jangan gunakan bullet simbol (●/○/•/).`;
+
+          const intiK13 = `Untuk Kegiatan Inti (K13), gunakan alur saintifik 5M sebagai urutan langkah dengan urutan:
 Mengamati → Menanya → Mencoba/Mengeksplorasi → Mengasosiasi/Menalar → Mengomunikasikan.
 Pastikan masing-masing punya durasi dan aktivitas yang konkret.`;
 
-          const intiMerdeka = `Untuk Kegiatan Inti, wajib mengikuti sintaks model "${M.modelPembelajaran}" dan menuliskan fase-fase model secara eksplisit sebagai label di kolom "Komponen" pada baris-baris Kegiatan Inti. Aktivitas harus konkret (apa yang dilakukan guru & peserta didik, data/lembar kerja yang dipakai, output yang dihasilkan).`;
+          const intiMerdeka = `Untuk Kegiatan Inti, wajib mengikuti sintaks model "${M.modelPembelajaran}" dan menuliskan fase-fase model secara eksplisit sebagai judul langkah (tebal) pada langkah-langkah Kegiatan Inti. Aktivitas harus konkret (apa yang dilakukan guru & peserta didik, data/lembar kerja yang dipakai, output yang dihasilkan).`;
 
           const dlRules = `Khusus Deep Learning:
-- Di Kegiatan Inti, wajib ada baris eksplisit: Eksplorasi, Analisis, Refleksi (boleh dipetakan ke 5M untuk K13).
-- Wajib ada elemen Mindful, Meaningful, Joyful tertulis eksplisit minimal 1 kali per pertemuan. Letakkan di kolom "Catatan" sebagai: Mindful / Meaningful / Joyful.
+- Di Kegiatan Inti, wajib ada langkah eksplisit: **Eksplorasi**, **Analisis**, **Refleksi** (boleh dipetakan ke 5M untuk K13).
+- Wajib ada elemen Mindful, Meaningful, Joyful tertulis eksplisit minimal 1 kali per pertemuan. Tulis sebagai 3 baris ringkas setelah Kegiatan Inti:
+  Mindful: ...
+  Meaningful: ...
+  Joyful: ...
 - Pertanyaan pemantik dan refleksi harus mendorong alasan (mengapa/bagaimana) dan transfer ke konteks nyata.`;
 
           if (isDL) return `${common}\n\n${isK13 ? intiK13 : intiMerdeka}\n\n${dlRules}`;
@@ -5575,7 +5751,7 @@ Khusus KBC: Pada SETIAP pertemuan, sisipkan minimal 1 aktivitas/strategi yang me
         const ctlKegiatan = isCTL
           ? `
 Khusus CTL: Pada SETIAP pertemuan, wajib ada urutan yang tampak jelas: (1) pemantik konteks nyata, (2) inkuiri/eksplorasi data, (3) diskusi/learning community, (4) modeling (contoh/produk/format), (5) presentasi/komunikasi hasil, (6) refleksi, (7) tindak lanjut/penerapan.
-Di kolom "Catatan" pada tabel kegiatan, tuliskan tag komponen CTL yang muncul pada langkah tersebut (gunakan tag persis): [Konstruktivisme], [Inkuiri], [Questioning], [Learning Community], [Modeling], [Refleksi], [Penilaian Autentik]. Pastikan ketujuh komponen muncul pada modul ini.`
+Di akhir langkah yang relevan, tuliskan tag komponen CTL yang muncul (gunakan tag persis): [Konstruktivisme], [Inkuiri], [Questioning], [Learning Community], [Modeling], [Refleksi], [Penilaian Autentik]. Pastikan ketujuh komponen muncul pada modul ini.`
           : ``;
 
         const identifikasiKesiapan = `
@@ -5917,6 +6093,76 @@ ${baselineModulAjar}
         }
       }
 
+      async function refineModulAjarKegiatan() {
+        const M = state.modulAjar || {};
+        if (M.kegiatanRefinedOnce) { alert('Perjelas Kegiatan hanya dapat dilakukan 1x setiap kali generate Modul Ajar. Jika ingin memperjelas lagi, silakan generate ulang Modul Ajar.'); return; }
+        const md = String(M.hasil || '').trim();
+        if (!md) { alert('Modul Ajar belum tersedia. Generate dulu.'); return; }
+        if (M.isGenerating || M.isRefiningKegiatan) return;
+        state.modulAjar.isRefiningKegiatan = true;
+        state.modulAjarError = null;
+        render();
+
+        const splitKegiatan = (raw) => {
+          const lines = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+          const isStart = (t) => /^(?:#{1,6}\s*)?(?:\*{0,2})?(?:\d+\.\s*)?Kegiatan\s+Pembelajaran\b/i.test(String(t || '').trim()) || /^\s*\*\*\s*5\.\s*Kegiatan\s+Pembelajaran\s*\*\*\s*$/i.test(String(t || ''));
+          const isEnd = (t) => /^(?:#{1,6}\s*)?(?:\*{0,2})?(?:6\.\s*)?Rubrik\s+Penilaian\b/i.test(String(t || '').trim())
+            || /^(?:#{1,6}\s*)?(?:\*{0,2})?(?:7\.\s*)?Daftar\s+Pustaka\b/i.test(String(t || '').trim())
+            || /^(?:#{1,6}\s*)?(?:\*{0,2})C\.\s*LAMPIRAN\b/i.test(String(t || '').trim());
+          let start = -1;
+          for (let i = 0; i < lines.length; i++) {
+            if (isStart(lines[i])) { start = i; break; }
+          }
+          if (start < 0) return null;
+          let end = lines.length;
+          for (let i = start + 1; i < lines.length; i++) {
+            if (isEnd(lines[i])) { end = i; break; }
+          }
+          return {
+            before: lines.slice(0, start).join('\n').trimEnd(),
+            section: lines.slice(start, end).join('\n').trim(),
+            after: lines.slice(end).join('\n').trimStart(),
+          };
+        };
+
+        try {
+          const parts = splitKegiatan(md);
+          if (!parts || !String(parts.section || '').trim()) throw new Error('Bagian Kegiatan Pembelajaran tidak ditemukan.');
+
+          const sys = 'Anda adalah editor kurikulum Indonesia. Tugas Anda memperjelas uraian kegiatan pembelajaran tanpa mengubah struktur utama. Gunakan Bahasa Indonesia baku dan formal.';
+          const usr = `Perjelas bagian berikut agar lebih detail (lebih kaya langkah operasional), tetapi WAJIB patuhi aturan ini:\n- Jangan mengubah urutan pertemuan.\n- Jangan mengubah judul pertemuan, judul bagian (Pendahuluan/Inti/Penutup), dan jangan mengubah format pemisah '---'.\n- Jangan menambah atau menghapus nomor langkah. Nomor 1., 2., dst harus tetap sama.\n- Jangan mengubah durasi yang sudah ada pada judul langkah (angka menit dalam tanda kurung).\n- Perjelas uraian tiap langkah menjadi 2–4 kalimat: jelaskan peran guru & murid, media/LKPD, output/produk, dan transisi singkat ke langkah berikutnya.\n- Hindari simbol bullet aneh (●/○/).\n\nKeluarkan HANYA bagian hasil revisinya (mulai dari judul Kegiatan Pembelajaran sampai sebelum bagian berikutnya).\n\nBAGIAN YANG DIREVISI:\n<<<\n${parts.section}\n>>>`;
+
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 240000);
+          const resp = await fetch('api/openai_proxy.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ type: 'modul_ajar', messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }], model: OPENAI_MODEL, max_tokens: 8000 }),
+            signal: ctrl.signal,
+          });
+          clearTimeout(timer);
+          if (!resp.ok) throw new Error(`Proxy ${resp.status}: ${await resp.text()}`);
+          const data = await resp.json();
+          const refined = String(data?.content || data?.choices?.[0]?.message?.content || '').trim();
+          if (!refined) throw new Error('Respons API kosong.');
+
+          const merged = [parts.before, refined, parts.after].filter(s => String(s || '').trim()).join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+          state.modulAjar.hasil = merged;
+          state.modulAjar.isRefiningKegiatan = false;
+          state.modulAjar.kegiatanRefinedOnce = true;
+          saveDebounced(true);
+          render();
+        } catch (e) {
+          state.modulAjar.isRefiningKegiatan = false;
+          render();
+          const msg = (e && (e.name === 'AbortError' || /aborted/i.test(String(e.message || ''))))
+            ? 'Proses terlalu lama (timeout). Silakan coba lagi.'
+            : (e?.message || 'Terjadi kesalahan.');
+          setTimeout(()=>{ const el=document.getElementById('maError'); if(el){el.textContent='⚠️ Gagal: '+msg; el.classList.remove('hidden');} }, 120);
+        }
+      }
+
       async function exportModulAjarDocx() {
         const M = state.modulAjar || {};
         if (!M.hasil) return;
@@ -5941,6 +6187,23 @@ ${baselineModulAjar}
             let tblRows=[], inTbl=false;
             let lastWasPB = false;
             let lastWasBlank = false;
+            const parseRuns = (text, baseSize = SZ) => {
+              const s = String(text || '');
+              const runs = [];
+              const re = /\*\*(.+?)\*\*/g;
+              let last = 0;
+              let m;
+              while ((m = re.exec(s)) !== null) {
+                const pre = s.slice(last, m.index);
+                if (pre) runs.push(new TextRun({ text: pre.replace(/\*(.+?)\*/g, '$1'), font: FONT, size: baseSize }));
+                runs.push(new TextRun({ text: String(m[1] || '').replace(/\*(.+?)\*/g, '$1'), font: FONT, size: baseSize, bold: true }));
+                last = m.index + m[0].length;
+              }
+              const tail = s.slice(last);
+              if (tail) runs.push(new TextRun({ text: tail.replace(/\*(.+?)\*/g, '$1'), font: FONT, size: baseSize }));
+              if (!runs.length) runs.push(new TextRun({ text: s.replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*(.+?)\*/g, '$1'), font: FONT, size: baseSize }));
+              return runs;
+            };
 
             const flushTbl = () => {
               if (!tblRows.length) return;
@@ -5974,6 +6237,20 @@ ${baselineModulAjar}
                 lastWasBlank = false;
                 continue;
               }
+              if (String(line || '').trim().match(/^---+$/)) {
+                if (inTbl) flushTbl();
+                if (out.length === 0 || lastWasPB) continue;
+                out.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: '999999' } }, ...sp(80, 80) }));
+                lastWasBlank = false;
+                lastWasPB = false;
+                continue;
+              }
+              const fullBold = String(line || '').match(/^\s*\*\*(.+?)\*\*\s*$/);
+              if (fullBold) {
+                if (inTbl) flushTbl();
+                out.push(new Paragraph({keepNext:true,keepLines:true,...sp(180,80),children:[new TextRun({text:String(fullBold[1] || '').trim(),font:FONT,size:26,bold:true})]}));
+                continue;
+              }
               if (line.match(/^\|[-|: ]+\|?$/)) continue;
               if (line.trim().startsWith('|')) {
                 inTbl=true;
@@ -6005,14 +6282,29 @@ ${baselineModulAjar}
                 out.push(new Paragraph({
                   ...sp(40,40),
                   indent:{left,hanging:hang},
-                  children:[new TextRun({text:'• '+String(line).replace(/^\s*[-•]\s+/,'').replace(/\*\*(.+?)\*\*/g,'$1'),font:FONT,size:SZ})]
+                  children:[new TextRun({text:'• ',font:FONT,size:SZ}), ...parseRuns(String(line).replace(/^\s*[-•]\s+/,''), SZ)]
                 }));
               } else if (line.match(/^\d+\. /)) {
                 const m=line.match(/^(\d+)\. (.*)/);
-                out.push(new Paragraph({...sp(40,40),indent:{left:400,hanging:200},children:[new TextRun({text:`${m[1]}. ${m[2].replace(/\*\*(.+?)\*\*/g,'$1')}`,font:FONT,size:SZ})]}));
+                const n = m ? m[1] : '';
+                const rest = m ? String(m[2] || '') : String(line || '');
+                out.push(new Paragraph({...sp(40,10),indent:{left:400,hanging:200},children:[new TextRun({text:`${n}. `,font:FONT,size:SZ}), ...parseRuns(rest, SZ)]}));
+                let k = i + 1;
+                while (k < lines.length) {
+                  const l = lines[k] || '';
+                  if (!l.trim()) break;
+                  if (String(l).trim().match(/^---+$/)) break;
+                  if (/^\s*\d+\.\s+/.test(l) || /^\s*[-•]\s+/.test(l) || /^\s*#{1,4}\s*/.test(l) || l.includes('|')) break;
+                  if (/^\s{2,}\S/.test(l)) {
+                    out.push(new Paragraph({...sp(0,10),indent:{left:650},children:parseRuns(String(l).trim(), SZ)}));
+                    k++;
+                    continue;
+                  }
+                  break;
+                }
+                i = k - 1;
               } else {
-                const txt=line.replace(/\*\*(.+?)\*\*/g,'$1').replace(/\*(.+?)\*/g,'$1');
-                out.push(new Paragraph({...sp(60,60),children:[new TextRun({text:txt,font:FONT,size:SZ})]}));
+                out.push(new Paragraph({...sp(60,60),children:parseRuns(String(line || ''), SZ)}));
               }
             }
             if (inTbl) flushTbl();
@@ -7134,7 +7426,7 @@ ${baselineModulAjar}
            </div>
            <div class="h-px bg-border-light dark:bg-border-dark my-2"></div>
            ${baseBtn('dark_mode','Tema','', 'id="btnTheme" onclick="toggleTheme()"')}
-           ${baseLink('profile.php','account_circle','Profil')}
+           ${IS_DEMO_USER ? `` : baseLink('profile.php','account_circle','Profil')}
            ${IS_ADMIN ? `
             ${baseLink('admin_soal_history.php','history','Riwayat')}
              ${baseLink('admin_audit_logs.php','bug_report','Audit Log')}
@@ -7525,6 +7817,10 @@ ${baselineModulAjar}
                           <button id="btnTopikUploadTxt" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikText()">
                             <span class="material-symbols-outlined text-[18px]">upload_file</span>
                             Upload File Teks
+                          </button>
+                          <button id="btnTopikUploadPdf" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikPdf()">
+                            <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                            Upload PDF
                           </button>
                         </div>
                       </div>
@@ -9294,8 +9590,10 @@ ${outputSchema}`;
 
           let needed = totalSec;
           let attempts = 0;
+          let noProgress = 0;
           let batchSize = Math.min(GEN_BATCH_SIZE, needed);
-          while (needed > 0 && attempts < GEN_MAX_ATTEMPTS) {
+          while (needed > 0 && attempts < GEN_MAX_ATTEMPTS && noProgress < 3) {
+            let added = 0;
             try {
               const ask = Math.min(batchSize, needed);
               const prompt = promptBase.replace("__JUMLAH__", String(ask));
@@ -9311,20 +9609,45 @@ ${outputSchema}`;
                 if (!q.question) continue;
                 state.questions.push(q);
                 needed--;
+                added++;
                 updateGenProgress();
                 if (needed <= 0) break;
               }
-              // jika respon kurang dari ask, kecilkan batch untuk berjaga timeout/limit
+              if (added === 0) noProgress++;
+              else noProgress = 0;
               if (items.length < ask && batchSize > 1) {
                 batchSize = Math.max(1, Math.floor(batchSize / 2));
               }
             } catch (e) {
-              // timeout/502 → perkecil batch dan coba lagi
               console.warn("Gen batch error:", e?.message || e);
               batchSize = Math.max(1, Math.floor(batchSize / 2));
+              noProgress++;
               await new Promise(r => setTimeout(r, 1000));
             } finally {
               attempts++;
+            }
+          }
+          if (needed > 0) {
+            let fillTries = 0;
+            const maxFill = Math.min(24, Math.max(6, needed * 3));
+            while (needed > 0 && fillTries < maxFill) {
+              try {
+                const prompt = promptBase.replace("__JUMLAH__", "1");
+                const res = await callOpenAI(prompt);
+                if (res && res._usage) {
+                  pkgTokenIn += Number(res._usage.in || 0);
+                  pkgTokenOut += Number(res._usage.out || 0);
+                }
+                const item = Array.isArray(res?.items) ? res.items[0] : null;
+                const q = item ? normalizeQuestion(item, sec) : null;
+                if (q && q.question) {
+                  state.questions.push(q);
+                  needed--;
+                  updateGenProgress();
+                }
+              } catch {}
+              fillTries++;
+              if (needed > 0) await new Promise(r => setTimeout(r, 400));
             }
           }
         }
@@ -9673,6 +9996,101 @@ ${out}`;
         elp.value = "";
         elp.click();
       };
+      const pickTopikPdf = () => {
+        const elp = el("topikPdfUpload");
+        if (!elp) return;
+        elp.value = "";
+        elp.click();
+      };
+      const ensurePdfJs = async () => {
+        if (window.pdfjsLib && window.pdfjsLib.getDocument) return;
+        const loadScript = (src) => new Promise((resolve, reject) => {
+          const existing = document.querySelector(`script[data-pdfjs-src="${src}"]`);
+          if (existing) {
+            existing.addEventListener('load', resolve, { once: true });
+            existing.addEventListener('error', () => reject(new Error('Gagal memuat PDF parser.')), { once: true });
+            return;
+          }
+          const s = document.createElement('script');
+          s.src = src;
+          s.async = true;
+          s.setAttribute('data-pdfjs-src', src);
+          s.onload = resolve;
+          s.onerror = () => reject(new Error('Gagal memuat PDF parser.'));
+          document.head.appendChild(s);
+        });
+
+        const candidates = [
+          {
+            lib: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.min.js',
+            worker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/legacy/build/pdf.worker.min.js',
+          },
+          {
+            lib: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+            worker: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js',
+          },
+        ];
+
+        let lastErr = null;
+        for (const c of candidates) {
+          try {
+            await loadScript(c.lib);
+            if (window.pdfjsLib && window.pdfjsLib.getDocument) {
+              window.pdfjsLib.GlobalWorkerOptions.workerSrc = c.worker;
+              return;
+            }
+          } catch (e) {
+            lastErr = e;
+          }
+        }
+        throw lastErr || new Error('PDF parser tidak tersedia.');
+      };
+      const pdfToText = async (file, maxPages = 25) => {
+        await ensurePdfJs();
+        const ab = await file.arrayBuffer();
+        const open = async (disableWorker) => window.pdfjsLib.getDocument({ data: ab, disableWorker }).promise;
+        let pdf;
+        try {
+          pdf = await open(false);
+        } catch {
+          pdf = await open(true);
+        }
+        const pages = Math.min(maxPages, pdf.numPages || 0);
+        const out = [];
+        for (let p = 1; p <= pages; p++) {
+          const page = await pdf.getPage(p);
+          const content = await page.getTextContent();
+          const text = (content?.items || []).map(it => String(it?.str || '')).join(' ').replace(/\s+/g, ' ').trim();
+          if (text) out.push(text);
+        }
+        return out.join("\n\n").trim();
+      };
+      const handleTopikPdfSelected = async (evt) => {
+        const file = evt.target?.files?.[0];
+        if (!file) return;
+        const btn = el("btnTopikUploadPdf");
+        const original = btn ? btn.innerHTML : "";
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Membaca PDF...'; }
+        try {
+          const text = await pdfToText(file, 25);
+          const cleaned = String(text || '').trim();
+          if (!cleaned) throw new Error('Teks PDF kosong atau tidak terbaca.');
+          state.identity = state.identity || {};
+          const prev = String(state.identity.topik_raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+          const head = `\n\n---\nSumber PDF: ${String(file.name || 'materi.pdf').trim()}\n---\n`;
+          const merged = [prev, head + cleaned].filter(Boolean).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+          state.identity.topik_raw = merged.slice(0, 30000);
+          saveDebounced(true);
+          render();
+          alert('Sumber materi berhasil dimuat dari PDF.');
+        } catch (e) {
+          const msg = String(e?.message || '').trim();
+          const extra = msg ? `\n\nDetail: ${msg}` : '';
+          alert('Gagal membaca PDF. Jika PDF berupa scan gambar, gunakan Upload Gambar agar dibaca OCR.' + extra);
+        } finally {
+          if (btn) { btn.disabled = false; if (original) btn.innerHTML = original; }
+        }
+      };
       async function ocrImageToText(file) {
         if (!window.Tesseract) throw new Error("OCR tidak tersedia");
         const result = await Tesseract.recognize(file, "eng");
@@ -9740,17 +10158,33 @@ ${out}`;
         reader.readAsText(file);
       };
       const handleTopikImageSelected = async (evt) => {
-        const file = evt.target?.files?.[0];
-        if (!file) return;
+        const files = Array.from(evt.target?.files || []).filter(Boolean);
+        if (!files.length) return;
         const btn = el("btnTopikUploadImg");
         const original = btn ? btn.innerHTML : "";
-        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> OCR...'; }
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> OCR (0/' + files.length + ')...'; }
         try {
-          const text = await ocrImageToText(file);
-          await setTopikFromMateri(text, btn, original, "gambar");
+          state.identity = state.identity || {};
+          const prev = String(state.identity.topik_raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+          const chunks = [];
+          for (let i = 0; i < files.length; i++) {
+            const f = files[i];
+            if (btn) btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> OCR (' + (i + 1) + '/' + files.length + ')...';
+            const text = await ocrImageToText(f);
+            const cleaned = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+            if (!cleaned) continue;
+            const head = `\n\n---\nSumber Gambar: ${String(f.name || `gambar-${i + 1}`).trim()}\n---\n`;
+            chunks.push(head + cleaned);
+          }
+          const merged = [prev, ...chunks].filter(Boolean).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+          state.identity.topik_raw = merged.slice(0, 30000);
+          saveDebounced(true);
+          render();
+          alert(files.length > 1 ? `Sumber materi berhasil dimuat dari ${files.length} gambar.` : 'Sumber materi berhasil dimuat dari gambar.');
         } catch (e) {
-          if (btn) { btn.disabled = false; btn.innerHTML = original; }
           alert("Gagal OCR gambar. Silakan coba file lain.");
+        } finally {
+          if (btn) { btn.disabled = false; if (original) btn.innerHTML = original; }
         }
       };
       const handleLkpdTextSelected = (evt) => {
@@ -11376,6 +11810,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         pickLkpdText,
         pickTopikImage,
         pickTopikText,
+        pickTopikPdf,
         buildPackage,
         uploadQuestionImage,
         exportDocx,
@@ -11417,6 +11852,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         },
         openModulAjarFromDetail,
         buildModulAjar,
+        refineModulAjarKegiatan,
         exportModulAjarDocx,
         cp046MapelInput,
         cp046MapelBlur,
@@ -11493,6 +11929,8 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       if (topikImg) topikImg.addEventListener("change", handleTopikImageSelected);
       const topikTxt = el("topikTxtUpload");
       if (topikTxt) topikTxt.addEventListener("change", handleTopikTextSelected);
+      const topikPdf = el("topikPdfUpload");
+      if (topikPdf) topikPdf.addEventListener("change", handleTopikPdfSelected);
       const rosterPicker = el("rosterPicker");
       if (rosterPicker) rosterPicker.addEventListener("change", handleRosterSelected);
       const rekapPicker = el("rekapExcelPicker");

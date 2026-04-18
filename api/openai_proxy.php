@@ -371,8 +371,8 @@ if ($type === 'modul_ajar') {
   ]);
   curl_setopt($ch, CURLOPT_POST, true);
   curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 20);
-  curl_setopt($ch, CURLOPT_TIMEOUT, 240);
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 30);
+  curl_setopt($ch, CURLOPT_TIMEOUT, 600);
   $result = curl_exec($ch);
   $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
   $err    = curl_error($ch);
