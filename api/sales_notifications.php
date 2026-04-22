@@ -1,4 +1,13 @@
 <?php
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Max-Age: 86400');
+header('Cache-Control: no-store');
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+  http_response_code(204);
+  exit;
+}
 header('Content-Type: application/json; charset=utf-8');
 @ini_set('display_errors', '0');
 @error_reporting(E_ERROR | E_PARSE);
