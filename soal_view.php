@@ -181,6 +181,12 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
     })();
     let submitted = false;
     let activeTab = 'soal';
+    function escapeHtml(s) {
+      return String(s ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
+    }
     function shuffleWithSeed(arr, seed) {
       const a = arr.slice();
       let s = seed;
@@ -224,12 +230,14 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       const cards = order.map((origIdx, i) => {
         const q = questions[origIdx] || {};
         const opts = Array.isArray(q.options) ? q.options : [];
+        const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+        const ctxHtml = ctxRaw ? `<div class="mb-3 p-3 rounded-xl border bg-gray-50 text-sm leading-relaxed">${escapeHtml(ctxRaw).replaceAll('\n','<br>')}</div>` : ``;
         const optsHtml = opts.map((t, oi) => `
           <div class="flex gap-3 items-start">
             <label class="font-semibold pt-0.5">${String.fromCharCode(65 + oi)}.</label>
             <label class="flex-1 flex gap-3 p-2 rounded-lg hover:bg-gray-50 transition">
               <input type="radio" name="q_${i}" value="${oi}" class="mt-1 rounded border-gray-300">
-              <span class="text-sm leading-relaxed">${String(t || '')}</span>
+              <span class="text-sm leading-relaxed">${escapeHtml(String(t || ''))}</span>
             </label>
           </div>
         `).join('');
@@ -238,7 +246,8 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
             <div class="flex gap-4">
               <span class="font-bold text-lg min-w-[1.5rem]">${i + 1}.</span>
               <div class="flex-1">
-                <p class="mb-3 text-justify leading-relaxed">${String(q.question || '')}</p>
+                ${ctxHtml}
+                <p class="mb-3 text-justify leading-relaxed">${escapeHtml(String(q.question || ''))}</p>
                 ${q.image ? `<img src="${String(q.image)}" class="w-64 h-64 object-contain rounded-lg mb-3 border shadow-sm">` : ``}
                 <div class="grid grid-cols-1 gap-2 pl-1">
                   ${optsHtml}
@@ -267,11 +276,14 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         const correctText = (Array.isArray(q.options) && q.options[correct]) ? q.options[correct] : '';
         const letter = correct >= 0 ? String.fromCharCode(65 + correct) : '-';
         const explain = String(q.explain || '');
+        const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+        const ctxHtml = ctxRaw ? `<div class="mt-2 mb-2 p-3 rounded-lg border bg-gray-50 text-sm leading-relaxed">${escapeHtml(ctxRaw).replaceAll('\n','<br>')}</div>` : ``;
         return `
           <div class="mb-4 rounded-xl border p-4">
-            <div class="font-semibold mb-1">${i+1}. ${String(q.question || '')}</div>
-            <div class="text-sm"><span class="font-semibold">Kunci:</span> ${letter}${correctText ? ` — ${correctText}` : ''}</div>
-            ${explain ? `<div class="text-sm mt-2"><span class="font-semibold">Pembahasan:</span> ${explain}</div>` : ``}
+            <div class="font-semibold mb-1">${i+1}. ${escapeHtml(String(q.question || ''))}</div>
+            ${ctxHtml}
+            <div class="text-sm"><span class="font-semibold">Kunci:</span> ${letter}${correctText ? ` — ${escapeHtml(correctText)}` : ''}</div>
+            ${explain ? `<div class="text-sm mt-2"><span class="font-semibold">Pembahasan:</span> ${escapeHtml(explain)}</div>` : ``}
           </div>
         `;
       }).join('');

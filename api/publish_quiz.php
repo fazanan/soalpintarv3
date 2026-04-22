@@ -151,10 +151,65 @@ $payloadObject['settings']['meta'] = [
   'kelas' => $kelas
 ];
 $payloadObject['settings']['show_solution'] = $showSolution ? 1 : 0;
-$payloadObject['settings']['answer_key'] = is_array($answerKey) ? array_map('intval', $answerKey) : [];
+$itemsList = is_array($payloadObject['items'] ?? null) ? $payloadObject['items'] : [];
+$normalizedAnswerKey = [];
+if (is_array($answerKey)) {
+  $nItems = count($itemsList);
+  if ($nItems > 0 && count($answerKey) !== $nItems) {
+    http_response_code(400);
+    echo json_encode([
+      'ok' => false,
+      'error' => 'answer_key_length_mismatch',
+      'expected' => $nItems,
+      'got' => count($answerKey),
+    ], JSON_UNESCAPED_UNICODE);
+    log_audit($mysqli, (int)$_SESSION['user_id'], 'warn', 'quiz_publish', 'Answer key length mismatch', 400, [
+      'expected' => $nItems,
+      'got' => count($answerKey),
+      'slug' => $slug,
+      'mapel' => $mapel,
+      'kelas' => $kelas,
+    ]);
+    exit;
+  }
+  $toIndex = function ($val, int $optCount): int {
+    $idx = 0;
+    if (is_int($val) || is_float($val)) {
+      $idx = (int)$val;
+    } else if (is_string($val)) {
+      $s = strtoupper(trim($val));
+      if (preg_match('/^[A-E]$/', $s)) {
+        $idx = ord($s) - 65;
+      } else if (preg_match('/^\d+$/', $s)) {
+        $n = (int)$s;
+        if ($optCount > 0 && $n >= 1 && $n <= $optCount) $idx = $n - 1;
+        else $idx = $n;
+      } else {
+        $idx = 0;
+      }
+    } else {
+      $idx = 0;
+    }
+    if ($optCount > 0) {
+      if ($idx < 0) $idx = 0;
+      if ($idx > ($optCount - 1)) $idx = $optCount - 1;
+    } else {
+      if ($idx < 0) $idx = 0;
+    }
+    return $idx;
+  };
+  for ($i = 0; $i < $nItems; $i++) {
+    $it = $itemsList[$i] ?? null;
+    $opts = (is_array($it) && isset($it['options']) && is_array($it['options'])) ? $it['options'] : [];
+    $optCount = count($opts);
+    $raw = $answerKey[$i] ?? 0;
+    $normalizedAnswerKey[] = $toIndex($raw, $optCount);
+  }
+}
+$payloadObject['settings']['answer_key'] = $normalizedAnswerKey;
 $jsonFlags = JSON_UNESCAPED_UNICODE | (defined('JSON_INVALID_UTF8_SUBSTITUTE') ? JSON_INVALID_UTF8_SUBSTITUTE : 0);
 $payloadJson = json_encode($payloadObject, $jsonFlags);
-$answerJson = is_string($answerKey) ? $answerKey : json_encode($answerKey, $jsonFlags);
+$answerJson = json_encode($normalizedAnswerKey, $jsonFlags);
 $total = is_array($payloadObject['items'] ?? null) ? count($payloadObject['items']) : 0;
 if (!is_string($payloadJson) || $payloadJson === '' || !is_string($answerJson) || $answerJson === '') {
   http_response_code(500);

@@ -1670,12 +1670,12 @@ session_write_close();
                   if (!q) { row.push(""); continue; }
                   let ansChar = "-";
                   if (sec.type === "benar_salah") {
-                    const idx = Number(q.answer);
+                    const idx = normalizeAnswerIndex(q.answer, ["Benar", "Salah"]);
                     ansChar = idx === 1 ? "Salah" : "Benar";
-                  } else if (typeof q.answer === "number") {
-                    ansChar = String.fromCharCode(65 + q.answer);
+                  } else {
+                    const idx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
+                    ansChar = String.fromCharCode(65 + idx);
                   }
-                  else if (typeof q.answer === "string") ansChar = q.answer;
                   row.push(`${i + j + 1}. ${ansChar}`);
                 }
                 body.push(row);
@@ -3907,9 +3907,10 @@ session_write_close();
           const rows = items.map((q, i) => {
             let ans = '';
             if (sec.type === 'pg') {
-              ans = typeof q.answer === 'number' ? String.fromCharCode(65 + q.answer) : String(q.answer ?? '');
+              const idx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
+              ans = String.fromCharCode(65 + idx);
             } else if (sec.type === 'benar_salah') {
-              const idx = Number(q.answer);
+              const idx = normalizeAnswerIndex(q.answer, ['Benar','Salah']);
               ans = idx === 1 ? 'Salah' : 'Benar';
             } else if (sec.type === 'pg_kompleks') {
               if (Array.isArray(q.answer)) ans = q.answer.map(n => String.fromCharCode(65 + Number(n))).join(', ');
@@ -8891,10 +8892,13 @@ ${baselineModulAjar}
         const q = state.questions[state.quiz.idx];
         const body = document.getElementById('quizBody');
         if (!q || !body) return;
+        const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+        const ctxHtml = ctxRaw ? `<div class="mb-4 p-3 rounded-lg border bg-gray-50 text-sm leading-relaxed">${safeText(ctxRaw).replaceAll('\n','<br>')}</div>` : '';
         if (q.type === 'pg' || q.type === 'pg_kompleks') {
           const selected = state.quiz.answered[state.quiz.idx];
+          const ansIdx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
           const optsHtml = q.options.map((opt, i) => {
-            const correct = Array.isArray(q.answer) ? (q.answer || []).includes(i) : i === (q.answer || 0);
+            const correct = Array.isArray(q.answer) ? (q.answer || []).includes(i) : i === ansIdx;
             const chosen = Array.isArray(selected) ? (selected || []).includes(i) : selected === i;
             const base = "block w-full text-left px-3 py-2 border rounded transition-colors";
             let stateCls = "";
@@ -8908,16 +8912,18 @@ ${baselineModulAjar}
           }).join('');
           body.innerHTML = `
             <div class="p-6">
+              ${ctxHtml}
               <div class="font-bold mb-4">${safeText(q.question)}</div>
               <div class="space-y-2">
                 ${optsHtml}
               </div>
-              ${state.quiz.reveal ? `<div class="mt-4 font-bold text-green-600">Kunci: ${Array.isArray(q.answer) ? q.answer.map(n => String.fromCharCode(65 + n)).join(', ') : String.fromCharCode(65 + (q.answer || 0))}</div>` : ``}
+              ${state.quiz.reveal ? `<div class="mt-4 font-bold text-green-600">Kunci: ${Array.isArray(q.answer) ? q.answer.map(n => String.fromCharCode(65 + Number(n))).join(', ') : String.fromCharCode(65 + ansIdx)}</div>` : ``}
             </div>
           `;
         } else {
           body.innerHTML = `
             <div class="p-6">
+              ${ctxHtml}
               <div class="font-bold mb-4">${safeText(q.question)}</div>
               <div class="text-sm text-text-sub-light">Jawaban ditampilkan setelah diungkap</div>
               ${state.quiz.reveal ? `<div class="mt-4 font-bold text-green-600">Kunci: ${safeText(String(q.answer || ''))}</div>` : ``}
@@ -9150,7 +9156,7 @@ ${baselineModulAjar}
           return;
         }
         const payload = pg.map(q => ({ question: String(q.question||''), options: q.options.map(x=>String(x||'')) }));
-        const answer_key = pg.map(q => Number(Array.isArray(q.answer)? q.answer[0] : q.answer || 0));
+        const answer_key = pg.map(q => normalizeAnswerIndex(Array.isArray(q.answer) ? q.answer[0] : q.answer, Array.isArray(q.options) ? q.options : []));
         const slug = String(state.quizPublishForm?.slug || "").trim().toLowerCase().replace(/[^a-z0-9\-]+/g,'-').replace(/^-+|-+$/g,'');
         let expireRaw = String(state.quizPublishForm?.expire || "").trim();
         const addDays = (d, days) => {
@@ -9292,6 +9298,7 @@ ${baselineModulAjar}
             const imgUrl = await uploadIfNeeded(q.image);
             return {
               question: String(q.question||''),
+              context: String(q.context || ''),
               options: q.options.map(x=>String(x||'')),
               explain: String(q.explanation || q.pembahasan || q.rationale || ''),
               image: imgUrl ? String(imgUrl) : ''
@@ -9668,13 +9675,66 @@ ${baselineModulAjar}
               return;
             }
             const normalized = applyContextPolicy({ context: base }).context || '';
-            let assigned = 0;
+            const nums = [...new Set((normalized.match(/\d{1,6}/g) || []))];
+            const stop = new Set([
+              'yang','dan','atau','dengan','untuk','dari','pada','dalam','ke','di','ini','itu','sebuah','para','oleh','setiap','agar','karena',
+              'maka','jika','jadi','serta','lebih','kurang','berapa','bagaimana','mengapa','kapan','dimana','siapa','apa','bukan','adalah',
+              'tersebut','sebagai','dapat','akan','harus','telah','sudah','belum','hanya','terhadap','antara','ketika','saat','masing','masing-masing',
+              'pertama','kedua','ketiga'
+            ]);
+            const wordCounts = new Map();
+            const tokens = normalized
+              .toLowerCase()
+              .replace(/[^\p{L}\p{N}]+/gu, ' ')
+              .split(/\s+/)
+              .map(x => x.trim())
+              .filter(Boolean);
+            for (const t of tokens) {
+              if (t.length < 4) continue;
+              if (stop.has(t)) continue;
+              wordCounts.set(t, (wordCounts.get(t) || 0) + 1);
+            }
+            const keywords = [...wordCounts.entries()]
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 12)
+              .map(([w]) => w);
+            const qIdxList = [];
+            const scoreByIdx = new Map();
+            for (let i = startIdx; i < endIdx; i++) {
+              const q = state.questions[i];
+              if (!q || !String(q.question || '').trim()) continue;
+              qIdxList.push(i);
+              const text = String(q.question || '').toLowerCase();
+              let score = 0;
+              for (const n of nums) if (n && text.includes(n)) score += 3;
+              for (const w of keywords) if (w && text.includes(w)) score += 1;
+              if (text.includes('berdasarkan') || text.includes('konteks') || text.includes('bacaan')) score += 1;
+              scoreByIdx.set(i, score);
+            }
+            const k = Math.max(0, Math.min(konteksSoalCount, qIdxList.length));
+            const chosen = new Set();
+            if (k > 0) {
+              if (k >= qIdxList.length) {
+                for (const idx of qIdxList) chosen.add(idx);
+              } else {
+                let bestStart = 0;
+                let bestSum = -1;
+                let sum = 0;
+                for (let p = 0; p < k; p++) sum += (scoreByIdx.get(qIdxList[p]) || 0);
+                bestSum = sum;
+                for (let start = 1; start <= qIdxList.length - k; start++) {
+                  sum -= (scoreByIdx.get(qIdxList[start - 1]) || 0);
+                  sum += (scoreByIdx.get(qIdxList[start + k - 1]) || 0);
+                  if (sum > bestSum) { bestSum = sum; bestStart = start; }
+                }
+                if (bestSum <= 0) bestStart = 0;
+                for (let p = bestStart; p < bestStart + k; p++) chosen.add(qIdxList[p]);
+              }
+            }
             for (let i = startIdx; i < endIdx; i++) {
               const q = state.questions[i];
               if (!q || !String(q.question || '').trim()) { state.questions[i] = { ...(q || {}), context: '' }; continue; }
-              if (assigned < konteksSoalCount) state.questions[i] = { ...q, context: normalized };
-              else state.questions[i] = { ...q, context: '' };
-              assigned++;
+              state.questions[i] = chosen.has(i) ? { ...q, context: normalized } : { ...q, context: '' };
             }
           };
 
@@ -9727,6 +9787,8 @@ ${baselineModulAjar}
 - Field "context" WAJIB minimal 2 paragraf (dipisahkan 1 baris kosong) dan memuat data/situasi nyata yang digunakan pada soal.
 - Panjang "context" disarankan 450–1100 karakter (jangan melebihi 1100).
 - Soal tanpa konteks WAJIB tetap boleh (field "context" kosong).
+- Untuk soal yang memakai stimulus, pertanyaan WAJIB nyambung dengan stimulus: tetap dalam skenario/objek yang sama dan menyebut minimal 1 data/fakta dari stimulus (misalnya angka, nama benda, tokoh, tempat, variabel).
+- DILARANG mengganti objek utama stimulus secara acak (misalnya stimulus tentang kue tapi soal tiba-tiba tentang buku) pada soal yang memakai stimulus.
 `
             : `\nMODE SOAL BERKONTEKS: NONAKTIF
 - Field "context" harus kosong. Soal langsung ke pertanyaan.\n`;
@@ -11286,12 +11348,12 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                                 const q = items[i+j];
                                 let ansChar = "-";
                                 if (sec.type === 'benar_salah') {
-                                  const idx = Number(q.answer);
+                                  const idx = normalizeAnswerIndex(q.answer, ['Benar','Salah']);
                                   ansChar = idx === 1 ? 'Salah' : 'Benar';
-                                } else if (typeof q.answer === 'number') {
-                                  ansChar = String.fromCharCode(65 + q.answer);
+                                } else {
+                                  const idx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
+                                  ansChar = String.fromCharCode(65 + idx);
                                 }
-                                else if (typeof q.answer === 'string') ansChar = q.answer;
                                 rowCells.push(new TableCell({
                                     children: [new Paragraph({ text: `${i+j+1}. ${ansChar}` })],
                                     borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
@@ -11951,12 +12013,12 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                       const q = items[i+j];
                       let ansChar = "-";
                       if (sec.type === 'benar_salah') {
-                        const idx = Number(q.answer);
+                        const idx = normalizeAnswerIndex(q.answer, ['Benar','Salah']);
                         ansChar = idx === 1 ? 'Salah' : 'Benar';
-                      } else if (typeof q.answer === 'number') {
-                        ansChar = String.fromCharCode(65 + q.answer);
+                      } else {
+                        const idx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
+                        ansChar = String.fromCharCode(65 + idx);
                       }
-                      else if (typeof q.answer === 'string') ansChar = q.answer;
                       rowCells.push(new TableCell({
                         children: [new Paragraph({ text: `${i+j+1}. ${ansChar}` })],
                         borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
