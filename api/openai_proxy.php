@@ -16,7 +16,9 @@ $isLockExempt = (int)($_SESSION['session_lock_exempt'] ?? 0) === 1;
 require_once __DIR__ . '/../auth_lock.php';
 $sid = session_id();
 if ($user_id > 0 && $sid && $role !== 'admin' && !$isLockExempt) {
-  if (!auth_lock_touch($user_id, $sid)) {
+  $did = auth_lock_get_device_id();
+  $fp = auth_lock_fingerprint();
+  if (!auth_lock_touch($user_id, $sid, $did, $fp)) {
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
     exit;

@@ -1,6 +1,24 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../db.php';
+function normalize_student_name($s) {
+  $s = trim((string)$s);
+  if ($s === '') return '';
+  $s = str_replace("\0", '', $s);
+  for ($i = 0; $i < 2; $i++) {
+    if (strpos($s, '%') === false && strpos($s, '+') === false) break;
+    $dec = urldecode($s);
+    if ($dec === $s) break;
+    $s = $dec;
+  }
+  $s = preg_replace('/\s+/', ' ', $s);
+  if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+    if (mb_strlen($s, 'UTF-8') > 120) $s = mb_substr($s, 0, 120, 'UTF-8');
+  } else {
+    if (strlen($s) > 120) $s = substr($s, 0, 120);
+  }
+  return $s;
+}
 $raw = file_get_contents('php://input');
 $data = json_decode($raw, true);
 $slug = isset($data['slug']) ? trim((string)$data['slug']) : '';
@@ -14,8 +32,7 @@ if (($slug === '' && $pubIdParam <= 0) || $absen <= 0 || empty($answers) || empt
   echo json_encode(['ok'=>false,'error'=>'invalid_input']);
   exit;
 }
-$nama = preg_replace('/\s+/', ' ', $nama);
-if (strlen($nama) > 120) $nama = substr($nama, 0, 120);
+$nama = normalize_student_name($nama);
 $sql = $pubIdParam > 0
   ? "SELECT id, answer_key, is_active, expire_at, total_soal, payload_public FROM published_quizzes WHERE id=? LIMIT 1"
   : "SELECT id, answer_key, is_active, expire_at, total_soal, payload_public FROM published_quizzes WHERE slug=? LIMIT 1";
@@ -72,14 +89,14 @@ for ($i=0; $i<$len; $i++) {
 $totalFinal = $total ?: $len;
 $stmt = null;
 try {
-  $stmt = $mysqli->prepare("INSERT INTO published_quiz_results (published_id, absen, nama, score, total) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nama=IF(nama IS NULL OR nama='', VALUES(nama), nama)");
+  $stmt = $mysqli->prepare("INSERT INTO published_quiz_results (published_id, absen, nama, score, total) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nama=CASE WHEN VALUES(nama) IS NULL OR VALUES(nama)='' THEN nama WHEN nama IS NULL OR nama='' THEN VALUES(nama) WHEN nama LIKE '%\\%%' OR nama LIKE '%+%' THEN VALUES(nama) WHEN CHAR_LENGTH(nama) < CHAR_LENGTH(VALUES(nama)) THEN VALUES(nama) ELSE nama END");
 } catch (mysqli_sql_exception $e) {
   $stmt = null;
 }
 if (!$stmt) {
   try { $mysqli->query("ALTER TABLE published_quiz_results ADD COLUMN nama VARCHAR(120) NULL AFTER absen"); } catch (mysqli_sql_exception $e) {}
   try {
-    $stmt = $mysqli->prepare("INSERT INTO published_quiz_results (published_id, absen, nama, score, total) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nama=IF(nama IS NULL OR nama='', VALUES(nama), nama)");
+    $stmt = $mysqli->prepare("INSERT INTO published_quiz_results (published_id, absen, nama, score, total) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE nama=CASE WHEN VALUES(nama) IS NULL OR VALUES(nama)='' THEN nama WHEN nama IS NULL OR nama='' THEN VALUES(nama) WHEN nama LIKE '%\\%%' OR nama LIKE '%+%' THEN VALUES(nama) WHEN CHAR_LENGTH(nama) < CHAR_LENGTH(VALUES(nama)) THEN VALUES(nama) ELSE nama END");
   } catch (mysqli_sql_exception $e) {
     $stmt = null;
   }

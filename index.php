@@ -31,7 +31,9 @@ function normalize_nama(string $s): string {
 }
 
 if ($__uid > 0 && $__sid && $__role !== 'admin' && !$__isLockExempt) {
-  if (!auth_lock_touch($__uid, $__sid)) {
+  $__did = auth_lock_get_device_id();
+  $__fp = auth_lock_fingerprint();
+  if (!auth_lock_touch($__uid, $__sid, $__did, $__fp)) {
     $_SESSION = [];
     session_destroy();
     header('Location: login.php?e=busy');
@@ -847,6 +849,7 @@ session_write_close();
             tingkatKesulitan: "campuran",
             cakupanBloom: "level_standar",
             dimensi: ["C1", "C2", "C3", "C4"],
+            soalKonteks: false,
             pakaiGambar: false,
           },
         ],
@@ -899,6 +902,20 @@ session_write_close();
         safeText(s)
           .replaceAll('"', "&quot;")
           .replaceAll("'", "&#39;");
+      const decodeMaybeUrlText = (s) => {
+        let out = String(s ?? "");
+        for (let i = 0; i < 2; i++) {
+          if (!out.includes("%") && !out.includes("+")) break;
+          try {
+            const next = decodeURIComponent(out.replaceAll("+", " "));
+            if (next === out) break;
+            out = next;
+          } catch {
+            break;
+          }
+        }
+        return out;
+      };
       const sectionLetter = (idx) => String.fromCharCode("A".charCodeAt(0) + idx);
 
       const cp046MapelUi = {
@@ -1514,9 +1531,9 @@ session_write_close();
               }
 
               const startIndex = chunkIdx * 10;
-              for (let i = 0; i < chunk.length; i++) {
-                const q = chunk[i] || {};
-                ctx.addHanging(`${startIndex + i + 1}.`, String(q.question || "").trim(), 12, "normal", 0, 8);
+              const normKey = (t) => String(t || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\s+/g, ' ').trim();
+              const renderOne = (q, num) => {
+                ctx.addHanging(`${num}.`, String(q.question || "").trim(), 12, "normal", 0, 8);
                 if (q._pdfImg) {
                   try {
                     const img = q._pdfImg;
@@ -1579,6 +1596,32 @@ session_write_close();
                   }
                   ctx.setY(ctx.getY() + 8);
                 }
+              };
+
+              for (let i = 0; i < chunk.length; i++) {
+                const q = chunk[i] || {};
+                const qCtx = String(q.context || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+                if (qCtx) {
+                  const key = normKey(qCtx);
+                  let j = i;
+                  while (j + 1 < chunk.length) {
+                    const nxt = chunk[j + 1] || {};
+                    const nxtCtx = String(nxt.context || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+                    if (!nxtCtx) break;
+                    if (normKey(nxtCtx) !== key) break;
+                    j++;
+                  }
+                  const a = startIndex + i + 1;
+                  const b = startIndex + j + 1;
+                  const rangeText = a === b ? `nomor ${a}` : `nomor ${a} s.d. ${b}`;
+                  ctx.addPara(`Untuk menjawab soal ${rangeText}, pahami bacaan berikut.`, 11, "italic", 0, 6);
+                  const paras = qCtx.split(/\n\s*\n/).map(s => String(s || "").trim()).filter(Boolean);
+                  for (const p of paras) ctx.addPara(p, 11, "normal", 20, 6);
+                  for (let k = i; k <= j; k++) renderOne({ ...(chunk[k] || {}), context: "" }, startIndex + k + 1);
+                  i = j;
+                  continue;
+                }
+                renderOne(q, startIndex + i + 1);
               }
 
               firstTypeRendered = true;
@@ -2138,6 +2181,33 @@ session_write_close();
         const m = el('modalIdentitasHelp');
         if (m) m.style.display = 'none';
       }
+      function openKonteksHelp(konteksSoalCount) {
+        const m = el('modalKonteksHelp');
+        if (!m) return;
+        const c = Number(konteksSoalCount || 0);
+        const cnt = Number.isFinite(c) && c > 0 ? c : null;
+        const titleEl = el('konteksHelpTitle');
+        const bodyEl = el('konteksHelpBody');
+        if (titleEl) titleEl.textContent = 'Petunjuk Soal Berkonteks (Stimulus)';
+        if (bodyEl) {
+          bodyEl.innerHTML = `
+            <div class="space-y-3">
+              <div>Fitur ini membuat <b>1 stimulus/bacaan</b> yang dipakai oleh sebagian soal dalam bagian yang sama.</div>
+              <ul class="list-disc pl-5 space-y-1">
+                <li>Dalam 1 bagian: <b>hanya 1 konteks</b>.</li>
+                <li>Jumlah soal yang memakai konteks: maksimal <b>30%</b> dari jumlah soal (minimal <b>3 soal</b> jika memungkinkan).</li>
+                ${cnt ? `<li>Bagian ini: 1 konteks untuk <b>${cnt} soal</b>.</li>` : ``}
+                <li>Konteks dibuat minimal <b>2 paragraf</b> (dipisahkan 1 baris kosong).</li>
+              </ul>
+            </div>
+          `;
+        }
+        m.style.display = 'flex';
+      }
+      function closeKonteksHelp() {
+        const m = el('modalKonteksHelp');
+        if (m) m.style.display = 'none';
+      }
       function openBuatSoalHelp() {
         const m = el('modalBuatSoalHelp');
         if (m) m.style.display = 'flex';
@@ -2171,7 +2241,7 @@ session_write_close();
             </div>`,
           },
           jumlah: {
-            title: 'Maks Absen / Siswa',
+            title: 'Jumlah Siswa',
             html: `<div class="space-y-2">
               <div>Membatasi nomor absen/siswa yang boleh mengisi.</div>
               <ul class="list-disc pl-5 space-y-1">
@@ -2824,6 +2894,7 @@ session_write_close();
           tingkatKesulitan: "campuran",
           cakupanBloom: "level_standar",
           dimensi: ["C1", "C2", "C3", "C4"],
+          soalKonteks: false,
           pakaiGambar: false,
         });
         saveDebounced(true);
@@ -3048,6 +3119,25 @@ session_write_close();
           t = t.replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
           return t;
         };
+        const cleanMultilineHtml = (input) => {
+          let t = String(input ?? "");
+          t = t.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+          t = t
+            .replace(/<\s*sup\s*>([\s\S]*?)<\s*\/\s*sup\s*>/gi, (_m, g1) => `^${String(g1 ?? "").trim()}`)
+            .replace(/<\s*sub\s*>([\s\S]*?)<\s*\/\s*sub\s*>/gi, (_m, g1) => `_${String(g1 ?? "").trim()}`)
+            .replace(/<\s*\/\s*sup\s*>/gi, "")
+            .replace(/<\s*\/\s*sub\s*>/gi, "")
+            .replace(/<\s*sup\s*>/gi, "^")
+            .replace(/<\s*sub\s*>/gi, "_")
+            .replace(/<\/?[^>]+>/g, "");
+          t = t.replace(/&nbsp;/gi, " ");
+          t = t
+            .split("\n")
+            .map((line) => String(line).replace(/\s+/g, " ").trim())
+            .join("\n");
+          t = t.replace(/\n{3,}/g, "\n\n").trim();
+          return t;
+        };
         const cleanOptionText = (s) => {
           let t = cleanInlineHtml(s);
           t = t.replace(/^\s*\(?([A-Ea-e]|[1-9]|10)\)?\s*[\)\.\-:]\s*/,'');
@@ -3084,6 +3174,7 @@ session_write_close();
         if (rawType === "isian") type = "isian";
         if (sec?.bentuk) type = sec.bentuk;
         
+        const context = cleanMultilineHtml(item?.context ?? item?.stimulus ?? "");
         const question = cleanInlineHtml(item?.question ?? "");
         const explanation = cleanInlineHtml(item?.explanation ?? "");
         const difficulty = cleanInlineHtml(item?.difficulty ?? "");
@@ -3252,6 +3343,7 @@ session_write_close();
           sectionId: sec?.id,
           pakaiGambar: Boolean(sec?.pakaiGambar),
           type,
+          context,
           question: invalidMenjodohkan ? '' : question,
           options: cappedOptions,
           answer,
@@ -3717,7 +3809,44 @@ session_write_close();
                           <div class="italic text-sm mb-4">${subtitleMap[t]}</div>
                         ` : ``}
                         <div class="space-y-6">
-                          ${chunk.map((q, i) => renderItem(q, startIndex + i)).join('')}
+                          ${(() => {
+                            const normKey = (t) => String(t || '')
+                              .replace(/\r\n/g, '\n')
+                              .replace(/\r/g, '\n')
+                              .replace(/\s+/g, ' ')
+                              .trim();
+                            let out = '';
+                            for (let i = 0; i < chunk.length; i++) {
+                              const q = chunk[i] || {};
+                              const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+                              if (ctxRaw) {
+                                const key = normKey(ctxRaw);
+                                let j = i;
+                                while (j + 1 < chunk.length) {
+                                  const next = chunk[j + 1] || {};
+                                  const nextCtx = String(next.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+                                  if (!nextCtx) break;
+                                  if (normKey(nextCtx) !== key) break;
+                                  j++;
+                                }
+                                const a = startIndex + i + 1;
+                                const b = startIndex + j + 1;
+                                const rangeText = a === b ? `nomor ${a}` : `nomor ${a} s.d. ${b}`;
+                                const ctxHtml = safeText(ctxRaw).replace(/\n/g, '<br>');
+                                out += `<div class="mb-4 p-3 rounded-lg border border-border-light dark:border-border-dark bg-transparent text-[15px] leading-relaxed">
+                                  <div class="font-bold mb-1">Untuk menjawab soal ${rangeText}, pahami bacaan berikut.</div>
+                                  <div>${ctxHtml}</div>
+                                </div>`;
+                                for (let k = i; k <= j; k++) {
+                                  out += renderItem({ ...(chunk[k] || {}), context: '' }, startIndex + k);
+                                }
+                                i = j;
+                                continue;
+                              }
+                              out += renderItem(q, startIndex + i);
+                            }
+                            return out;
+                          })()}
                         </div>
                       </div>
                     `;
@@ -7651,6 +7780,15 @@ ${baselineModulAjar}
                 </div>
               </div>
             </div>
+            <div id="modalKonteksHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+              <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[720px] max-height-[85vh] overflow-auto">
+                <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                  <div id="konteksHelpTitle" class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Soal Berkonteks</div>
+                  <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeKonteksHelp()">&times;</button>
+                </div>
+                <div id="konteksHelpBody" class="p-5 text-sm leading-relaxed"></div>
+              </div>
+            </div>
           `;
           const tutorialModal = `
             <div id="modalBuatSoalTutorial" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
@@ -8005,6 +8143,9 @@ ${baselineModulAjar}
         
         const isObjective = ["pg", "benar_salah", "pg_kompleks", "menjodohkan"].includes(s.bentuk);
         const isEssay = ["isian", "uraian"].includes(s.bentuk);
+        const showOpsiPG = s.bentuk === "pg" || s.bentuk === "pg_kompleks";
+        const totalTarget = Number(isObjective ? s.jumlahPG : s.jumlahIsian) || 0;
+        const jmlSoalKonteks = totalTarget >= 3 ? Math.min(totalTarget, Math.max(3, Math.floor(totalTarget * 0.3))) : totalTarget;
 
         return `
           <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
@@ -8070,18 +8211,20 @@ ${baselineModulAjar}
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div class="flex flex-col gap-2 ${(s.bentuk === "pg" || s.bentuk === "pg_kompleks") ? "" : "hidden"}">
-                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jumlah Opsi PG</label>
-                  <select
-                    class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
-                    onchange="window.__sp.updateSection('${s.id}','opsiPG',Number(this.value))"
-                  >
-                    ${[3, 4, 5]
-                      .map((n) => `<option value="${n}" ${Number(s.opsiPG || 4) === n ? "selected" : ""}>${n} opsi</option>`)
-                      .join("")}
-                  </select>
-                </div>
+              <div class="grid grid-cols-1 md:grid-cols-${showOpsiPG ? 3 : 2} gap-5">
+                ${showOpsiPG ? `
+                  <div class="flex flex-col gap-2">
+                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jumlah Opsi PG</label>
+                    <select
+                      class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
+                      onchange="window.__sp.updateSection('${s.id}','opsiPG',Number(this.value))"
+                    >
+                      ${[3, 4, 5]
+                        .map((n) => `<option value="${n}" ${Number(s.opsiPG || 4) === n ? "selected" : ""}>${n} opsi</option>`)
+                        .join("")}
+                    </select>
+                  </div>
+                ` : ``}
                 <div class="flex flex-col gap-2">
                   <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jumlah Soal</label>
                   <input
@@ -8092,6 +8235,18 @@ ${baselineModulAjar}
                     oninput="window.__sp.updateSection('${s.id}','${isObjective ? 'jumlahPG' : 'jumlahIsian'}',Number(this.value),false)"
                     onblur="window.__sp.updateSection('${s.id}','${isObjective ? 'jumlahPG' : 'jumlahIsian'}',Number(this.value),true)"
                   />
+                </div>
+                <div class="flex flex-col gap-2">
+                  <div class="flex items-center gap-2">
+                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Soal Berkonteks (Stimulus)</label>
+                    <button type="button" class="inline-flex items-center justify-center size-7 rounded-md border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark/60 transition-colors" onclick="window.__sp.openKonteksHelp(${jmlSoalKonteks})" title="Petunjuk">
+                      <span class="material-symbols-outlined text-[16px]">help</span>
+                    </button>
+                  </div>
+                  <label class="flex items-center gap-3 h-11 px-4 rounded-lg border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 cursor-pointer">
+                    <input type="checkbox" ${s.soalKonteks ? "checked" : ""} onchange="window.__sp.updateSection('${s.id}','soalKonteks',this.checked)" />
+                    <span class="text-sm font-semibold">${s.soalKonteks ? "ON" : "OFF"} • 1 konteks untuk ${jmlSoalKonteks} soal</span>
+                  </label>
                 </div>
               </div>
 
@@ -8259,8 +8414,8 @@ ${baselineModulAjar}
               </div>
               <div class="rounded-xl border bg-white dark:bg-surface-dark p-4 space-y-4">
                 <div class="font-bold">A. Pengaturan Link</div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div class="space-y-1.5">
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                  <div class="space-y-1.5 md:col-span-6">
                     <div class="flex items-center gap-2">
                       <label class="text-sm font-semibold">Nama Link (wajib)</label>
                       <button type="button" class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('slug')">
@@ -8269,16 +8424,16 @@ ${baselineModulAjar}
                     </div>
                     <input class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(f.slug || '')}" placeholder="contoh: biologi-kls10-pts" oninput="window.__sp.setQuizPublish('slug', this.value)">
                   </div>
-                  <div class="space-y-1.5">
+                  <div class="space-y-1.5 md:col-span-2">
                     <div class="flex items-center gap-2">
-                      <label class="text-sm font-semibold">Maks Absen / Siswa</label>
+                      <label class="text-sm font-semibold">Jumlah Siswa</label>
                       <button type="button" class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('jumlah')">
                         <span class="material-symbols-outlined text-[18px]">help</span>
                       </button>
                     </div>
                     <input type="number" min="1" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${Number(f.jumlah||32)}" placeholder="contoh: 32" oninput="window.__sp.setQuizPublish('jumlah', Number(this.value))">
                   </div>
-                  <div class="space-y-1.5">
+                  <div class="space-y-1.5 md:col-span-4">
                     <div class="flex items-center gap-2">
                       <label class="text-sm font-semibold">Batas Waktu Link (opsional)</label>
                       <button type="button" class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('expire')">
@@ -8292,10 +8447,10 @@ ${baselineModulAjar}
                       const minOptions = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
                         .map(m => `<option value="${m}" ${m===parts.mm?'selected':''}>${m}</option>`).join('');
                       return `
-                        <div class="grid grid-cols-3 gap-2">
-                          <input placeholder="31-12-2026" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(parts.date)}" oninput="window.__sp.setQuizExpirePart('date', this.value)">
-                          <select class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" onchange="window.__sp.setQuizExpirePart('hh', this.value)">${hourOptions}</select>
-                          <select class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" onchange="window.__sp.setQuizExpirePart('mm', this.value)">${minOptions}</select>
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <input placeholder="31-12-2026" class="w-[12ch] h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(parts.date)}" oninput="window.__sp.setQuizExpirePart('date', this.value)">
+                          <select class="w-20 h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" onchange="window.__sp.setQuizExpirePart('hh', this.value)">${hourOptions}</select>
+                          <select class="w-20 h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" onchange="window.__sp.setQuizExpirePart('mm', this.value)">${minOptions}</select>
                         </div>
                       `;
                     })()}
@@ -8355,8 +8510,9 @@ ${baselineModulAjar}
               })()}
               ${Array.isArray(f.roster) && f.roster.length && state.quizLastPubId ? (() => {
                 const rows = f.roster.map(r => {
-                  const link = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(state.quizLastPubId))}&n=${encodeURIComponent(String(r.absen))}&name=${encodeURIComponent(String(r.nama||''))}`;
-                  return `<tr><td class="border px-2 py-1 text-center">${r.absen}</td><td class="border px-2 py-1">${safeText(r.nama||'')}</td><td class="border px-2 py-1"><a href="${link}" target="_blank" class="text-blue-600 underline">${link}</a></td></tr>`;
+                  const nm = decodeMaybeUrlText(String(r.nama || ''));
+                  const link = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(state.quizLastPubId))}&n=${encodeURIComponent(String(r.absen))}&name=${encodeURIComponent(nm)}`;
+                  return `<tr><td class="border px-2 py-1 text-center">${r.absen}</td><td class="border px-2 py-1">${safeText(nm || '')}</td><td class="border px-2 py-1"><a href="${link}" target="_blank" class="text-blue-600 underline">${link}</a></td></tr>`;
                 }).join('');
                 return `
                   <div class="mt-3">
@@ -8400,7 +8556,8 @@ ${baselineModulAjar}
           const filteredRows = query
             ? dataRows.filter(r => {
                 const ab = String(r?.absen ?? '').toLowerCase();
-                const nm = (String(r?.nama || r?.name || '') || (nameMap.get(Number(r?.absen)) || '')).toLowerCase();
+                const nmRaw = String(r?.nama || r?.name || '') || (nameMap.get(Number(r?.absen)) || '');
+                const nm = decodeMaybeUrlText(nmRaw).toLowerCase();
                 return ab.includes(query) || nm.includes(query);
               })
             : dataRows;
@@ -8426,13 +8583,15 @@ ${baselineModulAjar}
           })();
           const top3 = dataRows.slice(0,3).map((r,i) => {
             const ab = Number(r.absen);
-            const nm = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
+            const nmRaw = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
+            const nm = decodeMaybeUrlText(nmRaw);
             return { rank: i+1, absen: ab, name: nm, nilai: r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0 };
           });
           const rows = filteredRows.map((r, idx) => {
             const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
             const ab = Number(r.absen);
-            const nm = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
+            const nmRaw = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
+            const nm = decodeMaybeUrlText(nmRaw);
             const trophy = idx < 3 ? `<span class="material-symbols-outlined text-amber-500 text-[18px] align-middle">trophy</span>` : '';
             const rowCls = idx % 2 ? 'bg-background-light/40 dark:bg-background-dark/30' : '';
             return `<tr>
@@ -8806,33 +8965,29 @@ ${baselineModulAjar}
         saveDebounced(false);
       };
       const parseExpireParts = (s) => {
-        const raw = String(s || '').trim();
-        if (!raw) return { date: '', hh: '23', mm: '59' };
-        const m1 = raw.match(/^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{1,2}):(\d{2}))?$/);
-        if (m1) {
-          const dd = m1[1];
-          const mm = m1[2];
-          const yyyy = m1[3];
-          const hh = String(m1[4] ?? '23').padStart(2, '0');
-          const mi = String(m1[5] ?? '59').padStart(2, '0');
-          return { date: `${dd}-${mm}-${yyyy}`, hh, mm: mi };
+        const raw0 = String(s || '').trim();
+        if (!raw0) return { date: '', hh: '23', mm: '59' };
+        const raw = raw0.replace('T', ' ');
+        const mDate = raw.match(/(\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2})/);
+        const mTime = raw.match(/(\d{1,2}):(\d{2})/);
+        let date = mDate ? String(mDate[1] || '').trim() : raw0;
+        let hh = '23';
+        let mm = '59';
+        if (mTime) {
+          hh = String(mTime[1] ?? '23').padStart(2, '0');
+          mm = String(mTime[2] ?? '59').padStart(2, '0');
         }
-        const norm = raw.replace('T', ' ');
-        const m2 = norm.match(/^(\d{4})-(\d{2})-(\d{2})(?:\s+(\d{1,2}):(\d{2}))?$/);
-        if (m2) {
-          const yyyy = m2[1];
-          const mm = m2[2];
-          const dd = m2[3];
-          const hh = String(m2[4] ?? '23').padStart(2, '0');
-          const mi = String(m2[5] ?? '59').padStart(2, '0');
-          return { date: `${dd}-${mm}-${yyyy}`, hh, mm: mi };
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          const parts = date.split('-');
+          date = `${parts[2]}-${parts[1]}-${parts[0]}`;
         }
-        return { date: raw, hh: '23', mm: '59' };
+        return { date, hh, mm };
       };
       const setQuizExpirePart = (part, val) => {
         state.quizPublishForm = state.quizPublishForm || {};
         const cur = parseExpireParts(state.quizPublishForm.expire || '');
-        const v = String(val ?? '').trim();
+        let v = String(val ?? '').trim();
+        if (part === 'date') v = String(v.split(/\s+/)[0] || '').trim().slice(0, 10);
         const next = { ...cur };
         if (part === 'date') next.date = v;
         if (part === 'hh') next.hh = String(v || '23').padStart(2, '0');
@@ -8845,7 +9000,6 @@ ${baselineModulAjar}
           state.quizPublishForm.expire = `${next.date} ${hh}:${mm}`;
         }
         saveDebounced(false);
-        render();
       };
       const setQuizResultsQuery = (q) => {
         state.quizResultsQuery = String(q || "");
@@ -8901,8 +9055,9 @@ ${baselineModulAjar}
         const base = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(pubId))}`;
         const lines = ['No Absen,Nama Siswa,Link'];
         for (const r of roster) {
-          const link = `${base}&n=${encodeURIComponent(String(r.absen))}&name=${encodeURIComponent(String(r.nama||''))}`;
-          lines.push(`${r.absen},"${(r.nama||'').replace(/"/g,'""')}",${link}`);
+          const nm = decodeMaybeUrlText(String(r.nama || ''));
+          const link = `${base}&n=${encodeURIComponent(String(r.absen))}&name=${encodeURIComponent(nm)}`;
+          lines.push(`${r.absen},"${String(nm || '').replace(/"/g,'""')}",${link}`);
         }
         const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
         const a = document.createElement('a');
@@ -8931,8 +9086,9 @@ ${baselineModulAjar}
         doc.text(subtitle, margin, 58);
         doc.setTextColor(0, 0, 0);
         const body = roster.map(r => {
-          const link = `${base}&n=${encodeURIComponent(String(r.absen))}&name=${encodeURIComponent(String(r.nama||''))}`;
-          return [String(r.absen), String(r.nama || ''), link];
+          const nm = decodeMaybeUrlText(String(r.nama || ''));
+          const link = `${base}&n=${encodeURIComponent(String(r.absen))}&name=${encodeURIComponent(nm)}`;
+          return [String(r.absen), nm, link];
         });
         doc.autoTable({
           head: [['No Absen', 'Nama Siswa', 'Link']],
@@ -9242,7 +9398,8 @@ ${baselineModulAjar}
         const body = rows.map(r => {
           const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
           const ab = Number(r.absen);
-          const nm = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
+          const nmRaw = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
+          const nm = decodeMaybeUrlText(nmRaw);
           const dt = String(r.created_at || '');
           return [String(ab), nm, String(pct), dt];
         });
@@ -9321,7 +9478,8 @@ ${baselineModulAjar}
         const body = rows.map((r, idx) => {
           const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
           const ab = Number(r.absen);
-          const nm = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
+          const nmRaw = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
+          const nm = decodeMaybeUrlText(nmRaw);
           const dt = String(r.created_at || '');
           return [String(idx+1), String(ab||''), nm || '-', String(pct), dt];
         });
@@ -9371,7 +9529,8 @@ ${baselineModulAjar}
         const top3 = rows.slice(0, 3).map((r, i) => {
           const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
           const ab = Number(r.absen);
-          const nm = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
+          const nmRaw = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
+          const nm = decodeMaybeUrlText(nmRaw);
           return [String(i+1), String(ab||''), nm || '-', String(pct)];
         });
         const afterSummaryY = (doc.lastAutoTable?.finalY || (afterResultsY + 8)) + 16;
@@ -9486,6 +9645,38 @@ ${baselineModulAjar}
           const jumlahIsian = Number(sec.jumlahIsian || 0);
           const totalSec = isObjective ? jumlahPG : isEssay ? jumlahIsian : 0;
           if (totalSec === 0) continue;
+          const konteksOn = !!sec.soalKonteks;
+          const konteksSoalCount = konteksOn ? (totalSec >= 3 ? Math.min(totalSec, Math.max(3, Math.floor(totalSec * 0.3))) : totalSec) : 0;
+          const applyContextPolicy = (q) => {
+            if (!q) return q;
+            let ctx = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+            if (!konteksOn || !ctx) return { ...q, context: '' };
+            if (!/\n\s*\n/.test(ctx)) {
+              const m = ctx.match(/^(.{40,}?[.!?])\s+/);
+              if (m) ctx = ctx.replace(m[0], `${m[1]}\n\n`);
+              else if (ctx.length > 140) ctx = `${ctx.slice(0, 140)}\n\n${ctx.slice(140)}`;
+            }
+            return { ...q, context: ctx.slice(0, 1100).trim() };
+          };
+          const applySingleContextForSection = (startIdx, endIdx) => {
+            if (!Number.isFinite(startIdx) || !Number.isFinite(endIdx) || startIdx < 0 || endIdx <= startIdx) return;
+            const slice = state.questions.slice(startIdx, endIdx);
+            const found = slice.find(x => x && String(x.context || '').trim());
+            const base = found ? String(found.context || '') : '';
+            if (!konteksOn || !base.trim() || konteksSoalCount <= 0) {
+              for (let i = startIdx; i < endIdx; i++) state.questions[i] = { ...(state.questions[i] || {}), context: '' };
+              return;
+            }
+            const normalized = applyContextPolicy({ context: base }).context || '';
+            let assigned = 0;
+            for (let i = startIdx; i < endIdx; i++) {
+              const q = state.questions[i];
+              if (!q || !String(q.question || '').trim()) { state.questions[i] = { ...(q || {}), context: '' }; continue; }
+              if (assigned < konteksSoalCount) state.questions[i] = { ...q, context: normalized };
+              else state.questions[i] = { ...q, context: '' };
+              assigned++;
+            }
+          };
 
           const opsi = clamp(Number(sec.opsiPG || 4), 3, 5);
           const bloomPreset = sec.cakupanBloom || "level_standar";
@@ -9530,12 +9721,22 @@ ${baselineModulAjar}
           const specialRules = special
             ? `\nATURAN TAMBAHAN DARI GURU (WAJIB DIPATUHI):\n${special}\n- Jika aturan ini bertentangan dengan instruksi lain, prioritaskan aturan tambahan dari guru.\n`
             : ``;
+          const contextRules = konteksOn
+            ? `\nMODE SOAL BERKONTEKS: AKTIF
+- Buat tepat 1 stimulus/bacaan (field "context") yang sama untuk ${konteksSoalCount} soal. Soal lainnya field "context" kosong.
+- Field "context" WAJIB minimal 2 paragraf (dipisahkan 1 baris kosong) dan memuat data/situasi nyata yang digunakan pada soal.
+- Panjang "context" disarankan 450–1100 karakter (jangan melebihi 1100).
+- Soal tanpa konteks WAJIB tetap boleh (field "context" kosong).
+`
+            : `\nMODE SOAL BERKONTEKS: NONAKTIF
+- Field "context" harus kosong. Soal langsung ke pertanyaan.\n`;
 
           const outputSchema = sec.bentuk === "menjodohkan"
             ? `OUTPUT JSON (Array of Objects):
 [
   {
     "type": "menjodohkan",
+    "context": "...",
     "question": "...",
     "pairs": [
       { "left": "...", "right": "..." }
@@ -9556,25 +9757,7 @@ Kembalikan JSON persis: {"items": [...]}`
 [
   {
     "type": "benar_salah",
-    "question": "...",
-    "options": ["Benar", "Salah"],
-    "answer": 0,
-    "explanation": "...",
-    "difficulty": "...",
-    "bloom": "...",
-    "materi": "...",
-    "indikator": "...",
-    "asciiDiagram": "...",
-    "svgSource": "...",
-    "imagePrompt": "..."
-  }
-]
-Kembalikan JSON persis: {"items": [...]}`
-            : (sec.bentuk === "benar_salah")
-              ? `OUTPUT JSON (Array of Objects):
-[
-  {
-    "type": "benar_salah",
+    "context": "...",
     "question": "...",
     "options": ["Benar", "Salah"],
     "answer": 0,
@@ -9594,6 +9777,7 @@ Kembalikan JSON persis: {"items": [...]}`
 [
   {
     "type": "${sec.bentuk}",
+    "context": "...",
     "question": "...",
     "options": ["..."],
     "answer": ...,
@@ -9612,6 +9796,7 @@ Kembalikan JSON persis: {"items": [...]}`
 [
   {
     "type": "${sec.bentuk}",
+    "context": "...",
     "question": "...",
     "answer": "...",
     "explanation": "...",
@@ -9663,8 +9848,11 @@ Jika soal membutuhkan gambar/diagram:
 1. Prioritas 1: Buat diagram ASCII sederhana di field "asciiDiagram".
 2. Prioritas 2: Buat kode SVG sederhana (hitam putih, viewBox minimal, tanpa width/height fixed) di field "svgSource".
 3. Prioritas 3: Jika sangat kompleks, kosongkan ascii/svg dan isi "imagePrompt" untuk digenerate AI Image.
+${contextRules}
 ${specialRules}
 ${outputSchema}`;
+
+          const sectionStartIdx = state.questions.length;
 
           let needed = totalSec;
           let attempts = 0;
@@ -9674,7 +9862,7 @@ ${outputSchema}`;
             let added = 0;
             try {
               const ask = Math.min(batchSize, needed);
-              const prompt = promptBase.replace("__JUMLAH__", String(ask));
+              const prompt = promptBase.replaceAll("__JUMLAH__", String(ask));
               const res = await callOpenAI(prompt);
               if (res && res._usage) {
                 pkgTokenIn += Number(res._usage.in || 0);
@@ -9683,8 +9871,9 @@ ${outputSchema}`;
               let items = Array.isArray(res?.items) ? res.items : [];
               if (items.length > ask) items = items.slice(0, ask);
               for (const item of items) {
-                const q = normalizeQuestion(item, sec);
+                let q = normalizeQuestion(item, sec);
                 if (!q.question) continue;
+                q = applyContextPolicy(q);
                 state.questions.push(q);
                 needed--;
                 added++;
@@ -9710,15 +9899,16 @@ ${outputSchema}`;
             const maxFill = Math.min(24, Math.max(6, needed * 3));
             while (needed > 0 && fillTries < maxFill) {
               try {
-                const prompt = promptBase.replace("__JUMLAH__", "1");
+                const prompt = promptBase.replaceAll("__JUMLAH__", "1");
                 const res = await callOpenAI(prompt);
                 if (res && res._usage) {
                   pkgTokenIn += Number(res._usage.in || 0);
                   pkgTokenOut += Number(res._usage.out || 0);
                 }
                 const item = Array.isArray(res?.items) ? res.items[0] : null;
-                const q = item ? normalizeQuestion(item, sec) : null;
+                let q = item ? normalizeQuestion(item, sec) : null;
                 if (q && q.question) {
+                  q = applyContextPolicy(q);
                   state.questions.push(q);
                   needed--;
                   updateGenProgress();
@@ -9728,6 +9918,8 @@ ${outputSchema}`;
               if (needed > 0) await new Promise(r => setTimeout(r, 400));
             }
           }
+
+          applySingleContextForSection(sectionStartIdx, state.questions.length);
         }
 
         state._isGenerating = false;
@@ -9775,12 +9967,20 @@ ${outputSchema}`;
         if (!q) return;
         updateQuestionData(qId, { _loadingText: true });
         try {
+          const secCfg = state.sections.find((s) => s.id === q.sectionId) || {};
+          const konteksOn = !!secCfg.soalKonteks;
+          const totalInSection = state.questions.filter(x => x && x.sectionId === q.sectionId).length;
+          const konteksSoalCount = konteksOn ? (totalInSection >= 3 ? Math.min(totalInSection, Math.max(3, Math.floor(totalInSection * 0.3))) : totalInSection) : 0;
+          const existingContext = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+          const tieToContext = konteksOn && !!existingContext;
+
           const out = q.type === 'menjodohkan'
             ? `OUTPUT JSON:
 {
   "items": [
     {
       "type": "menjodohkan",
+      "context": "...",
       "question": "...",
       "pairs": [{"left":"...","right":"..."}],
       "explanation": "...",
@@ -9799,6 +9999,7 @@ ${outputSchema}`;
   "items": [
     {
       "type": "${q.type}",
+      "context": "...",
       "question": "...",
       "options": [...],
       "answer": ...,
@@ -9813,11 +10014,15 @@ ${outputSchema}`;
     }
   ]
 }`;
+          const contextBlock = tieToContext
+            ? `\nKONTEKS BACAAN (WAJIB dijadikan acuan, jangan diubah):\n<<<\n${existingContext}\n>>>\n`
+            : ``;
           const prompt = `Buat ulang 1 butir soal sesuai detail berikut:
 Jenis: ${q.type}
 Tingkat Kesulitan: sedang
 Bloom: ${q.bloom || 'C2'}
 Materi: ${q.materi || '-'}
+${contextBlock}
 Instruksi:
 1. Gunakan Bahasa Indonesia.
 2. Jika tipe "pg" atau "pg_kompleks", buat ${clamp(Number(state.sections.find(s=>s.id===q.sectionId)?.opsiPG || 4), 3, 5)} opsi.
@@ -9825,6 +10030,11 @@ Instruksi:
 4. Jika butuh gambar: Prioritas 1: "asciiDiagram", Prioritas 2: "svgSource", Prioritas 3: "imagePrompt".
 5. Jika tipe "pg_kompleks", field "answer" HARUS array minimal 2 jawaban benar (contoh: [0,2]).
 6. Jika tipe "menjodohkan", field "pairs" HARUS ada: [{"left":"...","right":"..."}, ...] (teks, bukan angka). Jangan output "0,3" atau "1-4".
+7. Aturan konteks:
+- Jika bagian ini mode konteks OFF, field "context" wajib kosong.
+- Jika bagian ini mode konteks ON dan soal ini terkait konteks: field "context" wajib kosong (konteks sudah diberikan di atas dan harus tetap sama). Buat pertanyaan yang merujuk konteks tersebut.
+- Jika bagian ini mode konteks ON tapi soal ini tidak terkait konteks: field "context" tetap kosong.
+8. Jangan membuat stimulus baru. Dalam 1 bagian hanya ada 1 konteks (dipakai untuk ${konteksSoalCount} soal).
 ${out}`;
         const res = await callOpenAI(prompt);
         const item = Array.isArray(res?.items) ? res.items[0] : null;
@@ -9833,6 +10043,7 @@ ${out}`;
         const next = normalizeQuestion(item, sec);
         updateQuestionData(qId, {
           type: next.type,
+          context: q.context || "",
           question: next.question,
           options: next.options,
           answer: next.answer,
@@ -10782,10 +10993,11 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                 new Paragraph({ children: [new TextRun({ text: `${letter}. ${sec.title}`, bold: true })], spacing: { before: 200, after: 100 } }),
                 new Paragraph({ children: [new TextRun({ text: sec.subtitle, italics: true })], spacing: { after: 300 } })
               );
-              items.forEach((q, i) => {
+              const normKey = (t) => String(t || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\s+/g, ' ').trim();
+              const pushOne = (q, num) => {
                 questionParagraphs.push(
                   new Paragraph({
-                    children: [new TextRun({ text: `${i + 1}.\t${q.question}`, bold: false })],
+                    children: [new TextRun({ text: `${num}.\t${q.question}`, bold: false })],
                     tabStops: [{ type: "left", position: 400 }],
                     indent: { left: 0, hanging: 0 },
                     spacing: { before: 200, after: 100 },
@@ -10884,7 +11096,32 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                   }
                 }
                 questionParagraphs.push(new Paragraph({ spacing: { after: 200 } }));
-              });
+              };
+              for (let i = 0; i < items.length; i++) {
+                const q = items[i];
+                const ctxText = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+                if (ctxText) {
+                  const key = normKey(ctxText);
+                  let j = i;
+                  while (j + 1 < items.length) {
+                    const nxt = items[j + 1];
+                    const nxtCtx = String(nxt?.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+                    if (!nxtCtx) break;
+                    if (normKey(nxtCtx) !== key) break;
+                    j++;
+                  }
+                  const a = i + 1;
+                  const b = j + 1;
+                  const rangeText = a === b ? `nomor ${a}` : `nomor ${a} s.d. ${b}`;
+                  questionParagraphs.push(new Paragraph({ children: [new TextRun({ text: `Untuk menjawab soal ${rangeText}, pahami bacaan berikut.`, italics: true })], spacing: { before: 100, after: 80 } }));
+                  const paras = ctxText.split(/\n\s*\n/).map(s => String(s || '').trim()).filter(Boolean);
+                  paras.forEach((p) => questionParagraphs.push(new Paragraph({ children: [new TextRun({ text: p, bold: false })], spacing: { after: 80 }, indent: { left: 400 } })));
+                  for (let k = i; k <= j; k++) pushOne(items[k], k + 1);
+                  i = j;
+                  continue;
+                }
+                pushOne(q, i + 1);
+              }
             }
             return { headerTitle, headerTable, spacer, questionParagraphs };
           };
@@ -11500,10 +11737,11 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                 new Paragraph({ children: [new TextRun({ text: `${letter}. ${sec.title}`, bold: true })], spacing: { before: 200, after: 100 } }),
                 new Paragraph({ children: [new TextRun({ text: sec.subtitle, italics: true })], spacing: { after: 300 } })
               );
-              items.forEach((q, i) => {
+              const normKey = (t) => String(t || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\s+/g, ' ').trim();
+              const pushOne = (q, num) => {
                 questionParagraphs.push(
                   new Paragraph({
-                    children: [new TextRun({ text: `${i + 1}.\t${q.question}`, bold: false })],
+                    children: [new TextRun({ text: `${num}.\t${q.question}`, bold: false })],
                     tabStops: [{ type: "left", position: 400 }],
                     indent: { left: 0, hanging: 0 },
                     spacing: { before: 200, after: 100 },
@@ -11585,7 +11823,32 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                   }
                 }
                 questionParagraphs.push(new Paragraph({ spacing: { after: 200 } }));
-              });
+              };
+              for (let i = 0; i < items.length; i++) {
+                const q = items[i];
+                const ctxText = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+                if (ctxText) {
+                  const key = normKey(ctxText);
+                  let j = i;
+                  while (j + 1 < items.length) {
+                    const nxt = items[j + 1];
+                    const nxtCtx = String(nxt?.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+                    if (!nxtCtx) break;
+                    if (normKey(nxtCtx) !== key) break;
+                    j++;
+                  }
+                  const a = i + 1;
+                  const b = j + 1;
+                  const rangeText = a === b ? `nomor ${a}` : `nomor ${a} s.d. ${b}`;
+                  questionParagraphs.push(new Paragraph({ children: [new TextRun({ text: `Untuk menjawab soal ${rangeText}, pahami bacaan berikut.`, italics: true })], spacing: { before: 100, after: 80 } }));
+                  const paras = ctxText.split(/\n\s*\n/).map(s => String(s || '').trim()).filter(Boolean);
+                  paras.forEach((p) => questionParagraphs.push(new Paragraph({ children: [new TextRun({ text: p, bold: false })], spacing: { after: 80 }, indent: { left: 400 } })));
+                  for (let k = i; k <= j; k++) pushOne(items[k], k + 1);
+                  i = j;
+                  continue;
+                }
+                pushOne(q, i + 1);
+              }
             }
             return { headerTitle, headerTable, spacer, questionParagraphs };
           };
@@ -11856,6 +12119,8 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         generateRekapPDF,
         openIdentitasHelp,
         closeIdentitasHelp,
+        openKonteksHelp,
+        closeKonteksHelp,
         openBuatSoalHelp,
         closeBuatSoalHelp,
         openBagikanLinkHelp,

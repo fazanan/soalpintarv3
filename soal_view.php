@@ -39,7 +39,26 @@ $items = [];
 $maxAbsen = 0;
 $showSolution = 0;
 $answerKeySettings = [];
+$__sp_normalize_student_name = function ($s) {
+  $s = trim((string)$s);
+  if ($s === '') return '';
+  $s = str_replace("\0", '', $s);
+  for ($i = 0; $i < 2; $i++) {
+    if (strpos($s, '%') === false && strpos($s, '+') === false) break;
+    $dec = urldecode($s);
+    if ($dec === $s) break;
+    $s = $dec;
+  }
+  $s = preg_replace('/\s+/', ' ', $s);
+  if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+    if (mb_strlen($s, 'UTF-8') > 120) $s = mb_substr($s, 0, 120, 'UTF-8');
+  } else {
+    if (strlen($s) > 120) $s = substr($s, 0, 120);
+  }
+  return $s;
+};
 $studentName = isset($_GET['name']) ? trim((string)$_GET['name']) : (isset($_GET['nama']) ? trim((string)$_GET['nama']) : '');
+$studentName = $__sp_normalize_student_name($studentName);
 if (is_array($decoded)) {
   if (isset($decoded['items']) && is_array($decoded['items'])) {
     $items = $decoded['items'];

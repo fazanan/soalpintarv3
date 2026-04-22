@@ -220,7 +220,7 @@ if (!$exists) {
       $stmt->close();
     }
   }
-  $hash = password_hash('GuruPintar123!', PASSWORD_BCRYPT);
+  $hash = password_hash('GuruPintar', PASSWORD_BCRYPT);
   $role = 'user';
   $limitGambar = 0;
   $noHp = extract_customer_phone($data);

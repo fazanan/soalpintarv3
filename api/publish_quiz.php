@@ -167,7 +167,7 @@ if (!is_string($payloadJson) || $payloadJson === '' || !is_string($answerJson) |
   exit;
 }
 if ($expire === '') {
-  $expire = date('Y-m-d H:i:s', time() + 86400);
+  $expire = date('Y-m-d H:i:s', time() + (14 * 86400));
 }
 $sql = "INSERT INTO published_quizzes (user_id, slug, mapel, kelas, total_soal, payload_public, answer_key, is_active, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)";
 $stmt = $mysqli->prepare($sql);
