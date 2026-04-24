@@ -5659,7 +5659,7 @@ session_write_close();
 
       async function buildModulAjar() {
         const M = state.modulAjar || {};
-        const baselineModulAjar = String(M.hasil || '');
+        let baselineModulAjar = String(M.hasil || '');
         const req = [M.namaGuru,M.institusi,M.jenjang,M.mapel,M.judulModul,M.jumlahPertemuan,M.durasi,M.modelPembelajaran];
         const errEl = () => document.getElementById('maError');
         const showErr = (msg) => { const e=errEl(); if(e){e.textContent='⚠️ '+msg; e.classList.remove('hidden');} };
@@ -5681,6 +5681,7 @@ session_write_close();
         const jumlah = String(M.jumlahPertemuan || '').trim();
         const durasi = String(M.durasi || '').trim();
         const model = String(M.modelPembelajaran || '').trim();
+        if (M.lastGeneratedModel && M.lastGeneratedModel !== model) baselineModulAjar = '';
 
         if (!namaGuru) { failMA('informasi', 'Langkah 1 belum lengkap: isi Nama Guru dulu ya.', 'namaGuru'); return; }
         if (!institusi) { failMA('informasi', 'Langkah 1 belum lengkap: isi Nama Institusi dulu ya.', 'institusi'); return; }
@@ -5699,6 +5700,7 @@ session_write_close();
         state.modulAjar.isRefiningKegiatan = false;
         state.modulAjar.kegiatanRefinedOnce = false;
         state.modulAjar.hasil = '';
+        state.modulAjar.lastGeneratedModel = model;
         render();
 
         const kurikulumLabel = String(M.kurikulum || 'Kurikulum Merdeka').trim();
@@ -9653,7 +9655,7 @@ ${baselineModulAjar}
           const totalSec = isObjective ? jumlahPG : isEssay ? jumlahIsian : 0;
           if (totalSec === 0) continue;
           const konteksOn = !!sec.soalKonteks;
-          const konteksSoalCount = konteksOn ? (totalSec >= 3 ? Math.min(totalSec, Math.max(3, Math.floor(totalSec * 0.3))) : totalSec) : 0;
+          const konteksSoalCount = konteksOn ? Math.min(3, totalSec) : 0;
           const applyContextPolicy = (q) => {
             if (!q) return q;
             let ctx = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
@@ -9709,13 +9711,14 @@ ${baselineModulAjar}
               for (const n of nums) if (n && text.includes(n)) score += 3;
               for (const w of keywords) if (w && text.includes(w)) score += 1;
               if (text.includes('berdasarkan') || text.includes('konteks') || text.includes('bacaan')) score += 1;
-              scoreByIdx.set(i, score);
+              scoreByIdx.set(i, score > 0 ? score : -2);
             }
             const k = Math.max(0, Math.min(konteksSoalCount, qIdxList.length));
             const chosen = new Set();
             if (k > 0) {
               if (k >= qIdxList.length) {
-                for (const idx of qIdxList) chosen.add(idx);
+                const sumAll = qIdxList.reduce((acc, idx) => acc + (scoreByIdx.get(idx) || 0), 0);
+                if (sumAll > 0) for (const idx of qIdxList) chosen.add(idx);
               } else {
                 let bestStart = 0;
                 let bestSum = -1;
@@ -9727,8 +9730,9 @@ ${baselineModulAjar}
                   sum += (scoreByIdx.get(qIdxList[start + k - 1]) || 0);
                   if (sum > bestSum) { bestSum = sum; bestStart = start; }
                 }
-                if (bestSum <= 0) bestStart = 0;
-                for (let p = bestStart; p < bestStart + k; p++) chosen.add(qIdxList[p]);
+                if (bestSum > 0) {
+                  for (let p = bestStart; p < bestStart + k; p++) chosen.add(qIdxList[p]);
+                }
               }
             }
             for (let i = startIdx; i < endIdx; i++) {
@@ -9792,6 +9796,16 @@ ${baselineModulAjar}
 `
             : `\nMODE SOAL BERKONTEKS: NONAKTIF
 - Field "context" harus kosong. Soal langsung ke pertanyaan.\n`;
+          const contextRulesNoStimulus = `\nMODE SOAL BERKONTEKS: NONAKTIF
+- Field "context" harus kosong. Soal langsung ke pertanyaan.\n`;
+          const contextRulesStimulusQuestions = `\nMODE SOAL BERKONTEKS: AKTIF
+- Dalam 1 BAGIAN hanya boleh ada 1 stimulus (jangan buat stimulus lain).
+- Gunakan STIMULUS berikut sebagai satu-satunya acuan (jangan diubah):
+<<<
+__STIMULUS__
+>>>
+- Field "context" WAJIB kosong untuk setiap item (stimulus akan dipasang oleh sistem).
+- Buat soal yang merujuk stimulus dan menyebut minimal 1 data/fakta dari stimulus (angka/nama/objek/tempat/variabel).\n`;
 
           const outputSchema = sec.bentuk === "menjodohkan"
             ? `OUTPUT JSON (Array of Objects):
@@ -9916,72 +9930,130 @@ ${outputSchema}`;
 
           const sectionStartIdx = state.questions.length;
 
-          let needed = totalSec;
-          let attempts = 0;
-          let noProgress = 0;
-          let batchSize = Math.min(GEN_BATCH_SIZE, needed);
-          while (needed > 0 && attempts < GEN_MAX_ATTEMPTS && noProgress < 3) {
-            let added = 0;
+          const generateStimulusOnce = async () => {
+            const stimulusPrompt = `Bertindaklah sebagai Guru Profesional.
+Buat 1 stimulus/bacaan untuk BAGIAN: ${bagianLabel}.
+
+KONTEKS:
+Jenjang: ${displayJenjang(state.identity.jenjang, state.identity.kesetaraanPaket)} ${faseEfektif ? faseEfektif : state.identity.fase} Kelas ${state.identity.kelas}
+Mapel: ${state.identity.mataPelajaran}
+Sumber Materi Mentah (WAJIB jadi dasar utama stimulus):${topikRawClip ? `\n<<<\n${topikRawClip}\n>>>` : " -"}
+${levelRules ? `\n${levelRules}\n` : ''}
+${cp046SoalBlock ? `\n${cp046SoalBlock}\n` : ''}
+
+ATURAN STIMULUS (WAJIB):
+1. Stimulus minimal 2 paragraf (dipisahkan 1 baris kosong).
+2. Memuat data/situasi nyata yang bisa dipakai sebagai dasar pertanyaan (angka/nama/objek/tempat/variabel).
+3. Panjang 450–1100 karakter (jangan melebihi 1100).
+4. Gunakan Bahasa Indonesia.
+5. Jangan membuat soal, hanya stimulus.
+
+OUTPUT JSON:
+{"context":"..."}`
             try {
-              const ask = Math.min(batchSize, needed);
-              const prompt = promptBase.replaceAll("__JUMLAH__", String(ask));
-              const res = await callOpenAI(prompt);
+              const res = await callOpenAI(stimulusPrompt);
               if (res && res._usage) {
                 pkgTokenIn += Number(res._usage.in || 0);
                 pkgTokenOut += Number(res._usage.out || 0);
               }
-              let items = Array.isArray(res?.items) ? res.items : [];
-              if (items.length > ask) items = items.slice(0, ask);
-              for (const item of items) {
-                let q = normalizeQuestion(item, sec);
-                if (!q.question) continue;
-                q = applyContextPolicy(q);
-                state.questions.push(q);
-                needed--;
-                added++;
-                updateGenProgress();
-                if (needed <= 0) break;
+              let ctx = String(res?.context || res?.stimulus || '').trim();
+              if (!ctx) {
+                const it0 = Array.isArray(res?.items) ? res.items[0] : null;
+                ctx = String(it0?.context || it0?.stimulus || '').trim();
               }
-              if (added === 0) noProgress++;
-              else noProgress = 0;
-              if (items.length < ask && batchSize > 1) {
-                batchSize = Math.max(1, Math.floor(batchSize / 2));
-              }
-            } catch (e) {
-              console.warn("Gen batch error:", e?.message || e);
-              batchSize = Math.max(1, Math.floor(batchSize / 2));
-              noProgress++;
-              await new Promise(r => setTimeout(r, 1000));
-            } finally {
-              attempts++;
+              ctx = applyContextPolicy({ context: ctx })?.context || '';
+              return ctx;
+            } catch {
+              return '';
             }
-          }
-          if (needed > 0) {
-            let fillTries = 0;
-            const maxFill = Math.min(24, Math.max(6, needed * 3));
-            while (needed > 0 && fillTries < maxFill) {
+          };
+
+          const pushGeneratedItem = (item, forceContext) => {
+            let q = normalizeQuestion(item, sec);
+            if (!q || !q.question) return false;
+            q = { ...q, context: forceContext ? forceContext : '' };
+            q = applyContextPolicy(q);
+            state.questions.push(q);
+            updateGenProgress();
+            return true;
+          };
+
+          const generateQuestions = async (promptBaseLocal, countNeeded, forceContext) => {
+            let needed = countNeeded;
+            let attempts = 0;
+            let noProgress = 0;
+            let batchSize = Math.min(GEN_BATCH_SIZE, needed);
+            while (needed > 0 && attempts < GEN_MAX_ATTEMPTS && noProgress < 3) {
+              let added = 0;
               try {
-                const prompt = promptBase.replaceAll("__JUMLAH__", "1");
+                const ask = Math.min(batchSize, needed);
+                const prompt = promptBaseLocal.replaceAll("__JUMLAH__", String(ask));
                 const res = await callOpenAI(prompt);
                 if (res && res._usage) {
                   pkgTokenIn += Number(res._usage.in || 0);
                   pkgTokenOut += Number(res._usage.out || 0);
                 }
-                const item = Array.isArray(res?.items) ? res.items[0] : null;
-                let q = item ? normalizeQuestion(item, sec) : null;
-                if (q && q.question) {
-                  q = applyContextPolicy(q);
-                  state.questions.push(q);
-                  needed--;
-                  updateGenProgress();
+                let items = Array.isArray(res?.items) ? res.items : [];
+                if (items.length > ask) items = items.slice(0, ask);
+                for (const item of items) {
+                  if (pushGeneratedItem(item, forceContext)) {
+                    needed--;
+                    added++;
+                    if (needed <= 0) break;
+                  }
                 }
-              } catch {}
-              fillTries++;
-              if (needed > 0) await new Promise(r => setTimeout(r, 400));
+                if (added === 0) noProgress++;
+                else noProgress = 0;
+                if (items.length < ask && batchSize > 1) {
+                  batchSize = Math.max(1, Math.floor(batchSize / 2));
+                }
+              } catch (e) {
+                console.warn("Gen batch error:", e?.message || e);
+                batchSize = Math.max(1, Math.floor(batchSize / 2));
+                noProgress++;
+                await new Promise(r => setTimeout(r, 1000));
+              } finally {
+                attempts++;
+              }
             }
-          }
+            if (needed > 0) {
+              let fillTries = 0;
+              const maxFill = Math.min(24, Math.max(6, needed * 3));
+              while (needed > 0 && fillTries < maxFill) {
+                try {
+                  const prompt = promptBaseLocal.replaceAll("__JUMLAH__", "1");
+                  const res = await callOpenAI(prompt);
+                  if (res && res._usage) {
+                    pkgTokenIn += Number(res._usage.in || 0);
+                    pkgTokenOut += Number(res._usage.out || 0);
+                  }
+                  const item = Array.isArray(res?.items) ? res.items[0] : null;
+                  if (item && pushGeneratedItem(item, forceContext)) {
+                    needed--;
+                  }
+                } catch {}
+                fillTries++;
+                if (needed > 0) await new Promise(r => setTimeout(r, 400));
+              }
+            }
+          };
 
-          applySingleContextForSection(sectionStartIdx, state.questions.length);
+          if (!konteksOn || konteksSoalCount <= 0) {
+            await generateQuestions(promptBase, totalSec, '');
+            applySingleContextForSection(sectionStartIdx, state.questions.length);
+          } else {
+            const stimulusText = await generateStimulusOnce();
+            const stimCount = stimulusText ? konteksSoalCount : 0;
+            const nonStimCount = totalSec - stimCount;
+
+            const promptStimulusQuestions = promptBase
+              .replace(contextRules, contextRulesStimulusQuestions)
+              .replaceAll("__STIMULUS__", stimulusText || '');
+            const promptNoStimulus = promptBase.replace(contextRules, contextRulesNoStimulus);
+
+            if (stimCount > 0) await generateQuestions(promptStimulusQuestions, stimCount, stimulusText);
+            if (nonStimCount > 0) await generateQuestions(promptNoStimulus, nonStimCount, '');
+          }
         }
 
         state._isGenerating = false;
@@ -10032,7 +10104,7 @@ ${outputSchema}`;
           const secCfg = state.sections.find((s) => s.id === q.sectionId) || {};
           const konteksOn = !!secCfg.soalKonteks;
           const totalInSection = state.questions.filter(x => x && x.sectionId === q.sectionId).length;
-          const konteksSoalCount = konteksOn ? (totalInSection >= 3 ? Math.min(totalInSection, Math.max(3, Math.floor(totalInSection * 0.3))) : totalInSection) : 0;
+          const konteksSoalCount = konteksOn ? Math.min(3, totalInSection) : 0;
           const existingContext = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
           const tieToContext = konteksOn && !!existingContext;
 
