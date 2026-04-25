@@ -10197,6 +10197,19 @@ OUTPUT JSON:
           const contextBlock = tieToContext
             ? `\nKONTEKS BACAAN (WAJIB dijadikan acuan, jangan diubah):\n<<<\n${existingContext}\n>>>\n`
             : ``;
+          const special = String(state.specialInstruction || "").trim();
+          const specialLower = special.toLowerCase();
+          const hasArabic = /[\u0600-\u06FF]/.test(String(q.question || '') + ' ' + String(existingContext || '') + ' ' + String((q.options || []).join(' ')) + ' ' + special);
+          const wantsArabicHarakat = hasArabic || /bahasa arab|arabic|harokat|harakat|tasykil|tashkil|tashkeel|syakal|diakritik/.test(specialLower);
+          const specialRules = special
+            ? `\nATURAN TAMBAHAN DARI GURU (WAJIB DIPATUHI):\n${special}\n- Jika aturan ini bertentangan dengan instruksi lain, prioritaskan aturan tambahan dari guru.\n`
+            : ``;
+          const arabicHarakatRules = wantsArabicHarakat
+            ? `\nINSTRUKSI BAHASA ARAB BERHARAKAT (WAJIB):
+- Jika menulis teks Arab, WAJIB gunakan huruf Arab dengan harakat/tasykīl (fathah, kasrah, dhammah, sukun, tanwin, tasydid) secara lengkap.
+- Jangan menulis Arab tanpa harakat. Jangan hilangkan diakritik pada kata Arab.
+- Jangan gunakan transliterasi latin untuk kata Arab (kecuali jika diminta di aturan tambahan dari guru).\n`
+            : ``;
           const prompt = `Buat ulang 1 butir soal sesuai detail berikut:
 Jenis: ${q.type}
 Tingkat Kesulitan: sedang
@@ -10204,10 +10217,10 @@ Bloom: ${q.bloom || 'C2'}
 Materi: ${q.materi || '-'}
 ${contextBlock}
 Instruksi:
-1. Gunakan Bahasa Indonesia.
+1. ${wantsArabicHarakat ? 'Gunakan Bahasa Arab dengan harakat/tasykīl lengkap.' : 'Gunakan Bahasa Indonesia.'}
 2. Jika tipe "pg" atau "pg_kompleks", buat ${clamp(Number(state.sections.find(s=>s.id===q.sectionId)?.opsiPG || 4), 3, 5)} opsi.
 3. Pastikan jawaban benar dan disertai penjelasan singkat.
-4. Jika butuh gambar: Prioritas 1: "asciiDiagram", Prioritas 2: "svgSource", Prioritas 3: "imagePrompt".
+4. Jika butuh gambar: Prioritas 1: "asciiDiagram", Prioritas 2: "svgSource", Prioritas 3: "imagePrompt" (tulis "imagePrompt" dalam Bahasa Inggris; jika soal berbahasa lain pahami artinya lalu tulis deskripsi gambar dalam Bahasa Inggris; hindari teks/label di gambar).
 5. Jika tipe "pg_kompleks", field "answer" HARUS array minimal 2 jawaban benar (contoh: [0,2]).
 6. Jika tipe "menjodohkan", field "pairs" HARUS ada: [{"left":"...","right":"..."}, ...] (teks, bukan angka). Jangan output "0,3" atau "1-4".
 7. Aturan konteks:
@@ -10215,6 +10228,8 @@ Instruksi:
 - Jika bagian ini mode konteks ON dan soal ini terkait konteks: field "context" wajib kosong (konteks sudah diberikan di atas dan harus tetap sama). Buat pertanyaan yang merujuk konteks tersebut.
 - Jika bagian ini mode konteks ON tapi soal ini tidak terkait konteks: field "context" tetap kosong.
 8. Jangan membuat stimulus baru. Dalam 1 bagian hanya ada 1 konteks (dipakai untuk ${konteksSoalCount} soal).
+${specialRules}
+${arabicHarakatRules}
 ${out}`;
         const res = await callOpenAI(prompt);
         const item = Array.isArray(res?.items) ? res.items[0] : null;
