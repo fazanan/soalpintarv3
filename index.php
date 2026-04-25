@@ -1660,7 +1660,31 @@ session_write_close();
             const letter = String.fromCharCode(65 + sectionIndex++);
             ctx.addPara(`${letter}. ${sec.title}`, 12, "bold", 0, 10);
 
-            if (sec.type === "pg" || sec.type === "benar_salah") {
+            if (sec.type === "pg") {
+              const rows = qs.map((q, idx) => {
+                const ansIdx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
+                const ansChar = String.fromCharCode(65 + ansIdx);
+                const exp = String(q.explanation || q.pembahasan || q.rationale || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+                return [String(idx + 1), ansChar, exp || "-"];
+              });
+              ctx.doc.autoTable({
+                startY: ctx.getY(),
+                margin: { left: ctx.margin, right: ctx.margin },
+                head: [["No", "Kunci", "Pembahasan Singkat"]],
+                body: rows,
+                styles: { font: "times", fontSize: 10, textColor: [0, 0, 0], cellPadding: 3, lineWidth: 0.6, lineColor: [0, 0, 0], overflow: "linebreak" },
+                headStyles: { fillColor: [224, 224, 224], textColor: [0, 0, 0], fontStyle: "bold", halign: "center" },
+                columnStyles: {
+                  0: { cellWidth: 34, halign: "center" },
+                  1: { cellWidth: 50, halign: "center" },
+                  2: { cellWidth: ctx.maxW - 34 - 50 },
+                },
+              });
+              ctx.setY((ctx.doc.lastAutoTable?.finalY || ctx.getY()) + 14);
+              continue;
+            }
+
+            if (sec.type === "benar_salah") {
               const cols = 5;
               const body = [];
               for (let i = 0; i < qs.length; i += cols) {
@@ -1669,13 +1693,8 @@ session_write_close();
                   const q = qs[i + j];
                   if (!q) { row.push(""); continue; }
                   let ansChar = "-";
-                  if (sec.type === "benar_salah") {
-                    const idx = normalizeAnswerIndex(q.answer, ["Benar", "Salah"]);
-                    ansChar = idx === 1 ? "Salah" : "Benar";
-                  } else {
-                    const idx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
-                    ansChar = String.fromCharCode(65 + idx);
-                  }
+                  const idx = normalizeAnswerIndex(q.answer, ["Benar", "Salah"]);
+                  ansChar = idx === 1 ? "Salah" : "Benar";
                   row.push(`${i + j + 1}. ${ansChar}`);
                 }
                 body.push(row);
@@ -3906,9 +3925,11 @@ session_write_close();
           letterIdx++;
           const rows = items.map((q, i) => {
             let ans = '';
+            let explain = '';
             if (sec.type === 'pg') {
               const idx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
               ans = String.fromCharCode(65 + idx);
+              explain = String(q.explanation || q.pembahasan || q.rationale || '');
             } else if (sec.type === 'benar_salah') {
               const idx = normalizeAnswerIndex(q.answer, ['Benar','Salah']);
               ans = idx === 1 ? 'Salah' : 'Benar';
@@ -3928,13 +3949,18 @@ session_write_close();
             } else {
               ans = String(q.answer || '');
             }
+            if (sec.type === 'pg') {
+              const exp = String(explain || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+              const expHtml = exp ? safeText(exp).replaceAll('\n', '<br>') : '-';
+              return `<tr><td class="border px-2 py-1 text-center">${i + 1}</td><td class="border px-2 py-1">${safeText(ans || '-')}</td><td class="border px-2 py-1 text-xs leading-relaxed">${expHtml}</td></tr>`;
+            }
             return `<tr><td class="border px-2 py-1 text-center">${i + 1}</td><td class="border px-2 py-1">${safeText(ans || '-')}</td></tr>`;
           }).join('');
           parts.push(`
             <div class="mt-6">
               <div class="font-bold text-base mb-2">${letter}. ${sec.title}</div>
               <table class="w-full text-sm border-collapse">
-                <thead><tr><th class="border px-2 py-1 w-14">No</th><th class="border px-2 py-1">Kunci</th></tr></thead>
+                <thead><tr><th class="border px-2 py-1 w-14">No</th><th class="border px-2 py-1 w-20">Kunci</th>${sec.type==='pg' ? `<th class="border px-2 py-1">Pembahasan Singkat</th>` : ``}</tr></thead>
                 <tbody>${rows}</tbody>
               </table>
             </div>
@@ -9782,6 +9808,15 @@ ${baselineModulAjar}
               : ``);
 
           const special = String(state.specialInstruction || "").trim();
+          const specialLower = special.toLowerCase();
+          const wantsArabicHarakat = /harokat|harakat|tasykil|tashkil|tashkeel|syakal|diakritik/.test(specialLower);
+          const arabicHarakatRules = wantsArabicHarakat
+            ? `\nINSTRUKSI BAHASA ARAB BERHARAKAT (WAJIB):
+- Jika menulis teks Arab, WAJIB gunakan huruf Arab dengan harakat/tasykīl (fathah, kasrah, dhammah, sukun, tanwin, tasydid) secara lengkap.
+- Jangan menulis Arab tanpa harakat. Jangan hilangkan diakritik pada kata Arab.
+- Jangan gunakan transliterasi latin untuk kata Arab (kecuali jika diminta di aturan tambahan dari guru).
+- Pastikan harakat tetap ada di: stimulus (jika ada), pertanyaan, opsi, pasangan menjodohkan, dan pembahasan.\n`
+            : ``;
           const specialRules = special
             ? `\nATURAN TAMBAHAN DARI GURU (WAJIB DIPATUHI):\n${special}\n- Jika aturan ini bertentangan dengan instruksi lain, prioritaskan aturan tambahan dari guru.\n`
             : ``;
@@ -9806,6 +9841,12 @@ __STIMULUS__
 >>>
 - Field "context" WAJIB kosong untuk setiap item (stimulus akan dipasang oleh sistem).
 - Buat soal yang merujuk stimulus dan menyebut minimal 1 data/fakta dari stimulus (angka/nama/objek/tempat/variabel).\n`;
+          const pembahasanRules = (sec.bentuk === "pg" || sec.bentuk === "pg_kompleks")
+            ? `\nATURAN PEMBAHASAN (WAJIB):
+- Isi field "explanation" singkat, 2–6 kalimat (maks 450 karakter).
+- Jelaskan mengapa jawaban benar tepat (sebut huruf opsinya) dan mengapa minimal 2 opsi lain tidak tepat (ringkas).
+- Jika tipe "pg_kompleks": jelaskan mengapa opsi yang benar dipilih dan mengapa minimal 2 opsi lain tidak dipilih.\n`
+            : ``;
 
           const outputSchema = sec.bentuk === "menjodohkan"
             ? `OUTPUT JSON (Array of Objects):
@@ -9913,6 +9954,7 @@ ATURAN JAWABAN (WAJIB):
 - Jika tipe "benar_salah": field "answer" harus 0 (Benar) atau 1 (Salah).
 - Jika tipe "pg_kompleks": field "answer" harus ARRAY angka index 0-based, MINIMAL 2 jawaban benar. Contoh: [0,2] berarti A dan C benar.
 - Jika tipe "menjodohkan": field "pairs" HARUS ada dan berisi ARRAY object { "left": "...", "right": "..." } (teks, bukan angka). Panjang pairs 4–8. Jangan output pasangan angka seperti "1-3" atau "0,3".
+${pembahasanRules}
 
 INSTRUKSI FORMAT MATEMATIKA (WAJIB PATUH):
 1. JANGAN GUNAKAN FORMAT LATEX ($..$).
@@ -9926,6 +9968,7 @@ Jika soal membutuhkan gambar/diagram:
 3. Prioritas 3: Jika sangat kompleks, kosongkan ascii/svg dan isi "imagePrompt" untuk digenerate AI Image.
 ${contextRules}
 ${specialRules}
+${arabicHarakatRules}
 ${outputSchema}`;
 
           const sectionStartIdx = state.questions.length;
@@ -9945,8 +9988,9 @@ ATURAN STIMULUS (WAJIB):
 1. Stimulus minimal 2 paragraf (dipisahkan 1 baris kosong).
 2. Memuat data/situasi nyata yang bisa dipakai sebagai dasar pertanyaan (angka/nama/objek/tempat/variabel).
 3. Panjang 450–1100 karakter (jangan melebihi 1100).
-4. Gunakan Bahasa Indonesia.
+4. ${wantsArabicHarakat ? 'Gunakan Bahasa Arab dengan harakat/tasykīl lengkap.' : 'Gunakan Bahasa Indonesia.'}
 5. Jangan membuat soal, hanya stimulus.
+${wantsArabicHarakat ? '\n6. Jangan menghapus harakat/diakritik pada kata Arab.' : ''}
 
 OUTPUT JSON:
 {"context":"..."}`
@@ -11441,6 +11485,21 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                         rows: pgRows,
                         borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
                     }));
+                    if (sec.type === 'pg') {
+                      content.push(new Paragraph({ children: [new TextRun({ text: "Pembahasan Singkat:", bold: true })], spacing: { before: 200, after: 150 } }));
+                      items.forEach((q, i) => {
+                        const idx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
+                        const ansChar = String.fromCharCode(65 + idx);
+                        const exp = String(q.explanation || q.pembahasan || q.rationale || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+                        content.push(new Paragraph({
+                          children: [
+                            new TextRun({ text: `${i + 1}. `, bold: true }),
+                            new TextRun({ text: `Kunci ${ansChar}. ${exp || '-'}` }),
+                          ],
+                          spacing: { after: 80 },
+                        }));
+                      });
+                    }
                 } else {
                     items.forEach((q, i) => {
                         let ansText = "";
@@ -12106,6 +12165,21 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                   rows: pgRows,
                   borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
                 }));
+                if (sec.type === 'pg') {
+                  content.push(new Paragraph({ children: [new TextRun({ text: "Pembahasan Singkat:", bold: true })], spacing: { before: 200, after: 150 } }));
+                  items.forEach((q, i) => {
+                    const idx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
+                    const ansChar = String.fromCharCode(65 + idx);
+                    const exp = String(q.explanation || q.pembahasan || q.rationale || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+                    content.push(new Paragraph({
+                      children: [
+                        new TextRun({ text: `${i + 1}. `, bold: true }),
+                        new TextRun({ text: `Kunci ${ansChar}. ${exp || '-'}` }),
+                      ],
+                      spacing: { after: 80 },
+                    }));
+                  });
+                }
               } else {
                 items.forEach((q, i) => {
                   let ansText = "";
