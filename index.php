@@ -9966,6 +9966,8 @@ Jika soal membutuhkan gambar/diagram:
 1. Prioritas 1: Buat diagram ASCII sederhana di field "asciiDiagram".
 2. Prioritas 2: Buat kode SVG sederhana (hitam putih, viewBox minimal, tanpa width/height fixed) di field "svgSource".
 3. Prioritas 3: Jika sangat kompleks, kosongkan ascii/svg dan isi "imagePrompt" untuk digenerate AI Image.
+4. Isi "imagePrompt" dalam Bahasa Inggris. Jika soal berbahasa selain Indonesia, pahami artinya lalu tulis deskripsi gambarnya dalam Bahasa Inggris.
+5. Jangan menaruh teks/tulisan/label di dalam gambar (hindari kata-kata yang harus terbaca di gambar).
 ${contextRules}
 ${specialRules}
 ${arabicHarakatRules}
