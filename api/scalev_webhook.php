@@ -400,9 +400,9 @@ if ($orderId !== '' && table_exists($mysqli, 'whapify_notifications')) {
           }
         } else {
           $loginLink = 'https://pinterin.my.id/login.php';
-          $msg = "Pembayaran Anda sudah berhasil.\n\nLink login: {$loginLink}\nUsername: {$email}\nPassword: GuruPintar";
-          if ($recipient !== '') $msg .= "\n\nJika diperlukan, Anda juga bisa login pakai No HP: {$recipient}";
-          $msg .= "\n\nSilakan ganti password setelah login.";
+          $msg = "Halo Bapak/Ibu Guru,\n\n✅ Pembayaran Anda telah berhasil kami terima.\n\n🔗 Silakan login melalui tautan berikut: {$loginLink}\n👤 Username: {$email}\n🔐 Password: GuruPintar";
+          if ($recipient !== '') $msg .= "\n\n📱 Apabila diperlukan, Anda juga dapat login menggunakan nomor HP: {$recipient}.";
+          $msg .= "\n\n🛡️ Demi keamanan akun, kami menyarankan Anda segera mengganti password setelah login dan menggunakan password yang mudah diingat namun tetap aman.\n\n*Terimakasih*\n*Admin GuruPintar*";
 
           $res = send_whapify_text($cfg['endpoint_url'], $cfg['secret'], $cfg['account'], $recipient, $msg);
           $waHttp = (int)($res['http'] ?? 0);
