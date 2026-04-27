@@ -7627,6 +7627,7 @@ ${baselineModulAjar}
              ${baseLink('admin_audit_logs.php','bug_report','Audit Log')}
             ${baseLink('admin_api_models.php','model_training','Model API')}
              ${baseLink('admin_api_keys.php','key','Api Key')}
+             ${baseLink('admin_whapify.php','sms','Whapify')}
              ${baseLink('admin_users.php','group','Pengguna')}
            ` : ``}
            ${baseLink('logout.php','logout','Keluar')}

@@ -90,6 +90,39 @@ CREATE TABLE IF NOT EXISTS api_keys (
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS whapify_settings (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  endpoint_url VARCHAR(255) NOT NULL DEFAULT 'https://whapify.id/api/send/whatsapp',
+  secret TEXT NOT NULL,
+  account VARCHAR(128) NOT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_active (is_active)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS whapify_notifications (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id VARCHAR(64) NOT NULL,
+  username VARCHAR(160) NULL,
+  user_id INT UNSIGNED NULL,
+  recipient VARCHAR(32) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'pending',
+  http_status INT NULL,
+  response_text TEXT NULL,
+  error_text TEXT NULL,
+  sent_at TIMESTAMP NULL DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_order_id (order_id),
+  INDEX idx_status_created (status, created_at),
+  INDEX idx_user_created (user_id, created_at)
+) ENGINE=InnoDB
+  DEFAULT CHARSET=utf8mb4
+  COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS soal_user (
   id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   user_id INT UNSIGNED NOT NULL,

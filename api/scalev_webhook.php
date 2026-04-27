@@ -106,6 +106,76 @@ function get_signing_secret(): string {
   return '';
 }
 
+function normalize_phone_id(string $raw): string {
+  $s = trim($raw);
+  if ($s === '') return '';
+  $s = preg_replace('/[^0-9+]/', '', $s) ?? '';
+  $s = trim($s);
+  if ($s === '') return '';
+  if (str_starts_with($s, '+')) $s = substr($s, 1);
+  if (str_starts_with($s, '0')) $s = '62' . substr($s, 1);
+  else if (str_starts_with($s, '8')) $s = '62' . $s;
+  if (strlen($s) > 32) $s = substr($s, 0, 32);
+  return $s;
+}
+
+function get_whapify_settings(mysqli $db): ?array {
+  if (!table_exists($db, 'whapify_settings')) return null;
+  $stmt = $db->prepare("SELECT endpoint_url, secret, account FROM whapify_settings WHERE is_active=1 ORDER BY id DESC LIMIT 1");
+  if (!$stmt) return null;
+  $stmt->execute();
+  $stmt->bind_result($endpointUrl, $secret, $account);
+  $row = null;
+  if ($stmt->fetch()) {
+    $row = [
+      'endpoint_url' => (string)$endpointUrl,
+      'secret' => (string)$secret,
+      'account' => (string)$account,
+    ];
+  }
+  $stmt->close();
+  if (!$row) return null;
+  $row['endpoint_url'] = trim($row['endpoint_url']);
+  $row['secret'] = trim($row['secret']);
+  $row['account'] = trim($row['account']);
+  if ($row['endpoint_url'] === '' || $row['secret'] === '' || $row['account'] === '') return null;
+  return $row;
+}
+
+function send_whapify_text(string $endpointUrl, string $secret, string $account, string $recipient, string $message): array {
+  if (!function_exists('curl_init')) return ['ok' => false, 'http' => 0, 'body' => '', 'error' => 'curl_missing'];
+  $ch = curl_init();
+  curl_setopt($ch, CURLOPT_URL, $endpointUrl);
+  curl_setopt($ch, CURLOPT_POST, true);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 4);
+  curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+  $fields = [
+    'secret' => $secret,
+    'account' => $account,
+    'recipient' => $recipient,
+    'type' => 'text',
+    'message' => $message,
+  ];
+  curl_setopt($ch, CURLOPT_POSTFIELDS, $fields);
+  $body = curl_exec($ch);
+  $err = curl_error($ch);
+  $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  curl_close($ch);
+  $bodyStr = is_string($body) ? $body : '';
+  $ok = $http >= 200 && $http < 300;
+  if ($ok) {
+    $decoded = json_decode($bodyStr, true);
+    if (is_array($decoded) && isset($decoded['status'])) {
+      $statusVal = $decoded['status'];
+      if (is_int($statusVal) || ctype_digit((string)$statusVal)) {
+        $ok = ((int)$statusVal) >= 200 && ((int)$statusVal) < 300;
+      }
+    }
+  }
+  return ['ok' => $ok, 'http' => $http, 'body' => $bodyStr, 'error' => $err ?: ''];
+}
+
 function respond_ok(array $extra = []): void {
   echo json_encode(array_merge(['ok' => true], $extra), JSON_UNESCAPED_UNICODE);
   exit;
@@ -162,6 +232,24 @@ $mysqli->query("CREATE TABLE IF NOT EXISTS scalev_webhook_events (
   processed_at TIMESTAMP NULL DEFAULT NULL,
   UNIQUE KEY uniq_unique_id (unique_id),
   INDEX idx_event_received (event, received_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+$mysqli->query("CREATE TABLE IF NOT EXISTS whapify_notifications (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  order_id VARCHAR(64) NOT NULL,
+  username VARCHAR(160) NULL,
+  user_id INT UNSIGNED NULL,
+  recipient VARCHAR(32) NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'pending',
+  http_status INT NULL,
+  response_text TEXT NULL,
+  error_text TEXT NULL,
+  sent_at TIMESTAMP NULL DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_order_id (order_id),
+  INDEX idx_status_created (status, created_at),
+  INDEX idx_user_created (user_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
 if ($uniqueId !== '') {
@@ -257,4 +345,92 @@ if ($uniqueId !== '') {
   }
 }
 
-respond_ok(['handled' => 'created_or_exists', 'username' => $email]);
+$uidFinal = null;
+$stmt = $mysqli->prepare("SELECT id FROM users WHERE username=? LIMIT 1");
+if ($stmt) {
+  $stmt->bind_param('s', $email);
+  $stmt->execute();
+  $stmt->bind_result($uidTmp);
+  if ($stmt->fetch()) $uidFinal = (int)$uidTmp;
+  $stmt->close();
+}
+
+$orderId = isset($data['order_id']) ? (string)$data['order_id'] : '';
+if ($orderId === '') $orderId = $uniqueId !== '' ? $uniqueId : '';
+
+$waStatus = 'skipped';
+$waHttp = null;
+if ($orderId !== '' && table_exists($mysqli, 'whapify_notifications')) {
+  $hasNoHp = column_exists($mysqli, 'users', 'no_hp');
+  $userPhone = '';
+  if ($hasNoHp) {
+    $stmt = $mysqli->prepare("SELECT no_hp FROM users WHERE username=? LIMIT 1");
+    if ($stmt) {
+      $stmt->bind_param('s', $email);
+      $stmt->execute();
+      $stmt->bind_result($hp);
+      if ($stmt->fetch()) $userPhone = (string)$hp;
+      $stmt->close();
+    }
+  }
+  $recipient = normalize_phone_id($userPhone !== '' ? $userPhone : extract_customer_phone($data));
+
+  if ($recipient === '') {
+    $waStatus = 'no_phone';
+  } else {
+    $stmt = $mysqli->prepare("INSERT IGNORE INTO whapify_notifications (order_id, username, user_id, recipient, status) VALUES (?,?,?,?, 'pending')");
+    if ($stmt) {
+      $uidBind = $uidFinal === null ? null : (int)$uidFinal;
+      $stmt->bind_param('ssis', $orderId, $email, $uidBind, $recipient);
+      $stmt->execute();
+      $inserted = $stmt->affected_rows;
+      $stmt->close();
+      if ($inserted === 0) {
+        $waStatus = 'duplicate';
+      } else {
+        $cfg = get_whapify_settings($mysqli);
+        if (!$cfg) {
+          $waStatus = 'no_config';
+          $stmt = $mysqli->prepare("UPDATE whapify_notifications SET status='failed', error_text=?, updated_at=NOW() WHERE order_id=?");
+          if ($stmt) {
+            $err = 'whapify_config_missing';
+            $stmt->bind_param('ss', $err, $orderId);
+            $stmt->execute();
+            $stmt->close();
+          }
+        } else {
+          $loginLink = 'https://pinterin.my.id/login.php';
+          $msg = "Pembayaran Anda sudah berhasil.\n\nLink login: {$loginLink}\nUsername: {$email}\nPassword: GuruPintar";
+          if ($recipient !== '') $msg .= "\n\nJika diperlukan, Anda juga bisa login pakai No HP: {$recipient}";
+          $msg .= "\n\nSilakan ganti password setelah login.";
+
+          $res = send_whapify_text($cfg['endpoint_url'], $cfg['secret'], $cfg['account'], $recipient, $msg);
+          $waHttp = (int)($res['http'] ?? 0);
+          if (!empty($res['ok'])) {
+            $waStatus = 'sent';
+            $stmt = $mysqli->prepare("UPDATE whapify_notifications SET status='sent', http_status=?, response_text=?, sent_at=NOW(), updated_at=NOW() WHERE order_id=?");
+            if ($stmt) {
+              $body = (string)($res['body'] ?? '');
+              $stmt->bind_param('iss', $waHttp, $body, $orderId);
+              $stmt->execute();
+              $stmt->close();
+            }
+          } else {
+            $waStatus = 'failed';
+            $stmt = $mysqli->prepare("UPDATE whapify_notifications SET status='failed', http_status=?, response_text=?, error_text=?, updated_at=NOW() WHERE order_id=?");
+            if ($stmt) {
+              $body = (string)($res['body'] ?? '');
+              $err = (string)($res['error'] ?? '');
+              if ($err === '' && $waHttp >= 400) $err = 'http_' . $waHttp;
+              $stmt->bind_param('isss', $waHttp, $body, $err, $orderId);
+              $stmt->execute();
+              $stmt->close();
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+respond_ok(['handled' => 'created_or_exists', 'username' => $email, 'wa' => $waStatus, 'wa_http' => $waHttp]);
