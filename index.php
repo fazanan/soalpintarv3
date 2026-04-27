@@ -627,6 +627,9 @@ session_write_close();
           "Pendidikan Lingkungan Hidup",
           "Muatan Lokal",
           "Bimbingan Konseling",
+          "Kehutanan",
+          "Matematika Tingkat Lanjut",
+          "Agribisnis",
         ],
         "SMP/MTs": [
           "Pendidikan Agama Islam dan Budi Pekerti",
@@ -659,6 +662,9 @@ session_write_close();
           "Pendidikan Lingkungan Hidup",
           "Muatan Lokal",
           "Bimbingan Konseling",
+          "Kehutanan",
+          "Matematika Tingkat Lanjut",
+          "Agribisnis",
         ],
         "SMA/MA": [
           "Pendidikan Agama Islam dan Budi Pekerti",
@@ -698,6 +704,9 @@ session_write_close();
           "Pendidikan Lingkungan Hidup",
           "Muatan Lokal",
           "Bimbingan Konseling",
+          "Kehutanan",
+          "Matematika Tingkat Lanjut",
+          "Agribisnis",
         ],
         "SMK": [
           "Pendidikan Agama Islam dan Budi Pekerti",
@@ -726,6 +735,9 @@ session_write_close();
           "Pendidikan Lingkungan Hidup",
           "Muatan Lokal",
           "Bimbingan Konseling",
+          "Kehutanan",
+          "Matematika Tingkat Lanjut",
+          "Agribisnis",
         ],
         "PAUD": [
           "PAUD (Fase Fondasi)",
