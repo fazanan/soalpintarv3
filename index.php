@@ -919,7 +919,7 @@ session_write_close();
           .replaceAll("<", "&lt;")
           .replaceAll(">", "&gt;");
       const safeMathHtml = (s) =>
-        safeText(s)
+        safeText(s).replace(/[＾ˆ˄]/g, '^')
           .replace(/([0-9A-Za-z\)\]])\^\(([^)]+)\)/g, "$1<sup>$2</sup>")
           .replace(/([0-9A-Za-z\)\]])\^([-+]?[0-9A-Za-z]+)/g, "$1<sup>$2</sup>");
       const powTextDocxPdf = (() => {
@@ -938,10 +938,11 @@ session_write_close();
           "-": "⁻",
         };
         const toSupDocx = (s) => String(s || "").split("").map((c) => mapDocx[c] || c).join("");
+        const normalizeCaret = (t) => String(t || "").replace(/[＾ˆ˄]/g, '^');
         const forDocx = (text) =>
-          String(text || "").replace(/\^\s*\(?\s*([+\-]?\d+)\s*\)?/g, (_m, g1) => toSupDocx(String(g1 || "")));
+          normalizeCaret(text).replace(/\^\s*\{?\s*\(?\s*([+\-]?\d+)\s*\)?\s*\}?/g, (_m, g1) => toSupDocx(String(g1 || "")));
         const forPdf = (text) =>
-          String(text || "").replace(/\^\s*\(?\s*([1-3])\s*\)?/g, (_m, g1) => ({ "1": "¹", "2": "²", "3": "³" }[String(g1)] || `^${g1}`));
+          normalizeCaret(text).replace(/\^\s*\{?\s*\(?\s*([1-3])\s*\)?\s*\}?/g, (_m, g1) => ({ "1": "¹", "2": "²", "3": "³" }[String(g1)] || `^${g1}`));
         return { forDocx, forPdf };
       })();
       const safeAttr = (s) =>

@@ -197,7 +197,7 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         .replaceAll('>', '&gt;');
     }
     function renderMathText(s) {
-      const esc = escapeHtml(String(s ?? ''));
+      const esc = escapeHtml(String(s ?? '')).replace(/[＾ˆ˄]/g, '^');
       return esc
         .replace(/([0-9A-Za-z\)\]])\^\(([^)]+)\)/g, '$1<sup>$2</sup>')
         .replace(/([0-9A-Za-z\)\]])\^([-+]?[0-9A-Za-z]+)/g, '$1<sup>$2</sup>');
