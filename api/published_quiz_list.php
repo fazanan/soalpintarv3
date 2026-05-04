@@ -16,6 +16,7 @@ if ($role !== 'admin') {
     if ($stmtAcc) {
       $stmtAcc->bind_param('i', $_SESSION['user_id']);
       $stmtAcc->execute();
+      $aq = null;
       $stmtAcc->bind_result($aq);
       if ($stmtAcc->fetch()) $access = (int)$aq;
       $stmtAcc->close();

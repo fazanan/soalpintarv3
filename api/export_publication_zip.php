@@ -24,6 +24,7 @@ if ($role !== 'admin') {
     if ($stmtAcc) {
       $stmtAcc->bind_param('i', $_SESSION['user_id']);
       $stmtAcc->execute();
+      $aq = null;
       $stmtAcc->bind_result($aq);
       if ($stmtAcc->fetch()) $access = (int)$aq;
       $stmtAcc->close();
@@ -53,6 +54,11 @@ if ($id > 0) {
   $stmt->bind_param('si', $slug, $_SESSION['user_id']);
 }
 $stmt->execute();
+$pid = 0;
+$pslug = '';
+$pmapel = '';
+$pkelas = '';
+$ppayload = '';
 $stmt->bind_result($pid, $pslug, $pmapel, $pkelas, $ppayload);
 if (!$stmt->fetch()) {
   $stmt->close();

@@ -614,6 +614,8 @@ session_write_close();
           "Bahasa Indonesia",
           "Bahasa Indramayu",
           "Bahasa Jawa",
+          "Bahasa Sunda",
+          "Bahasa Bali",
           "Matematika",
           "Ilmu Pengetahuan Alam dan Sosial (IPAS)",
           "Informatika",
@@ -647,6 +649,8 @@ session_write_close();
           "Bahasa Indonesia",
           "Bahasa Indramayu",
           "Bahasa Jawa",
+          "Bahasa Sunda",
+          "Bahasa Bali",
           "Matematika",
           "Ilmu Pengetahuan Alam (IPA)",
           "Ilmu Pengetahuan Sosial (IPS)",
@@ -682,6 +686,8 @@ session_write_close();
           "Bahasa Indonesia",
           "Bahasa Indramayu",
           "Bahasa Jawa",
+          "Bahasa Sunda",
+          "Bahasa Bali",
           "Matematika",
           "Bahasa Inggris",
           "Fisika",
@@ -721,6 +727,8 @@ session_write_close();
           "Bahasa Indonesia",
           "Bahasa Indramayu",
           "Bahasa Jawa",
+          "Bahasa Sunda",
+          "Bahasa Bali",
           "Matematika",
           "Bahasa Inggris",
           "Sejarah",
@@ -8935,10 +8943,12 @@ ${baselineModulAjar}
         if (!q || !body) return;
         const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
         const ctxHtml = ctxRaw ? `<div class="mb-4 p-3 rounded-lg border bg-gray-50 text-sm leading-relaxed">${safeText(ctxRaw).replaceAll('\n','<br>')}</div>` : '';
-        if (q.type === 'pg' || q.type === 'pg_kompleks') {
+        const qType = String(q.type || '').trim();
+        if (qType === 'pg' || qType === 'benar_salah' || qType === 'pg_kompleks') {
           const selected = state.quiz.answered[state.quiz.idx];
           const ansIdx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
-          const optsHtml = q.options.map((opt, i) => {
+          const opts = qType === 'benar_salah' ? ['Benar', 'Salah'] : (Array.isArray(q.options) ? q.options : []);
+          const optsHtml = opts.map((opt, i) => {
             const correct = Array.isArray(q.answer) ? (q.answer || []).includes(i) : i === ansIdx;
             const chosen = Array.isArray(selected) ? (selected || []).includes(i) : selected === i;
             const base = "block w-full text-left px-3 py-2 border rounded transition-colors";
@@ -8951,6 +8961,9 @@ ${baselineModulAjar}
             const dis = state.quiz.reveal ? "disabled" : "";
             return `<button ${dis} onclick="handleQuizAnswer(${i})" class="${base}${stateCls}">${String.fromCharCode(65 + i)}. ${safeText(opt)}</button>`;
           }).join('');
+          const multiActions = (qType === 'pg_kompleks' && !state.quiz.reveal)
+            ? `<div class="mt-4"><button onclick="revealQuizAnswer()" class="h-10 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">Cek Jawaban</button></div>`
+            : ``;
           body.innerHTML = `
             <div class="p-6">
               ${ctxHtml}
@@ -8958,7 +8971,8 @@ ${baselineModulAjar}
               <div class="space-y-2">
                 ${optsHtml}
               </div>
-              ${state.quiz.reveal ? `<div class="mt-4 font-bold text-green-600">Kunci: ${Array.isArray(q.answer) ? q.answer.map(n => String.fromCharCode(65 + Number(n))).join(', ') : String.fromCharCode(65 + ansIdx)}</div>` : ``}
+              ${multiActions}
+              ${state.quiz.reveal ? `<div class="mt-4 font-bold text-green-600">Kunci: ${qType === 'benar_salah' ? (ansIdx === 1 ? 'Salah' : 'Benar') : (Array.isArray(q.answer) ? q.answer.map(n => String.fromCharCode(65 + Number(n))).join(', ') : String.fromCharCode(65 + ansIdx))}</div>` : ``}
             </div>
           `;
         } else {
@@ -8973,7 +8987,23 @@ ${baselineModulAjar}
         }
         document.getElementById('quizMeta').textContent = `${state.quiz.idx + 1} / ${state.questions.length}`;
       };
+      function revealQuizAnswer() {
+        state.quiz.reveal = true;
+        renderQuizContent();
+      }
       const handleQuizAnswer = (i) => {
+        const q = state.questions[state.quiz.idx];
+        const t = String(q?.type || '').trim();
+        if (t === 'pg_kompleks') {
+          const cur = Array.isArray(state.quiz.answered[state.quiz.idx]) ? state.quiz.answered[state.quiz.idx] : [];
+          const set = new Set(cur.map((x) => Number(x)));
+          if (set.has(i)) set.delete(i);
+          else set.add(i);
+          const next = Array.from(set).filter((n) => Number.isFinite(n) && n >= 0).sort((a, b) => a - b);
+          state.quiz.answered[state.quiz.idx] = next;
+          renderQuizContent();
+          return;
+        }
         state.quiz.answered[state.quiz.idx] = i;
         state.quiz.reveal = true;
         renderQuizContent();
@@ -9188,16 +9218,62 @@ ${baselineModulAjar}
           return;
         }
         const items = Array.isArray(state.questions) ? state.questions : [];
-        const pg = items.filter(q => q && q.type === 'pg' && Array.isArray(q.options) && q.options.length >= 3);
-        if (pg.length === 0) { alert("Hanya mendukung PG. Tidak ada PG pada paket ini."); return; }
+        const allowedTypes = new Set(['pg', 'benar_salah', 'pg_kompleks']);
+        const quizItems = items
+          .filter(q => q && allowedTypes.has(String(q.type || '').trim()))
+          .map(q => {
+            const t = String(q.type || '').trim();
+            const base = { ...q, type: t };
+            if (t === 'benar_salah') {
+              return { ...base, options: ['Benar', 'Salah'] };
+            }
+            return base;
+          })
+          .filter(q => {
+            const t = String(q.type || '').trim();
+            if (t === 'pg' || t === 'pg_kompleks') {
+              return Array.isArray(q.options) && q.options.length >= 3;
+            }
+            if (t === 'benar_salah') return true;
+            return false;
+          });
+        if (quizItems.length === 0) { alert("Hanya mendukung PG, Benar/Salah, dan PG Kompleks. Tidak ada soal yang bisa dipublish pada paket ini."); return; }
         const includeImages = state.quizPublishForm?.includeImages ?? true;
-        const imageCount = includeImages ? pg.reduce((acc, q) => acc + (String(q.image || '').trim() ? 1 : 0), 0) : 0;
+        const imageCount = includeImages ? quizItems.reduce((acc, q) => acc + (String(q.image || '').trim() ? 1 : 0), 0) : 0;
         if (includeImages && imageCount > 5) {
           alert(`Maksimal 5 gambar per paket publish. Saat ini terdeteksi ${imageCount} gambar.`);
           return;
         }
-        const payload = pg.map(q => ({ question: String(q.question||''), options: q.options.map(x=>String(x||'')) }));
-        const answer_key = pg.map(q => normalizeAnswerIndex(Array.isArray(q.answer) ? q.answer[0] : q.answer, Array.isArray(q.options) ? q.options : []));
+        const normalizeMultiAnswer = (raw, optCount) => {
+          const out = [];
+          const pushIdx = (v) => {
+            const idx = normalizeAnswerIndex(v, Array.from({ length: Math.max(0, Number(optCount || 0)) }, (_, i) => String(i)));
+            if (Number.isFinite(idx) && idx >= 0) out.push(idx);
+          };
+          if (Array.isArray(raw)) {
+            raw.forEach(pushIdx);
+          } else if (typeof raw === 'string') {
+            const s = raw.trim();
+            if (/^[A-E]+$/i.test(s) && s.length > 1) {
+              s.split('').forEach(pushIdx);
+            } else {
+              s.split(/[,\s;\/|]+/).filter(Boolean).forEach(pushIdx);
+            }
+          } else {
+            pushIdx(raw);
+          }
+          const uniq = Array.from(new Set(out.filter(n => Number.isFinite(n))));
+          uniq.sort((a, b) => a - b);
+          const maxIdx = Math.max(-1, Number(optCount || 0) - 1);
+          return uniq.map(n => Math.min(maxIdx, Math.max(0, n)));
+        };
+        const answer_key = quizItems.map((q) => {
+          const t = String(q.type || '').trim();
+          const opts = Array.isArray(q.options) ? q.options : [];
+          if (t === 'pg_kompleks') return normalizeMultiAnswer(q.answer, opts.length);
+          if (t === 'benar_salah') return normalizeAnswerIndex(q.answer, ['Benar', 'Salah']);
+          return normalizeAnswerIndex(Array.isArray(q.answer) ? q.answer[0] : q.answer, opts);
+        });
         const slug = String(state.quizPublishForm?.slug || "").trim().toLowerCase().replace(/[^a-z0-9\-]+/g,'-').replace(/^-+|-+$/g,'');
         let expireRaw = String(state.quizPublishForm?.expire || "").trim();
         const addDays = (d, days) => {
@@ -9335,12 +9411,15 @@ ${baselineModulAjar}
           params.set('sekolah', String(state.identity.namaSekolah||''));
           params.set('guru', String(state.identity.namaGuru||''));
           // tambahkan pembahasan jika ada
-          const payloadWithExplain = await Promise.all(pg.map(async (q) => {
+          const payloadWithExplain = await Promise.all(quizItems.map(async (q) => {
             const imgUrl = await uploadIfNeeded(q.image);
+            const t = String(q.type || '').trim() || 'pg';
+            const opts = (t === 'benar_salah') ? ['Benar', 'Salah'] : (Array.isArray(q.options) ? q.options : []);
             return {
+              type: t,
               question: String(q.question||''),
               context: String(q.context || ''),
-              options: q.options.map(x=>String(x||'')),
+              options: opts.map(x=>String(x||'')),
               explain: String(q.explanation || q.pembahasan || q.rationale || ''),
               image: imgUrl ? String(imgUrl) : ''
             };
@@ -9384,7 +9463,7 @@ ${baselineModulAjar}
               const snapshot = {
                 identity: { ...state.identity },
                 paket: { ...state.paket },
-                questions: pg,
+                questions: quizItems,
                 quizPublishMeta: {
                   published_id: Number(js.id || 0),
                   slug: String(js.slug || ''),

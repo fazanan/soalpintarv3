@@ -15,6 +15,13 @@ $stmt = $mysqli->prepare($sql);
 if ($pubIdParam > 0) $stmt->bind_param('i', $pubIdParam);
 else $stmt->bind_param('s', $slug);
 $stmt->execute();
+$pubId = 0;
+$slugDb = '';
+$mapel = '';
+$kelas = '';
+$payloadJson = '';
+$active = 0;
+$expireAt = null;
 $stmt->bind_result($pubId, $slugDb, $mapel, $kelas, $payloadJson, $active, $expireAt);
 if (!$stmt->fetch()) {
   $stmt->close();
@@ -181,6 +188,8 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
     })();
     let submitted = false;
     let activeTab = 'soal';
+    let soalTypeTab = 'pg';
+    const studentAnswers = {};
     function escapeHtml(s) {
       return String(s ?? '')
         .replaceAll('&', '&amp;')
@@ -196,6 +205,52 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
       }
       return a;
+    }
+    function normalizeQType(q) {
+      const t = String(q?.type || '').trim();
+      if (t === 'benar_salah' || t === 'pg_kompleks' || t === 'pg') return t;
+      return 'pg';
+    }
+    function buildOrderData(questions, seed) {
+      const typeOrder = ['pg', 'benar_salah', 'pg_kompleks'];
+      const groups = {};
+      for (const t of typeOrder) groups[t] = [];
+      const others = [];
+      for (let i = 0; i < questions.length; i++) {
+        const t = normalizeQType(questions[i]);
+        if (groups[t]) groups[t].push(i);
+        else others.push(i);
+      }
+      const shuffledGroups = {};
+      const all = [];
+      for (let ti = 0; ti < typeOrder.length; ti++) {
+        const t = typeOrder[ti];
+        const g = groups[t] || [];
+        const s = (Number(seed || 0) * 997) + (ti + 1) * 7919;
+        const sh = shuffleWithSeed(g, s);
+        shuffledGroups[t] = sh;
+        for (const idx of sh) all.push(idx);
+      }
+      for (const idx of others) all.push(idx);
+      const posByOrig = {};
+      for (let p = 0; p < all.length; p++) posByOrig[all[p]] = p;
+      return { typeOrder, groups: shuffledGroups, orderAll: all, posByOrig };
+    }
+    function onAnswerChange(pos, value, checked, isMulti) {
+      const p = Number(pos);
+      const v = Number(value);
+      if (!Number.isFinite(p) || p < 0) return;
+      if (!Number.isFinite(v) || v < 0) return;
+      if (Number(isMulti || 0) === 1) {
+        const cur = Array.isArray(studentAnswers[p]) ? studentAnswers[p] : [];
+        const set = new Set(cur.map(n => Number(n)));
+        if (checked) set.add(v);
+        else set.delete(v);
+        const next = Array.from(set).filter(n => Number.isFinite(n) && n >= 0).sort((a, b) => a - b);
+        studentAnswers[p] = next;
+        return;
+      }
+      studentAnswers[p] = v;
     }
     function renderTabs() {
       const container = document.getElementById('root');
@@ -225,18 +280,54 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
     }
     function renderSoal() {
       const questions = Array.isArray(payload) ? payload : [];
-      const indices = questions.map((_, i) => i);
-      const order = shuffleWithSeed(indices, absen);
-      const cards = order.map((origIdx, i) => {
+      const orderData = buildOrderData(questions, absen);
+      const availableTypes = orderData.typeOrder.filter(t => Array.isArray(orderData.groups[t]) && orderData.groups[t].length > 0);
+      const activeTypes = availableTypes.length ? availableTypes : ['pg'];
+      if (!activeTypes.includes(soalTypeTab)) soalTypeTab = activeTypes[0];
+      const tabLabel = { pg: 'Pilihan Ganda', benar_salah: 'Benar/Salah', pg_kompleks: 'PG Kompleks' };
+      const tabSubtitle = { pg: 'Pilihlah salah satu jawaban yang paling tepat!', benar_salah: 'Pilihlah jawaban Benar atau Salah!', pg_kompleks: 'Pilih jawaban yang benar (bisa lebih dari satu)!' };
+      const tabs = `
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+          ${activeTypes.map(t => `
+            <button
+              class="h-9 px-3 rounded-full border text-sm font-semibold ${soalTypeTab===t?'bg-blue-600 border-blue-600 text-white':'bg-white hover:bg-gray-50'}"
+              onclick="soalTypeTab='${t}'; renderTabs();"
+            >${escapeHtml(tabLabel[t] || t)}</button>
+          `).join('')}
+        </div>
+      `;
+      const group = Array.isArray(orderData.groups[soalTypeTab]) ? orderData.groups[soalTypeTab] : [];
+      const lastTab = activeTypes[activeTypes.length - 1];
+      const prevTab = (() => {
+        const i = activeTypes.indexOf(soalTypeTab);
+        return i > 0 ? activeTypes[i - 1] : '';
+      })();
+      const nextTab = (() => {
+        const i = activeTypes.indexOf(soalTypeTab);
+        return i >= 0 && i < activeTypes.length - 1 ? activeTypes[i + 1] : '';
+      })();
+      const cards = group.map((origIdx, localIdx) => {
         const q = questions[origIdx] || {};
-        const opts = Array.isArray(q.options) ? q.options : [];
+        const type = normalizeQType(q);
+        const isMulti = type === 'pg_kompleks';
+        const inputKind = isMulti ? 'checkbox' : 'radio';
+        const opts = type === 'benar_salah' ? ['Benar', 'Salah'] : (Array.isArray(q.options) ? q.options : []);
         const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
         const ctxHtml = ctxRaw ? `<div class="mb-3 p-3 rounded-xl border bg-gray-50 text-sm leading-relaxed">${escapeHtml(ctxRaw).replaceAll('\n','<br>')}</div>` : ``;
+        const pos = Number(orderData.posByOrig[origIdx] ?? -1);
+        const picked = studentAnswers[pos];
         const optsHtml = opts.map((t, oi) => `
           <div class="flex gap-3 items-start">
             <label class="font-semibold pt-0.5">${String.fromCharCode(65 + oi)}.</label>
             <label class="flex-1 flex gap-3 p-2 rounded-lg hover:bg-gray-50 transition">
-              <input type="radio" name="q_${i}" value="${oi}" class="mt-1 rounded border-gray-300">
+              <input
+                type="${inputKind}"
+                name="q_${pos}"
+                value="${oi}"
+                class="mt-1 rounded border-gray-300"
+                onchange="onAnswerChange(${pos},${oi},this.checked,${isMulti?1:0})"
+                ${isMulti ? (Array.isArray(picked) && picked.includes(oi) ? 'checked' : '') : (Number(picked) === oi ? 'checked' : '')}
+              >
               <span class="text-sm leading-relaxed">${escapeHtml(String(t || ''))}</span>
             </label>
           </div>
@@ -244,7 +335,7 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         return `
           <div class="mb-6">
             <div class="flex gap-4">
-              <span class="font-bold text-lg min-w-[1.5rem]">${i + 1}.</span>
+              <span class="font-bold text-lg min-w-[1.5rem]">${localIdx + 1}.</span>
               <div class="flex-1">
                 ${ctxHtml}
                 <p class="mb-3 text-justify leading-relaxed">${escapeHtml(String(q.question || ''))}</p>
@@ -257,12 +348,18 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
           </div>
         `;
       }).join('');
+      const showSubmit = soalTypeTab === lastTab;
       return `
         <div class="space-y-6">
-          <div class="font-bold mb-1">PILIHAN GANDA</div>
-          <div class="italic text-sm mb-4">Pilihlah salah satu jawaban yang paling tepat!</div>
+          ${tabs}
+          <div class="font-bold mb-1">${escapeHtml(tabLabel[soalTypeTab] || 'Soal')}</div>
+          <div class="italic text-sm mb-4">${escapeHtml(tabSubtitle[soalTypeTab] || '')}</div>
           ${cards}
-          <div class="pt-2">
+          <div class="pt-2 flex items-center gap-2">
+            ${prevTab ? `<button class="h-11 px-5 rounded-lg border bg-white hover:bg-gray-50 font-semibold" onclick="soalTypeTab='${prevTab}'; renderTabs();">Sebelumnya</button>` : ``}
+            ${nextTab ? `<button class="h-11 px-5 rounded-lg border bg-white hover:bg-gray-50 font-semibold" onclick="soalTypeTab='${nextTab}'; renderTabs();">Berikutnya</button>` : ``}
+          </div>
+          <div class="${showSubmit ? '' : 'hidden'} pt-2">
             <button id="btnSubmit" class="h-11 px-5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">Submit</button>
             <div id="info" class="text-sm text-gray-600 mt-2"></div>
           </div>
@@ -272,9 +369,26 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
     function renderSolusi() {
       const questions = Array.isArray(payload) ? payload : [];
       const rows = questions.map((q, i) => {
-        const correct = typeof answerKey[i] === 'number' ? answerKey[i] : -1;
-        const correctText = (Array.isArray(q.options) && q.options[correct]) ? q.options[correct] : '';
-        const letter = correct >= 0 ? String.fromCharCode(65 + correct) : '-';
+        const type = String(q.type || '').trim() || (Array.isArray(answerKey[i]) ? 'pg_kompleks' : 'pg');
+        const opts = type === 'benar_salah' ? ['Benar', 'Salah'] : (Array.isArray(q.options) ? q.options : []);
+        const key = answerKey[i];
+        let kunciText = '-';
+        let correctText = '';
+        if (type === 'pg_kompleks') {
+          const arr = Array.isArray(key) ? key : [];
+          const letters = arr.filter(n => Number.isFinite(Number(n))).map(n => String.fromCharCode(65 + Number(n)));
+          kunciText = letters.length ? letters.join(', ') : '-';
+          const texts = arr.map(n => opts[Number(n)]).filter(Boolean);
+          correctText = texts.join(', ');
+        } else if (type === 'benar_salah') {
+          const idx = typeof key === 'number' ? key : -1;
+          kunciText = idx === 1 ? 'Salah' : (idx === 0 ? 'Benar' : '-');
+          correctText = idx >= 0 ? String(opts[idx] || '') : '';
+        } else {
+          const correct = typeof key === 'number' ? key : -1;
+          correctText = (Array.isArray(opts) && opts[correct]) ? opts[correct] : '';
+          kunciText = correct >= 0 ? String.fromCharCode(65 + correct) : '-';
+        }
         const explain = String(q.explain || '');
         const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
         const ctxHtml = ctxRaw ? `<div class="mt-2 mb-2 p-3 rounded-lg border bg-gray-50 text-sm leading-relaxed">${escapeHtml(ctxRaw).replaceAll('\n','<br>')}</div>` : ``;
@@ -282,7 +396,7 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
           <div class="mb-4 rounded-xl border p-4">
             <div class="font-semibold mb-1">${i+1}. ${escapeHtml(String(q.question || ''))}</div>
             ${ctxHtml}
-            <div class="text-sm"><span class="font-semibold">Kunci:</span> ${letter}${correctText ? ` — ${escapeHtml(correctText)}` : ''}</div>
+            <div class="text-sm"><span class="font-semibold">Kunci:</span> ${escapeHtml(kunciText)}${correctText ? ` — ${escapeHtml(correctText)}` : ''}</div>
             ${explain ? `<div class="text-sm mt-2"><span class="font-semibold">Pembahasan:</span> ${escapeHtml(explain)}</div>` : ``}
           </div>
         `;
@@ -295,12 +409,21 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       btn.addEventListener('click', async () => {
         if (!absen || absen <= 0) return;
         const questions = Array.isArray(payload) ? payload : [];
-        const indices = questions.map((_, i) => i);
-        const order = shuffleWithSeed(indices, absen);
+        const orderData = buildOrderData(questions, absen);
+        const order = Array.isArray(orderData.orderAll) ? orderData.orderAll : questions.map((_, i) => i);
         const answers = [];
-        for (let i=0;i<order.length;i++) {
-          const el = document.querySelector(`input[name="q_${i}"]:checked`);
-          answers.push(el ? Number(el.value) : -1);
+        for (let p = 0; p < order.length; p++) {
+          const origIdx = order[p];
+          const q = questions[origIdx] || {};
+          const type = normalizeQType(q);
+          if (type === 'pg_kompleks') {
+            const arr = Array.isArray(studentAnswers[p]) ? studentAnswers[p] : [];
+            const out = arr.map(n => Number(n)).filter(n => Number.isFinite(n) && n >= 0).sort((a, b) => a - b);
+            answers.push(Array.from(new Set(out)));
+          } else {
+            const v = studentAnswers[p];
+            answers.push(Number.isFinite(Number(v)) ? Number(v) : -1);
+          }
         }
         const info = document.getElementById('info');
         info.textContent = 'Mengirim...';

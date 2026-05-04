@@ -33,6 +33,8 @@ if ($count > 200) $count = 200;
 $stmt = $mysqli->prepare("SELECT id, total_soal FROM published_quizzes WHERE slug=? AND user_id=? LIMIT 1");
 $stmt->bind_param('si', $slug, $_SESSION['user_id']);
 $stmt->execute();
+$pubId = 0;
+$totalSoal = 0;
 $stmt->bind_result($pubId, $totalSoal);
 if (!$stmt->fetch()) {
   $stmt->close();

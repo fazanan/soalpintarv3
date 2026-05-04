@@ -16,6 +16,7 @@ if ($role !== 'admin') {
     if ($stmtAcc) {
       $stmtAcc->bind_param('i', $_SESSION['user_id']);
       $stmtAcc->execute();
+      $aq = null;
       $stmtAcc->bind_result($aq);
       if ($stmtAcc->fetch()) $access = (int)$aq;
       $stmtAcc->close();
@@ -37,6 +38,8 @@ if ($slug === '') {
 $stmt = $mysqli->prepare("SELECT id, mapel FROM published_quizzes WHERE slug=? AND user_id=? LIMIT 1");
 $stmt->bind_param('si', $slug, $_SESSION['user_id']);
 $stmt->execute();
+$pubId = 0;
+$mapel = '';
 $stmt->bind_result($pubId, $mapel);
 if (!$stmt->fetch()) {
   $stmt->close();

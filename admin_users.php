@@ -103,6 +103,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
       $hash = password_hash($password, PASSWORD_BCRYPT);
       $stmt = null;
+      $cols = [];
+      $types = '';
+      $values = [];
       try {
         $cols = ['username'];
         $types = 's';
@@ -173,6 +176,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $error = 'No HP terlalu panjang.';
     } else {
     $stmt = null;
+    $types = '';
+    $values = [];
     try {
       $sets = [];
       $types = '';

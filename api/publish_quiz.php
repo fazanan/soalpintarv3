@@ -43,6 +43,7 @@ if ($role !== 'admin') {
     if ($stmtAcc) {
       $stmtAcc->bind_param('i', $_SESSION['user_id']);
       $stmtAcc->execute();
+      $aq = null;
       $stmtAcc->bind_result($aq);
       if ($stmtAcc->fetch()) $access = (int)$aq;
       $stmtAcc->close();
@@ -198,12 +199,36 @@ if (is_array($answerKey)) {
     }
     return $idx;
   };
+  $toIndexList = function ($val, int $optCount) use ($toIndex): array {
+    $cands = [];
+    if (is_array($val)) {
+      $cands = $val;
+    } else if (is_string($val)) {
+      $s = strtoupper(trim($val));
+      if (preg_match('/^[A-E]+$/', $s) && strlen($s) > 1) {
+        $cands = str_split($s);
+      } else {
+        $parts = preg_split('/[,\s;\/\|]+/', $s, -1, PREG_SPLIT_NO_EMPTY);
+        $cands = is_array($parts) ? $parts : [];
+      }
+    } else {
+      $cands = [$val];
+    }
+    $out = [];
+    foreach ($cands as $x) $out[] = $toIndex($x, $optCount);
+    $out = array_values(array_unique($out));
+    sort($out);
+    return $out;
+  };
   for ($i = 0; $i < $nItems; $i++) {
     $it = $itemsList[$i] ?? null;
     $opts = (is_array($it) && isset($it['options']) && is_array($it['options'])) ? $it['options'] : [];
     $optCount = count($opts);
     $raw = $answerKey[$i] ?? 0;
-    $normalizedAnswerKey[] = $toIndex($raw, $optCount);
+    $type = is_array($it) ? strtolower(trim((string)($it['type'] ?? ''))) : '';
+    if ($type === 'benar_salah' && $optCount <= 0) $optCount = 2;
+    $isMulti = ($type === 'pg_kompleks') || is_array($raw);
+    $normalizedAnswerKey[] = $isMulti ? $toIndexList($raw, $optCount) : $toIndex($raw, $optCount);
   }
 }
 $payloadObject['settings']['answer_key'] = $normalizedAnswerKey;

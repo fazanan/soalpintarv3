@@ -40,6 +40,12 @@ $stmt = $mysqli->prepare($sql);
 if ($pubIdParam > 0) $stmt->bind_param('i', $pubIdParam);
 else $stmt->bind_param('s', $slug);
 $stmt->execute();
+$pubId = 0;
+$answerJson = '[]';
+$active = 0;
+$expireAt = null;
+$total = 0;
+$payloadJson = '{}';
 $stmt->bind_result($pubId, $answerJson, $active, $expireAt, $total, $payloadJson);
 if (!$stmt->fetch()) {
   $stmt->close();
@@ -82,9 +88,37 @@ $len = min(count($answerKey), count($answers), count($orderMap));
 for ($i=0; $i<$len; $i++) {
   $pos = $rev[$i] ?? null;
   if ($pos === null) continue;
-  $ansIdx = isset($answers[$pos]) ? (int)$answers[$pos] : -1;
-  $correct = isset($answerKey[$i]) ? (int)$answerKey[$i] : -1;
-  if ($ansIdx === $correct) $score++;
+  $ansRaw = $answers[$pos] ?? null;
+  $correctRaw = $answerKey[$i] ?? null;
+  if (is_array($correctRaw)) {
+    $corr = [];
+    foreach ($correctRaw as $v) {
+      if (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+$/', trim($v)))) $corr[] = (int)$v;
+    }
+    $corr = array_values(array_unique($corr));
+    sort($corr);
+    $ans = [];
+    if (is_array($ansRaw)) {
+      foreach ($ansRaw as $v) {
+        if (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+$/', trim($v)))) $ans[] = (int)$v;
+      }
+    } else if (is_int($ansRaw) || is_float($ansRaw) || (is_string($ansRaw) && preg_match('/^-?\d+$/', trim($ansRaw)))) {
+      $ans[] = (int)$ansRaw;
+    }
+    $ans = array_values(array_unique($ans));
+    sort($ans);
+    if ($ans === $corr) $score++;
+  } else {
+    $ansIdx = -1;
+    if (is_array($ansRaw)) {
+      if (count($ansRaw) > 0) $ansIdx = (int)($ansRaw[0] ?? -1);
+    } else if ($ansRaw !== null) {
+      $ansIdx = (int)$ansRaw;
+    }
+    $correct = -1;
+    if (is_int($correctRaw) || is_float($correctRaw) || (is_string($correctRaw) && preg_match('/^-?\d+$/', trim($correctRaw)))) $correct = (int)$correctRaw;
+    if ($ansIdx === $correct) $score++;
+  }
 }
 $totalFinal = $total ?: $len;
 $stmt = null;

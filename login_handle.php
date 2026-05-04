@@ -107,6 +107,18 @@ if ($stmt) {
     $stmt->bind_param('s', $uLookup);
   }
   $stmt->execute();
+  $id = 0;
+  $dbUsername = '';
+  $hash = '';
+  $role = 'user';
+  $accessQuiz = 1;
+  $accessRekap = 1;
+  $accessBuatSoal = 1;
+  $accessModulAjar = 1;
+  $accessRpp = 1;
+  $nama = '';
+  $jenjang = '';
+  $namaSekolah = '';
   $stmt->bind_result($id, $dbUsername, $hash, $role, $accessQuiz, $accessRekap, $accessBuatSoal, $accessModulAjar, $accessRpp, $nama, $jenjang, $namaSekolah);
   if ($stmt->fetch() && password_verify($p, $hash)) {
     session_regenerate_id(true);
@@ -149,6 +161,10 @@ if ($stmt) {
   $uLookup2 = $isEmail ? $uEmail : $u;
   $stmt2->bind_param('s', $uLookup2);
   $stmt2->execute();
+  $id2 = 0;
+  $dbUsername2 = '';
+  $hash2 = '';
+  $role2 = 'user';
   $stmt2->bind_result($id2, $dbUsername2, $hash2, $role2);
   if ($stmt2->fetch() && password_verify($p, $hash2)) {
     session_regenerate_id(true);
