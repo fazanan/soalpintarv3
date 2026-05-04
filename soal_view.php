@@ -196,6 +196,12 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;');
     }
+    function renderMathText(s) {
+      const esc = escapeHtml(String(s ?? ''));
+      return esc
+        .replace(/([0-9A-Za-z\)\]])\^\(([^)]+)\)/g, '$1<sup>$2</sup>')
+        .replace(/([0-9A-Za-z\)\]])\^([-+]?[0-9A-Za-z]+)/g, '$1<sup>$2</sup>');
+    }
     function shuffleWithSeed(arr, seed) {
       const a = arr.slice();
       let s = seed;
@@ -313,7 +319,7 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         const inputKind = isMulti ? 'checkbox' : 'radio';
         const opts = type === 'benar_salah' ? ['Benar', 'Salah'] : (Array.isArray(q.options) ? q.options : []);
         const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-        const ctxHtml = ctxRaw ? `<div class="mb-3 p-3 rounded-xl border bg-gray-50 text-sm leading-relaxed">${escapeHtml(ctxRaw).replaceAll('\n','<br>')}</div>` : ``;
+        const ctxHtml = ctxRaw ? `<div class="mb-3 p-3 rounded-xl border bg-gray-50 text-sm leading-relaxed">${renderMathText(ctxRaw).replaceAll('\n','<br>')}</div>` : ``;
         const pos = Number(orderData.posByOrig[origIdx] ?? -1);
         const picked = studentAnswers[pos];
         const optsHtml = opts.map((t, oi) => `
@@ -328,7 +334,7 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
                 onchange="onAnswerChange(${pos},${oi},this.checked,${isMulti?1:0})"
                 ${isMulti ? (Array.isArray(picked) && picked.includes(oi) ? 'checked' : '') : (Number(picked) === oi ? 'checked' : '')}
               >
-              <span class="text-sm leading-relaxed">${escapeHtml(String(t || ''))}</span>
+              <span class="text-sm leading-relaxed">${renderMathText(String(t || ''))}</span>
             </label>
           </div>
         `).join('');
@@ -338,7 +344,7 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
               <span class="font-bold text-lg min-w-[1.5rem]">${localIdx + 1}.</span>
               <div class="flex-1">
                 ${ctxHtml}
-                <p class="mb-3 text-justify leading-relaxed">${escapeHtml(String(q.question || ''))}</p>
+                <p class="mb-3 text-justify leading-relaxed">${renderMathText(String(q.question || ''))}</p>
                 ${q.image ? `<img src="${String(q.image)}" class="w-64 h-64 object-contain rounded-lg mb-3 border shadow-sm">` : ``}
                 <div class="grid grid-cols-1 gap-2 pl-1">
                   ${optsHtml}
@@ -391,13 +397,13 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         }
         const explain = String(q.explain || '');
         const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-        const ctxHtml = ctxRaw ? `<div class="mt-2 mb-2 p-3 rounded-lg border bg-gray-50 text-sm leading-relaxed">${escapeHtml(ctxRaw).replaceAll('\n','<br>')}</div>` : ``;
+        const ctxHtml = ctxRaw ? `<div class="mt-2 mb-2 p-3 rounded-lg border bg-gray-50 text-sm leading-relaxed">${renderMathText(ctxRaw).replaceAll('\n','<br>')}</div>` : ``;
         return `
           <div class="mb-4 rounded-xl border p-4">
-            <div class="font-semibold mb-1">${i+1}. ${escapeHtml(String(q.question || ''))}</div>
+            <div class="font-semibold mb-1">${i+1}. ${renderMathText(String(q.question || ''))}</div>
             ${ctxHtml}
-            <div class="text-sm"><span class="font-semibold">Kunci:</span> ${escapeHtml(kunciText)}${correctText ? ` — ${escapeHtml(correctText)}` : ''}</div>
-            ${explain ? `<div class="text-sm mt-2"><span class="font-semibold">Pembahasan:</span> ${escapeHtml(explain)}</div>` : ``}
+            <div class="text-sm"><span class="font-semibold">Kunci:</span> ${escapeHtml(kunciText)}${correctText ? ` — ${renderMathText(correctText)}` : ''}</div>
+            ${explain ? `<div class="text-sm mt-2"><span class="font-semibold">Pembahasan:</span> ${renderMathText(explain)}</div>` : ``}
           </div>
         `;
       }).join('');

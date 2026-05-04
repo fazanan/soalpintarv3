@@ -918,6 +918,10 @@ session_write_close();
           .replaceAll("&", "&amp;")
           .replaceAll("<", "&lt;")
           .replaceAll(">", "&gt;");
+      const safeMathHtml = (s) =>
+        safeText(s)
+          .replace(/([0-9A-Za-z\)\]])\^\(([^)]+)\)/g, "$1<sup>$2</sup>")
+          .replace(/([0-9A-Za-z\)\]])\^([-+]?[0-9A-Za-z]+)/g, "$1<sup>$2</sup>");
       const safeAttr = (s) =>
         safeText(s)
           .replaceAll('"', "&quot;")
@@ -1692,8 +1696,8 @@ session_write_close();
                 margin: { left: ctx.margin, right: ctx.margin },
                 head: [["No", "Kunci", "Pembahasan Singkat"]],
                 body: rows,
-                styles: { font: "times", fontSize: 10, textColor: [0, 0, 0], cellPadding: 3, lineWidth: 0.6, lineColor: [0, 0, 0], overflow: "linebreak" },
-                headStyles: { fillColor: [224, 224, 224], textColor: [0, 0, 0], fontStyle: "bold", halign: "center" },
+                styles: { font: "helvetica", fontSize: 10, textColor: [0, 0, 0], cellPadding: 3, lineWidth: 0.5, lineColor: [208, 208, 208], overflow: "linebreak", valign: "top" },
+                headStyles: { fillColor: [242, 242, 242], textColor: [0, 0, 0], fontStyle: "bold", halign: "center", lineWidth: 0.5, lineColor: [208, 208, 208] },
                 columnStyles: {
                   0: { cellWidth: 34, halign: "center" },
                   1: { cellWidth: 50, halign: "center" },
@@ -3725,7 +3729,7 @@ session_write_close();
                   </div>
                 </div>
                 <div class="pr-44">
-                  <p class="mb-4 pr-10 text-justify leading-relaxed text-lg">${safeText(q.question)}</p>
+                  <p class="mb-4 pr-10 text-justify leading-relaxed text-lg">${safeMathHtml(q.question)}</p>
                   ${q.image ? `<img src="${q.image}" class="w-64 h-64 object-contain rounded-lg mb-2 border shadow-sm">` : ""}
                   ${q._showImagePrompt && !q.image && q.imagePrompt ? `
                     <div class="mb-3 italic text-xs text-text-sub-light flex items-center gap-2">
@@ -3753,7 +3757,7 @@ session_write_close();
                           ${q.options.map((opt, oi) => `
                             <div class="flex gap-3 items-start">
                               <span class="font-semibold pt-0.5">${String.fromCharCode(65 + oi)}.</span>
-                              <span class="leading-relaxed">${safeText(opt)}</span>
+                              <span class="leading-relaxed">${safeMathHtml(opt)}</span>
                             </div>`).join("")}
                         </div>
                       `
@@ -3764,7 +3768,7 @@ session_write_close();
                               ${q.options.map((opt, oi) => `
                                  <div class="flex items-center gap-2">
                                     <span class="font-bold text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">${oi + 1}</span>
-                                    <div class="p-2 border rounded bg-white dark:bg-gray-800 w-full">${safeText(opt)}</div>
+                                    <div class="p-2 border rounded bg-white dark:bg-gray-800 w-full">${safeMathHtml(opt)}</div>
                                  </div>
                               `).join("")}
                            </div>
@@ -3772,7 +3776,7 @@ session_write_close();
                               ${(Array.isArray(q.answer) ? q.answer : []).map((ans, ai) => `
                                  <div class="flex items-center gap-2">
                                     <span class="font-bold text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">${String.fromCharCode(65 + ai)}</span>
-                                    <div class="p-2 border rounded bg-white dark:bg-gray-800 w-full">${safeText(ans)}</div>
+                                    <div class="p-2 border rounded bg-white dark:bg-gray-800 w-full">${safeMathHtml(ans)}</div>
                                  </div>
                               `).join("")}
                            </div>
@@ -3871,7 +3875,7 @@ session_write_close();
                                 const a = startIndex + i + 1;
                                 const b = startIndex + j + 1;
                                 const rangeText = a === b ? `nomor ${a}` : `nomor ${a} s.d. ${b}`;
-                                const ctxHtml = safeText(ctxRaw).replace(/\n/g, '<br>');
+                                const ctxHtml = safeMathHtml(ctxRaw).replace(/\n/g, '<br>');
                                 out += `<div class="mb-4 p-3 rounded-lg border border-border-light dark:border-border-dark bg-transparent text-[15px] leading-relaxed">
                                   <div class="font-bold mb-1">Untuk menjawab soal ${rangeText}, pahami bacaan berikut.</div>
                                   <div>${ctxHtml}</div>
@@ -8942,7 +8946,7 @@ ${baselineModulAjar}
         const body = document.getElementById('quizBody');
         if (!q || !body) return;
         const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-        const ctxHtml = ctxRaw ? `<div class="mb-4 p-3 rounded-lg border bg-gray-50 text-sm leading-relaxed">${safeText(ctxRaw).replaceAll('\n','<br>')}</div>` : '';
+        const ctxHtml = ctxRaw ? `<div class="mb-4 p-3 rounded-lg border bg-gray-50 text-sm leading-relaxed">${safeMathHtml(ctxRaw).replaceAll('\n','<br>')}</div>` : '';
         const qType = String(q.type || '').trim();
         if (qType === 'pg' || qType === 'benar_salah' || qType === 'pg_kompleks') {
           const selected = state.quiz.answered[state.quiz.idx];
@@ -8959,7 +8963,7 @@ ${baselineModulAjar}
               else stateCls = " opacity-70";
             }
             const dis = state.quiz.reveal ? "disabled" : "";
-            return `<button ${dis} onclick="handleQuizAnswer(${i})" class="${base}${stateCls}">${String.fromCharCode(65 + i)}. ${safeText(opt)}</button>`;
+            return `<button ${dis} onclick="handleQuizAnswer(${i})" class="${base}${stateCls}">${String.fromCharCode(65 + i)}. ${safeMathHtml(opt)}</button>`;
           }).join('');
           const multiActions = (qType === 'pg_kompleks' && !state.quiz.reveal)
             ? `<div class="mt-4"><button onclick="revealQuizAnswer()" class="h-10 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold">Cek Jawaban</button></div>`
@@ -8967,7 +8971,7 @@ ${baselineModulAjar}
           body.innerHTML = `
             <div class="p-6">
               ${ctxHtml}
-              <div class="font-bold mb-4">${safeText(q.question)}</div>
+              <div class="font-bold mb-4">${safeMathHtml(q.question)}</div>
               <div class="space-y-2">
                 ${optsHtml}
               </div>
@@ -8979,7 +8983,7 @@ ${baselineModulAjar}
           body.innerHTML = `
             <div class="p-6">
               ${ctxHtml}
-              <div class="font-bold mb-4">${safeText(q.question)}</div>
+              <div class="font-bold mb-4">${safeMathHtml(q.question)}</div>
               <div class="text-sm text-text-sub-light">Jawaban ditampilkan setelah diungkap</div>
               ${state.quiz.reveal ? `<div class="mt-4 font-bold text-green-600">Kunci: ${safeText(String(q.answer || ''))}</div>` : ``}
             </div>
@@ -11449,7 +11453,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               btn.disabled = true;
             }
   
-            const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = docx;
+            const { Document, Packer, Paragraph, TextRun, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType } = docx;
   
             const makeHeader = (title) => {
               const headerTitle = new Paragraph({
@@ -11563,24 +11567,72 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                 const letter = String.fromCharCode(65 + sectionIndex);
                 sectionIndex++;
                 content.push(new Paragraph({ children: [new TextRun({ text: `${letter}. ${sec.title}`, bold: true })], spacing: { after: 200 } }));
-                if (sec.type === 'pg' || sec.type === 'benar_salah') {
+                if (sec.type === 'pg') {
+                    const borders = {
+                      top: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
+                      bottom: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
+                      left: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
+                      right: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
+                      insideHorizontal: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
+                      insideVertical: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
+                    };
+                    const parasFromText = (t, align = AlignmentType.LEFT, bold = false) => {
+                      const s = String(t || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+                      const lines = s.split("\n");
+                      const out = [];
+                      for (const line of lines) {
+                        out.push(new Paragraph({ alignment: align, children: [new TextRun({ text: String(line || ''), bold })] }));
+                      }
+                      return out.length ? out : [new Paragraph({ alignment: align, children: [new TextRun({ text: "", bold })] })];
+                    };
+                    const cell = (t, wPct, align = AlignmentType.LEFT, bold = false, shaded = false) => {
+                      const base = {
+                        width: { size: wPct, type: WidthType.PERCENTAGE },
+                        margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                        borders,
+                        children: parasFromText(t, align, bold),
+                      };
+                      if (shaded) base.shading = { fill: "F2F2F2", type: ShadingType.CLEAR };
+                      return new TableCell(base);
+                    };
+                    const rows = [];
+                    rows.push(new TableRow({
+                      tableHeader: true,
+                      children: [
+                        cell("No", 6, AlignmentType.CENTER, true, true),
+                        cell("Kunci", 10, AlignmentType.CENTER, true, true),
+                        cell("Pembahasan Singkat", 84, AlignmentType.CENTER, true, true),
+                      ],
+                    }));
+                    items.forEach((q, i) => {
+                      const idx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
+                      const ansChar = String.fromCharCode(65 + idx);
+                      const exp = String(q.explanation || q.pembahasan || q.rationale || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+                      rows.push(new TableRow({
+                        children: [
+                          cell(String(i + 1), 6, AlignmentType.CENTER, false, false),
+                          cell(ansChar, 10, AlignmentType.CENTER, false, false),
+                          cell(exp || "-", 84, AlignmentType.LEFT, false, false),
+                        ],
+                      }));
+                    });
+                    content.push(new Table({
+                      width: { size: 100, type: WidthType.PERCENTAGE },
+                      borders,
+                      rows,
+                    }));
+                } else if (sec.type === 'benar_salah') {
                     const cols = 5;
                     const pgRows = [];
-                    for(let i=0; i<items.length; i+=cols) {
+                    for (let i = 0; i < items.length; i += cols) {
                         const rowCells = [];
-                        for(let j=0; j<cols; j++) {
-                            if (i+j < items.length) {
-                                const q = items[i+j];
-                                let ansChar = "-";
-                                if (sec.type === 'benar_salah') {
-                                  const idx = normalizeAnswerIndex(q.answer, ['Benar','Salah']);
-                                  ansChar = idx === 1 ? 'Salah' : 'Benar';
-                                } else {
-                                  const idx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
-                                  ansChar = String.fromCharCode(65 + idx);
-                                }
+                        for (let j = 0; j < cols; j++) {
+                            if (i + j < items.length) {
+                                const q = items[i + j];
+                                const idx = normalizeAnswerIndex(q.answer, ['Benar', 'Salah']);
+                                const ansChar = idx === 1 ? 'Salah' : 'Benar';
                                 rowCells.push(new TableCell({
-                                    children: [new Paragraph({ text: `${i+j+1}. ${ansChar}` })],
+                                    children: [new Paragraph({ text: `${i + j + 1}. ${ansChar}` })],
                                     borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
                                 }));
                             } else {
@@ -11594,21 +11646,6 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                         rows: pgRows,
                         borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
                     }));
-                    if (sec.type === 'pg') {
-                      content.push(new Paragraph({ children: [new TextRun({ text: "Pembahasan Singkat:", bold: true })], spacing: { before: 200, after: 150 } }));
-                      items.forEach((q, i) => {
-                        const idx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
-                        const ansChar = String.fromCharCode(65 + idx);
-                        const exp = String(q.explanation || q.pembahasan || q.rationale || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
-                        content.push(new Paragraph({
-                          children: [
-                            new TextRun({ text: `${i + 1}. `, bold: true }),
-                            new TextRun({ text: `Kunci ${ansChar}. ${exp || '-'}` }),
-                          ],
-                          spacing: { after: 80 },
-                        }));
-                      });
-                    }
                 } else {
                     items.forEach((q, i) => {
                         let ansText = "";
