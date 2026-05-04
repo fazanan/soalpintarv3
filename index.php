@@ -1683,67 +1683,38 @@ session_write_close();
             if (!qs.length) continue;
             const letter = String.fromCharCode(65 + sectionIndex++);
             ctx.addPara(`${letter}. ${sec.title}`, 12, "bold", 0, 10);
-
-            if (sec.type === "pg") {
-              const rows = qs.map((q, idx) => {
-                const ansIdx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
-                const ansChar = String.fromCharCode(65 + ansIdx);
-                const exp = String(q.explanation || q.pembahasan || q.rationale || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
-                return [String(idx + 1), ansChar, exp || "-"];
-              });
-              ctx.doc.autoTable({
-                startY: ctx.getY(),
-                margin: { left: ctx.margin, right: ctx.margin },
-                head: [["No", "Kunci", "Pembahasan Singkat"]],
-                body: rows,
-                styles: { font: "helvetica", fontSize: 10, textColor: [0, 0, 0], cellPadding: 3, lineWidth: 0.5, lineColor: [208, 208, 208], overflow: "linebreak", valign: "top" },
-                headStyles: { fillColor: [242, 242, 242], textColor: [0, 0, 0], fontStyle: "bold", halign: "center", lineWidth: 0.5, lineColor: [208, 208, 208] },
-                columnStyles: {
-                  0: { cellWidth: 34, halign: "center" },
-                  1: { cellWidth: 50, halign: "center" },
-                  2: { cellWidth: ctx.maxW - 34 - 50 },
-                },
-              });
-              ctx.setY((ctx.doc.lastAutoTable?.finalY || ctx.getY()) + 14);
-              continue;
-            }
-
-            if (sec.type === "benar_salah") {
-              const cols = 5;
-              const body = [];
-              for (let i = 0; i < qs.length; i += cols) {
-                const row = [];
-                for (let j = 0; j < cols; j++) {
-                  const q = qs[i + j];
-                  if (!q) { row.push(""); continue; }
-                  let ansChar = "-";
-                  const idx = normalizeAnswerIndex(q.answer, ["Benar", "Salah"]);
-                  ansChar = idx === 1 ? "Salah" : "Benar";
-                  row.push(`${i + j + 1}. ${ansChar}`);
-                }
-                body.push(row);
-              }
-              ctx.doc.autoTable({
-                startY: ctx.getY(),
-                margin: { left: ctx.margin, right: ctx.margin },
-                body,
-                theme: "plain",
-                styles: { font: "times", fontSize: 11, textColor: [0, 0, 0], cellPadding: 2, lineWidth: 0 },
-                columnStyles: { 0: { cellWidth: ctx.maxW / 5 }, 1: { cellWidth: ctx.maxW / 5 }, 2: { cellWidth: ctx.maxW / 5 }, 3: { cellWidth: ctx.maxW / 5 }, 4: { cellWidth: ctx.maxW / 5 } },
-              });
-              ctx.setY((ctx.doc.lastAutoTable?.finalY || ctx.getY()) + 14);
-              continue;
-            }
-
-            for (let i = 0; i < qs.length; i++) {
-              const q = qs[i] || {};
+            const rows = qs.map((q, idx) => {
               let ansText = "";
-              if (sec.type === "pg_kompleks") ansText = Array.isArray(q.answer) ? q.answer.map((idx) => String.fromCharCode(65 + Number(idx))).join(", ") : String(q.answer ?? "");
-              else if (sec.type === "menjodohkan") ansText = Array.isArray(q.matchKey) ? q.matchKey.map((pos, idx) => `${idx + 1}–${String.fromCharCode(65 + Number(pos || 0))}`).join(", ") : "";
-              else ansText = String(q.answer || "(Belum ada kunci)");
-              ctx.addHanging(`${i + 1}.`, ansText, 11, "normal", 0, 4);
-            }
-            ctx.setY(ctx.getY() + 14);
+              if (sec.type === "pg") {
+                const ansIdx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
+                ansText = String.fromCharCode(65 + ansIdx);
+              } else if (sec.type === "benar_salah") {
+                const ai = normalizeAnswerIndex(q.answer, ["Benar", "Salah"]);
+                ansText = ai === 1 ? "Salah" : "Benar";
+              } else if (sec.type === "pg_kompleks") {
+                ansText = Array.isArray(q.answer) ? q.answer.map((i) => String.fromCharCode(65 + Number(i))).join(", ") : String(q.answer ?? "");
+              } else if (sec.type === "menjodohkan") {
+                ansText = Array.isArray(q.matchKey) ? q.matchKey.map((pos, i) => `${i + 1}–${String.fromCharCode(65 + Number(pos || 0))}`).join(", ") : (Array.isArray(q.answer) ? "" : String(q.answer ?? ""));
+              } else {
+                ansText = String(q.answer ?? "");
+              }
+              const exp = String(q.explanation || q.pembahasan || q.rationale || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+              return [String(idx + 1), ansText || "-", exp || "-"];
+            });
+            ctx.doc.autoTable({
+              startY: ctx.getY(),
+              margin: { left: ctx.margin, right: ctx.margin },
+              head: [["No", "Kunci", "Pembahasan Singkat"]],
+              body: rows,
+              styles: { font: "helvetica", fontSize: 10, textColor: [0, 0, 0], cellPadding: 3, lineWidth: 0.5, lineColor: [208, 208, 208], overflow: "linebreak", valign: "top" },
+              headStyles: { fillColor: [242, 242, 242], textColor: [0, 0, 0], fontStyle: "bold", halign: "center", lineWidth: 0.5, lineColor: [208, 208, 208] },
+              columnStyles: {
+                0: { cellWidth: 34, halign: "center" },
+                1: { cellWidth: 70, halign: "center" },
+                2: { cellWidth: ctx.maxW - 34 - 70 },
+              },
+            });
+            ctx.setY((ctx.doc.lastAutoTable?.finalY || ctx.getY()) + 14);
           }
 
           const totalPages = ctx.doc.getNumberOfPages();
@@ -3973,18 +3944,16 @@ session_write_close();
             } else {
               ans = String(q.answer || '');
             }
-            if (sec.type === 'pg') {
-              const exp = String(explain || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-              const expHtml = exp ? safeText(exp).replaceAll('\n', '<br>') : '-';
-              return `<tr><td class="border px-2 py-1 text-center">${i + 1}</td><td class="border px-2 py-1">${safeText(ans || '-')}</td><td class="border px-2 py-1 text-xs leading-relaxed">${expHtml}</td></tr>`;
-            }
-            return `<tr><td class="border px-2 py-1 text-center">${i + 1}</td><td class="border px-2 py-1">${safeText(ans || '-')}</td></tr>`;
+            explain = String(explain || q.explanation || q.pembahasan || q.rationale || '');
+            const exp = String(explain || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+            const expHtml = exp ? safeText(exp).replaceAll('\n', '<br>') : '-';
+            return `<tr><td class="border px-2 py-1 text-center">${i + 1}</td><td class="border px-2 py-1">${safeText(ans || '-')}</td><td class="border px-2 py-1 text-xs leading-relaxed">${expHtml}</td></tr>`;
           }).join('');
           parts.push(`
             <div class="mt-6">
               <div class="font-bold text-base mb-2">${letter}. ${sec.title}</div>
               <table class="w-full text-sm border-collapse">
-                <thead><tr><th class="border px-2 py-1 w-14">No</th><th class="border px-2 py-1 w-20">Kunci</th>${sec.type==='pg' ? `<th class="border px-2 py-1">Pembahasan Singkat</th>` : ``}</tr></thead>
+                <thead><tr><th class="border px-2 py-1 w-14">No</th><th class="border px-2 py-1 w-20">Kunci</th><th class="border px-2 py-1">Pembahasan Singkat</th></tr></thead>
                 <tbody>${rows}</tbody>
               </table>
             </div>
@@ -9937,12 +9906,15 @@ __STIMULUS__
 >>>
 - Field "context" WAJIB kosong untuk setiap item (stimulus akan dipasang oleh sistem).
 - Buat soal yang merujuk stimulus dan menyebut minimal 1 data/fakta dari stimulus (angka/nama/objek/tempat/variabel).\n`;
-          const pembahasanRules = (sec.bentuk === "pg" || sec.bentuk === "pg_kompleks")
-            ? `\nATURAN PEMBAHASAN (WAJIB):
+          const pembahasanRules = `\nATURAN PEMBAHASAN (WAJIB):
 - Isi field "explanation" singkat, 2–6 kalimat (maks 450 karakter).
-- Jelaskan mengapa jawaban benar tepat (sebut huruf opsinya) dan mengapa minimal 2 opsi lain tidak tepat (ringkas).
-- Jika tipe "pg_kompleks": jelaskan mengapa opsi yang benar dipilih dan mengapa minimal 2 opsi lain tidak dipilih.\n`
-            : ``;
+- Pembahasan harus menjelaskan alasan kunci/jawaban benar sesuai tipe soal, ringkas dan jelas.
+- Jika tipe "pg": sebut huruf jawaban benar dan jelaskan mengapa minimal 2 opsi lain tidak tepat.
+- Jika tipe "pg_kompleks": sebut opsi yang benar dipilih dan mengapa minimal 2 opsi lain tidak dipilih.
+- Jika tipe "benar_salah": sebut hasil (Benar/Salah) dan alasan singkat berdasarkan pernyataan.
+- Jika tipe "menjodohkan": jelaskan prinsip/pola pencocokan secara ringkas (bukan hanya mengulang mapping).
+- Jika tipe "isian": tulis jawaban kunci singkat dan jelaskan alasan/konsepnya.
+- Jika tipe "uraian": tulis poin jawaban ideal (2–4 poin) secara ringkas.\n`;
 
           const outputSchema = sec.bentuk === "menjodohkan"
             ? `OUTPUT JSON (Array of Objects):
@@ -11552,6 +11524,51 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
   
             const spacer = new Paragraph({ spacing: { after: 400 } });
             const content = [];
+            const bordersGridSoft = {
+              top: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
+              bottom: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
+              left: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
+              right: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
+              insideHorizontal: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
+              insideVertical: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
+            };
+            const parasFromText = (t, align = AlignmentType.LEFT, bold = false) => {
+              const s = String(t || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+              const lines = s.split("\n");
+              const out = [];
+              for (const line of lines) out.push(new Paragraph({ alignment: align, children: [new TextRun({ text: String(line || ''), bold })] }));
+              return out.length ? out : [new Paragraph({ alignment: align, children: [new TextRun({ text: "", bold })] })];
+            };
+            const cell = (t, wPct, align = AlignmentType.LEFT, bold = false, shaded = false) => {
+              const base = {
+                width: { size: wPct, type: WidthType.PERCENTAGE },
+                margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                borders: bordersGridSoft,
+                children: parasFromText(t, align, bold),
+              };
+              if (shaded) base.shading = { fill: "F2F2F2", type: ShadingType.CLEAR };
+              return new TableCell(base);
+            };
+            const buildKunciText = (type, q) => {
+              if (type === 'pg') {
+                const idx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
+                return String.fromCharCode(65 + idx);
+              }
+              if (type === 'benar_salah') {
+                const idx = normalizeAnswerIndex(q.answer, ['Benar', 'Salah']);
+                return idx === 1 ? 'Salah' : 'Benar';
+              }
+              if (type === 'pg_kompleks') {
+                return Array.isArray(q.answer) ? q.answer.map((idx) => String.fromCharCode(65 + Number(idx))).join(', ') : String(q.answer ?? '');
+              }
+              if (type === 'menjodohkan') {
+                return Array.isArray(q.matchKey)
+                  ? q.matchKey.map((pos, idx) => `${idx + 1}–${String.fromCharCode(65 + Number(pos || 0))}`).join(', ')
+                  : (Array.isArray(q.answer) ? '' : String(q.answer ?? ''));
+              }
+              return String(q.answer ?? '');
+            };
+            const buildExpText = (q) => String(q.explanation || q.pembahasan || q.rationale || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim() || '-';
             const sections = [
               { type: 'pg', title: 'PILIHAN GANDA' },
               { type: 'benar_salah', title: 'BENAR / SALAH' },
@@ -11567,112 +11584,31 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                 const letter = String.fromCharCode(65 + sectionIndex);
                 sectionIndex++;
                 content.push(new Paragraph({ children: [new TextRun({ text: `${letter}. ${sec.title}`, bold: true })], spacing: { after: 200 } }));
-                if (sec.type === 'pg') {
-                    const borders = {
-                      top: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
-                      bottom: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
-                      left: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
-                      right: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
-                      insideHorizontal: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
-                      insideVertical: { style: BorderStyle.SINGLE, size: 6, color: "D0D0D0" },
-                    };
-                    const parasFromText = (t, align = AlignmentType.LEFT, bold = false) => {
-                      const s = String(t || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-                      const lines = s.split("\n");
-                      const out = [];
-                      for (const line of lines) {
-                        out.push(new Paragraph({ alignment: align, children: [new TextRun({ text: String(line || ''), bold })] }));
-                      }
-                      return out.length ? out : [new Paragraph({ alignment: align, children: [new TextRun({ text: "", bold })] })];
-                    };
-                    const cell = (t, wPct, align = AlignmentType.LEFT, bold = false, shaded = false) => {
-                      const base = {
-                        width: { size: wPct, type: WidthType.PERCENTAGE },
-                        margins: { top: 80, bottom: 80, left: 120, right: 120 },
-                        borders,
-                        children: parasFromText(t, align, bold),
-                      };
-                      if (shaded) base.shading = { fill: "F2F2F2", type: ShadingType.CLEAR };
-                      return new TableCell(base);
-                    };
-                    const rows = [];
-                    rows.push(new TableRow({
-                      tableHeader: true,
-                      children: [
-                        cell("No", 6, AlignmentType.CENTER, true, true),
-                        cell("Kunci", 10, AlignmentType.CENTER, true, true),
-                        cell("Pembahasan Singkat", 84, AlignmentType.CENTER, true, true),
-                      ],
-                    }));
-                    items.forEach((q, i) => {
-                      const idx = normalizeAnswerIndex(q.answer, Array.isArray(q.options) ? q.options : []);
-                      const ansChar = String.fromCharCode(65 + idx);
-                      const exp = String(q.explanation || q.pembahasan || q.rationale || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
-                      rows.push(new TableRow({
-                        children: [
-                          cell(String(i + 1), 6, AlignmentType.CENTER, false, false),
-                          cell(ansChar, 10, AlignmentType.CENTER, false, false),
-                          cell(exp || "-", 84, AlignmentType.LEFT, false, false),
-                        ],
-                      }));
-                    });
-                    content.push(new Table({
-                      width: { size: 100, type: WidthType.PERCENTAGE },
-                      borders,
-                      rows,
-                    }));
-                } else if (sec.type === 'benar_salah') {
-                    const cols = 5;
-                    const pgRows = [];
-                    for (let i = 0; i < items.length; i += cols) {
-                        const rowCells = [];
-                        for (let j = 0; j < cols; j++) {
-                            if (i + j < items.length) {
-                                const q = items[i + j];
-                                const idx = normalizeAnswerIndex(q.answer, ['Benar', 'Salah']);
-                                const ansChar = idx === 1 ? 'Salah' : 'Benar';
-                                rowCells.push(new TableCell({
-                                    children: [new Paragraph({ text: `${i + j + 1}. ${ansChar}` })],
-                                    borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                                }));
-                            } else {
-                                rowCells.push(new TableCell({ children: [], borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } } }));
-                            }
-                        }
-                        pgRows.push(new TableRow({ children: rowCells }));
-                    }
-                    content.push(new Table({
-                        width: { size: 100, type: WidthType.PERCENTAGE },
-                        rows: pgRows,
-                        borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
-                    }));
-                } else {
-                    items.forEach((q, i) => {
-                        let ansText = "";
-                        if (sec.type === 'pg_kompleks') {
-                            if (Array.isArray(q.answer)) {
-                                ansText = q.answer.map(idx => String.fromCharCode(65 + idx)).join(", ");
-                            } else {
-                                ansText = String(q.answer);
-                            }
-                        } else if (sec.type === 'menjodohkan') {
-                            if (Array.isArray(q.matchKey)) {
-                                ansText = q.matchKey.map((pos, idx) => `${idx + 1}–${String.fromCharCode(65 + Number(pos || 0))}`).join(", ");
-                            } else {
-                                ansText = '';
-                            }
-                        } else {
-                            ansText = q.answer || "(Belum ada kunci)";
-                        }
-                        content.push(new Paragraph({ 
-                            children: [
-                                new TextRun({ text: `${i+1}. `, bold: true }),
-                                new TextRun({ text: ansText })
-                            ],
-                            spacing: { after: 100 }
-                        }));
-                    });
-                }
+                const rows = [];
+                rows.push(new TableRow({
+                  tableHeader: true,
+                  children: [
+                    cell("No", 6, AlignmentType.CENTER, true, true),
+                    cell("Kunci", 10, AlignmentType.CENTER, true, true),
+                    cell("Pembahasan Singkat", 84, AlignmentType.CENTER, true, true),
+                  ],
+                }));
+                items.forEach((q, i) => {
+                  const ansText = buildKunciText(sec.type, q);
+                  const exp = buildExpText(q);
+                  rows.push(new TableRow({
+                    children: [
+                      cell(String(i + 1), 6, AlignmentType.CENTER, false, false),
+                      cell(ansText || "-", 10, AlignmentType.CENTER, false, false),
+                      cell(exp, 84, AlignmentType.LEFT, false, false),
+                    ],
+                  }));
+                });
+                content.push(new Table({
+                  width: { size: 100, type: WidthType.PERCENTAGE },
+                  borders: bordersGridSoft,
+                  rows,
+                }));
                 content.push(new Paragraph({ text: "", spacing: { after: 300 } }));
             }
   
