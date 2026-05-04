@@ -922,6 +922,28 @@ session_write_close();
         safeText(s)
           .replace(/([0-9A-Za-z\)\]])\^\(([^)]+)\)/g, "$1<sup>$2</sup>")
           .replace(/([0-9A-Za-z\)\]])\^([-+]?[0-9A-Za-z]+)/g, "$1<sup>$2</sup>");
+      const powTextDocxPdf = (() => {
+        const mapDocx = {
+          "0": "⁰",
+          "1": "¹",
+          "2": "²",
+          "3": "³",
+          "4": "⁴",
+          "5": "⁵",
+          "6": "⁶",
+          "7": "⁷",
+          "8": "⁸",
+          "9": "⁹",
+          "+": "⁺",
+          "-": "⁻",
+        };
+        const toSupDocx = (s) => String(s || "").split("").map((c) => mapDocx[c] || c).join("");
+        const forDocx = (text) =>
+          String(text || "").replace(/\^\s*\(?\s*([+\-]?\d+)\s*\)?/g, (_m, g1) => toSupDocx(String(g1 || "")));
+        const forPdf = (text) =>
+          String(text || "").replace(/\^\s*\(?\s*([1-3])\s*\)?/g, (_m, g1) => ({ "1": "¹", "2": "²", "3": "³" }[String(g1)] || `^${g1}`));
+        return { forDocx, forPdf };
+      })();
       const safeAttr = (s) =>
         safeText(s)
           .replaceAll('"', "&quot;")
@@ -1698,7 +1720,8 @@ session_write_close();
               } else {
                 ansText = String(q.answer ?? "");
               }
-              const exp = String(q.explanation || q.pembahasan || q.rationale || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+              const expRaw = String(q.explanation || q.pembahasan || q.rationale || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+              const exp = powTextDocxPdf.forPdf(expRaw);
               return [String(idx + 1), ansText || "-", exp || "-"];
             });
             ctx.doc.autoTable({
@@ -3946,7 +3969,7 @@ session_write_close();
             }
             explain = String(explain || q.explanation || q.pembahasan || q.rationale || '');
             const exp = String(explain || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-            const expHtml = exp ? safeText(exp).replaceAll('\n', '<br>') : '-';
+            const expHtml = exp ? safeMathHtml(exp).replaceAll('\n', '<br>') : '-';
             return `<tr><td class="border px-2 py-1 text-center">${i + 1}</td><td class="border px-2 py-1">${safeText(ans || '-')}</td><td class="border px-2 py-1 text-xs leading-relaxed">${expHtml}</td></tr>`;
           }).join('');
           parts.push(`
@@ -9420,7 +9443,6 @@ ${baselineModulAjar}
             state.quizLastPubId = Number(js.id);
             state.quizLastSlug = String(js.slug || '');
             state.quizPublishForm = state.quizPublishForm || {};
-            state.quizPublishForm.slug = String(js.slug || state.quizPublishForm.slug || '');
             saveDebounced(true);
             render();
             try {
@@ -11568,7 +11590,11 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               }
               return String(q.answer ?? '');
             };
-            const buildExpText = (q) => String(q.explanation || q.pembahasan || q.rationale || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim() || '-';
+            const buildExpText = (q) => {
+              const raw = String(q.explanation || q.pembahasan || q.rationale || '').replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
+              const cooked = powTextDocxPdf.forDocx(raw);
+              return cooked || '-';
+            };
             const sections = [
               { type: 'pg', title: 'PILIHAN GANDA' },
               { type: 'benar_salah', title: 'BENAR / SALAH' },
