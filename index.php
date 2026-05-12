@@ -616,6 +616,7 @@ session_write_close();
           "Bahasa Jawa",
           "Bahasa Sunda",
           "Bahasa Bali",
+          "Bahasa Madura",
           "Matematika",
           "Ilmu Pengetahuan Alam dan Sosial (IPAS)",
           "Informatika",
@@ -651,6 +652,7 @@ session_write_close();
           "Bahasa Jawa",
           "Bahasa Sunda",
           "Bahasa Bali",
+          "Bahasa Madura",
           "Matematika",
           "Ilmu Pengetahuan Alam (IPA)",
           "Ilmu Pengetahuan Sosial (IPS)",
@@ -688,6 +690,7 @@ session_write_close();
           "Bahasa Jawa",
           "Bahasa Sunda",
           "Bahasa Bali",
+          "Bahasa Madura",
           "Matematika",
           "Bahasa Inggris",
           "Fisika",
@@ -729,6 +732,7 @@ session_write_close();
           "Bahasa Jawa",
           "Bahasa Sunda",
           "Bahasa Bali",
+          "Bahasa Madura",
           "Matematika",
           "Bahasa Inggris",
           "Sejarah",
@@ -857,6 +861,8 @@ session_write_close();
           hariTanggal: "",
         },
         specialInstruction: "",
+        adminGeneratePromptEnabled: false,
+        adminGeneratePrompt: "",
         previewFlags: { kunci: true, kisi: true },
         sections: [
           {
@@ -3690,6 +3696,27 @@ session_write_close();
                 Buat Soal Sekarang
               </button>
             </div>
+            ${IS_ADMIN ? `
+              <div class="px-6 pb-6">
+                <div class="p-4 rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark">
+                  <div class="flex items-start justify-between gap-3">
+                    <div>
+                      <div class="text-sm font-extrabold">Admin: Prompt Generate (Override)</div>
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-1">Centang Aktif untuk menggunakan prompt ini. Jika tidak aktif, prompt mengikuti setup yang ada.</div>
+                    </div>
+                    <label class="inline-flex items-center gap-2 text-sm font-bold cursor-pointer select-none">
+                      <input type="checkbox" class="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                        ${state.adminGeneratePromptEnabled ? 'checked' : ''} onchange="window.__sp.setAdminGeneratePromptEnabled(this.checked)" />
+                      <span>Aktif</span>
+                    </label>
+                  </div>
+                  <textarea class="mt-3 w-full min-h-[110px] rounded-lg border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark px-3 py-2 text-sm ${state.adminGeneratePromptEnabled ? '' : 'opacity-60'}"
+                    placeholder="Tulis prompt wajib (admin) di sini..."
+                    ${state.adminGeneratePromptEnabled ? '' : 'disabled'}
+                    oninput="window.__sp.setAdminGeneratePrompt(this.value)">${safeText(state.adminGeneratePrompt || '')}</textarea>
+                </div>
+              </div>
+            ` : ``}
           </div>
         `;
         if (state.questions.length === 0) return `<div class="space-y-3">${buildNow}<div class="p-10 text-center">Belum ada soal. Klik "Buat Soal Sekarang".</div></div>`;
@@ -8245,7 +8272,7 @@ ${baselineModulAjar}
                     <option value="benar_salah" ${s.bentuk === "benar_salah" ? "selected" : ""}>Benar / Salah</option>
                     <option value="pg_kompleks" ${s.bentuk === "pg_kompleks" ? "selected" : ""}>Pilihan Ganda Kompleks (Jawaban >1)</option>
                     <option value="menjodohkan" ${s.bentuk === "menjodohkan" ? "selected" : ""}>Menjodohkan</option>
-                    <option value="isian" ${s.bentuk === "isian" ? "selected" : ""}>Uraian Singkat (Esai)</option>
+                    <option value="isian" ${s.bentuk === "isian" ? "selected" : ""}>Isian Singkat</option>
                     <option value="uraian" ${s.bentuk === "uraian" ? "selected" : ""}>Uraian Panjang</option>
                   </select>
                 </div>
@@ -9770,6 +9797,40 @@ ${baselineModulAjar}
           if (totalSec === 0) continue;
           const konteksOn = !!sec.soalKonteks;
           const konteksSoalCount = konteksOn ? Math.min(3, totalSec) : 0;
+          const trimContextComplete = (text, maxLen) => {
+            let s = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+            if (!maxLen || s.length <= maxLen) return s;
+            const cut = s.slice(0, maxLen);
+            let t = cut.trimEnd();
+            const minPos = Math.min(260, Math.floor(maxLen * 0.35));
+            let lastEnd = -1;
+            const re = /[.!?][)\]"'’”]*(?=\s|$)/g;
+            for (let m = re.exec(t); m; m = re.exec(t)) lastEnd = m.index + m[0].length;
+            if (lastEnd >= minPos) {
+              t = t.slice(0, lastEnd).trimEnd();
+            } else {
+              let w = -1;
+              for (let i = t.length - 1; i >= 0; i--) {
+                if (/\s/.test(t[i])) { w = i; break; }
+              }
+              if (w >= minPos) t = t.slice(0, w).trimEnd();
+            }
+            const lastCh = t.slice(-1);
+            const nextCh = s.charAt(t.length);
+            const isWordCh = (ch) => !!ch && /[\p{L}\p{N}]/u.test(ch);
+            if (isWordCh(lastCh) && isWordCh(nextCh)) {
+              let w = -1;
+              for (let i = t.length - 1; i >= 0; i--) {
+                if (/\s/.test(t[i])) { w = i; break; }
+              }
+              if (w >= 80) t = t.slice(0, w).trimEnd();
+            }
+            if (!/[.!?][)\]"'’”]*$/.test(t)) {
+              const base = t.length >= maxLen ? t.slice(0, Math.max(0, maxLen - 1)).trimEnd() : t;
+              t = `${base}.`.slice(0, maxLen).trimEnd();
+            }
+            return t;
+          };
           const applyContextPolicy = (q) => {
             if (!q) return q;
             let ctx = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
@@ -9779,7 +9840,7 @@ ${baselineModulAjar}
               if (m) ctx = ctx.replace(m[0], `${m[1]}\n\n`);
               else if (ctx.length > 140) ctx = `${ctx.slice(0, 140)}\n\n${ctx.slice(140)}`;
             }
-            return { ...q, context: ctx.slice(0, 1100).trim() };
+            return { ...q, context: trimContextComplete(ctx, 1100) };
           };
           const applySingleContextForSection = (startIdx, endIdx) => {
             if (!Number.isFinite(startIdx) || !Number.isFinite(endIdx) || startIdx < 0 || endIdx <= startIdx) return;
@@ -9860,6 +9921,10 @@ ${baselineModulAjar}
           const bloomPreset = sec.cakupanBloom || "level_standar";
           const bloomCodes = bloomPresets[bloomPreset]?.codes || ["C1", "C2", "C3", "C4"];
           const bloomLabel = bloomPresets[bloomPreset]?.label || bloomPreset;
+          const hasHots = bloomCodes.some(c => c === 'C4' || c === 'C5' || c === 'C6');
+          const isHotsPreset = bloomPreset === 'level_hots';
+          const isHard = sec.tingkatKesulitan === 'sulit';
+          const needDeepReasoningSteps = (hasHots && (isHotsPreset || isHard)) ? 3 : (hasHots ? 2 : 1);
           const bagianLabel = sec.bentuk === "pg" ? "Pilihan Ganda" :
                               sec.bentuk === "benar_salah" ? "Benar/Salah" :
                               sec.bentuk === "pg_kompleks" ? "Pilihan Ganda Kompleks" :
@@ -9898,6 +9963,14 @@ ${baselineModulAjar}
           const special = String(state.specialInstruction || "").trim();
           const specialLower = special.toLowerCase();
           const wantsArabicHarakat = /harokat|harakat|tasykil|tashkil|tashkeel|syakal|diakritik/.test(specialLower);
+          const adminPromptRaw = (IS_ADMIN && !!state.adminGeneratePromptEnabled) ? String(state.adminGeneratePrompt || '').trim() : '';
+          const adminPromptRules = adminPromptRaw
+            ? `\nPROMPT WAJIB DARI ADMIN (PRIORITAS TERTINGGI):
+<<<
+${adminPromptRaw}
+>>>
+- Jika prompt admin bertentangan dengan instruksi lain, prioritaskan prompt admin.\n`
+            : ``;
           const arabicHarakatRules = wantsArabicHarakat
             ? `\nINSTRUKSI BAHASA ARAB BERHARAKAT (WAJIB):
 - Jika menulis teks Arab, WAJIB gunakan huruf Arab dengan harakat/tasykīl (fathah, kasrah, dhammah, sukun, tanwin, tasydid) secara lengkap.
@@ -9913,8 +9986,9 @@ ${baselineModulAjar}
 - Buat tepat 1 stimulus/bacaan (field "context") yang sama untuk ${konteksSoalCount} soal. Soal lainnya field "context" kosong.
 - Field "context" WAJIB minimal 2 paragraf (dipisahkan 1 baris kosong) dan memuat data/situasi nyata yang digunakan pada soal.
 - Panjang "context" disarankan 450–1100 karakter (jangan melebihi 1100).
+- Field "context" harus rapi: paragraf terakhir selesai (kalimat lengkap) dan tidak terpotong di tengah kata.
 - Soal tanpa konteks WAJIB tetap boleh (field "context" kosong).
-- Untuk soal yang memakai stimulus, pertanyaan WAJIB nyambung dengan stimulus: tetap dalam skenario/objek yang sama dan menyebut minimal 1 data/fakta dari stimulus (misalnya angka, nama benda, tokoh, tempat, variabel).
+- Untuk soal yang memakai stimulus, pertanyaan WAJIB nyambung dengan stimulus: tetap dalam skenario/objek yang sama dan menyebut minimal 1 data/fakta dari stimulus (misalnya angka, nama benda, tokoh, tempat, variabel).${hasHots ? ` Untuk target C4–C6, sebut minimal 2 data/fakta/variabel dari stimulus (atau 1 data + 1 hubungan sebab-akibat yang eksplisit dari stimulus).` : ``}
 - DILARANG mengganti objek utama stimulus secara acak (misalnya stimulus tentang kue tapi soal tiba-tiba tentang buku) pada soal yang memakai stimulus.
 `
             : `\nMODE SOAL BERKONTEKS: NONAKTIF
@@ -9932,6 +10006,7 @@ __STIMULUS__
           const pembahasanRules = `\nATURAN PEMBAHASAN (WAJIB):
 - Isi field "explanation" singkat, 2–6 kalimat (maks 450 karakter).
 - Pembahasan harus menjelaskan alasan kunci/jawaban benar sesuai tipe soal, ringkas dan jelas.
+- Untuk target C4–C6: wajib menunjukkan ringkas alur berpikir (data/indikasi → konsep/aturan → kesimpulan).${konteksOn ? ` Wajib menyebut minimal 1 data/fakta dari stimulus/mini-kasus yang dipakai pada soal.` : ``}
 - Jika tipe "pg": sebut huruf jawaban benar dan jelaskan mengapa minimal 2 opsi lain tidak tepat.
 - Jika tipe "pg_kompleks": sebut opsi yang benar dipilih dan mengapa minimal 2 opsi lain tidak dipilih.
 - Jika tipe "benar_salah": sebut hasil (Benar/Salah) dan alasan singkat berdasarkan pernyataan.
@@ -10019,32 +10094,192 @@ Kembalikan JSON persis: {"items": [...]}`
 ]
 Kembalikan JSON persis: {"items": [...]}`;
 
-          const promptBase = `Bertindaklah sebagai Guru Profesional.
-Buatlah daftar soal untuk BAGIAN: ${bagianLabel}.
+          const promptBase = `Bertindaklah sebagai:
+- Guru Profesional,
+- Penyusun Soal HOTS Nasional,
+- Reviewer MGMP,
+- dan Validator Akademik.
 
-KONTEKS:
-Jenjang: ${displayJenjang(state.identity.jenjang, state.identity.kesetaraanPaket)} ${faseEfektif ? faseEfektif : state.identity.fase} Kelas ${state.identity.kelas}
+Tugas Anda adalah membuat soal berkualitas tinggi yang benar-benar sesuai dengan:
+- jenjang pendidikan,
+- fase,
+- kelas,
+- tingkat kesulitan,
+- dan level Taksonomi Bloom yang diminta.
+
+==================================================
+KONTEKS PEMBELAJARAN
+==================================================
+
+Jenjang: ${displayJenjang(state.identity.jenjang, state.identity.kesetaraanPaket)}
+Fase: ${faseEfektif}
+Kelas: ${state.identity.kelas}
 Mapel: ${state.identity.mataPelajaran}
-Sumber Materi Mentah (WAJIB jadi dasar utama soal):${topikRawClip ? `\n<<<\n${topikRawClip}\n>>>` : " -"}
+
+Materi utama yang WAJIB menjadi dasar soal:
+${topikRawClip ? `<<<\n${topikRawClip}\n>>>` : '-'}
 ${levelRules ? `\n${levelRules}\n` : ''}
 ${cp046SoalBlock ? `\n${cp046SoalBlock}\n` : ''}
+${adminPromptRules}
 
-KETENTUAN KESESUAIAN LEVEL (WAJIB):
-- Soal harus sesuai jenjang/fase/kelas yang dipilih. Jika materi mentah terlalu dasar atau terlalu tinggi, sesuaikan kedalaman dan kompleksitasnya agar tetap tepat level.
-- Prioritaskan konsep/subtopik yang paling dominan muncul di Materi Mentah (jika tersedia), bukan sekadar tema umum.
+==================================================
+TARGET KOGNITIF
+==================================================
 
-PARAMETER:
-- Jumlah Soal: __JUMLAH__ butir.
-- Tingkat Kesulitan: ${sec.tingkatKesulitan === 'campuran' ? 'Bervariasi (Mudah, Sedang, Sulit)' : sec.tingkatKesulitan}.
-- Kognitif: ${bloomLabel} (${bloomCodes.join(', ')}).
-- Opsi: ${opsi} pilihan (untuk PG).
-- SEMUA item bertipe: ${sec.bentuk} (JANGAN buat tipe lain).
+Level Bloom:
+${bloomLabel} (${bloomCodes.join(', ')})
+
+Definisi level kognitif:
+- C1 → mengingat fakta, istilah, tokoh, konsep dasar
+- C2 → memahami konsep dan menjelaskan makna
+- C3 → menerapkan konsep pada situasi sederhana
+- C4 → menganalisis hubungan sebab-akibat, konflik, strategi, interpretasi data/kasus
+- C5 → mengevaluasi keputusan, menilai efektivitas, memilih solusi terbaik
+- C6 → menciptakan solusi, prediksi, rancangan strategi baru, sintesis ide
+
+==================================================
+ATURAN WAJIB LEVEL HOTS
+==================================================
+
+Jika level mencakup C4, C5, atau C6 dan MODE SOAL BERKONTEKS AKTIF maka:
+WAJIB:
+- menggunakan stimulus,
+- menggunakan penalaran bertingkat,
+- menuntut analisis,
+- menuntut interpretasi,
+- menuntut evaluasi atau pengambilan keputusan,
+- dan menghubungkan beberapa konsep/peristiwa.
+
+Stimulus dapat berupa:
+- narasi sejarah,
+- studi kasus,
+- konflik tokoh,
+- fenomena sosial,
+- ilustrasi situasi,
+- tabel,
+- data,
+- kutipan,
+- perbandingan peristiwa,
+- atau skenario kontekstual.
+
+${hasHots ? `==================================================
+ATURAN HOTS MAKSIMAL (WAJIB UNTUK C4–C6)
+==================================================
+
+Standar minimal kualitas:
+- Setiap soal harus memaksa siswa melakukan penalaran bertingkat minimal ${needDeepReasoningSteps} langkah (bukan 1 langkah hafalan). Contoh langkah: (1) identifikasi data/indikasi → (2) kaitkan konsep/aturan → (3) simpulkan/putuskan.
+- Setiap soal wajib punya "pengunci": data/kondisi/kriteria yang jelas sehingga hanya 1 jawaban paling tepat (atau set jawaban yang tepat untuk PG Kompleks).
+- Jika MODE SOAL BERKONTEKS NONAKTIF: buat mini-kasus 2–4 kalimat langsung di field "question" (tetap field "context" kosong) berisi minimal 2 data/variabel/kondisi yang harus dianalisis.
+- DILARANG membuat soal yang bisa dijawab dengan menyalin 1 kalimat dari stimulus. Untuk C4–C6, pertanyaan wajib memaksa inferensi: menggabungkan minimal 2 fakta/indikasi dari stimulus/mini-kasus, atau menilai pilihan terbaik berdasarkan kriteria/constraint.
+- Hindari pola hafalan tokoh/waktu/tempat (mis. “Siapa…”, “Kapan…”, “Di mana…”, “Apa definisi…”). Jika harus menyebut tokoh/kejadian, jadikan evaluatif/analitis (mis. memilih strategi/argumen/keputusan paling tepat berdasarkan data).
+
+Kriteria distraktor (PG/PG Kompleks):
+- Semua opsi harus homogen (bentuk dan ruang lingkup sama), panjang relatif mirip, dan sama-sama masuk akal.
+- Setiap distraktor harus salah karena alasan spesifik yang umum terjadi (miskonsepsi/overgeneralisasi/salah interpretasi data), bukan asal.
+- DILARANG opsi "semua benar", "semua salah", atau petunjuk meta (mis. "jawaban A dan C") kecuali materi memang menuntut.
+
+Kualitas pertanyaan:
+- Gunakan kata kerja operasional yang tepat (menganalisis, menyimpulkan, mengevaluasi, memilih strategi, memprediksi, merancang).
+- Hindari kata "paling tepat" jika tanpa kriteria; jika memakai, sertakan kriteria/tujuan/constraint yang jelas di stem.
+` : ``}
+
+==================================================
+LARANGAN
+==================================================
+
+JANGAN:
+- membuat soal definisi jika target C4-C6,
+- membuat soal hafalan langsung,
+- membuat soal yang jawabannya dapat ditemukan langsung dalam satu kalimat materi,
+- membuat soal terlalu mudah,
+- membuat soal satu langkah berpikir,
+- membuat pengecoh yang terlalu jelas salah,
+- menggunakan pola monoton seperti:
+  - “apa tujuan…”
+  - “siapa tokoh…”
+  - “apa arti…”
+
+Jika soal masih bisa dijawab hanya dengan mengingat fakta, revisi ulang soal tersebut.
+
+==================================================
+POLA SOAL HOTS YANG WAJIB DIGUNAKAN
+==================================================
+
+Gunakan variasi pola berikut:
+- analisis sebab-akibat,
+- studi kasus,
+- konflik antar tokoh,
+- interpretasi peristiwa,
+- evaluasi strategi,
+- pengambilan keputusan,
+- hubungan antar peristiwa,
+- prediksi alternatif sejarah,
+- sintesis solusi,
+- evaluasi dampak,
+- perbandingan kondisi,
+- interpretasi data,
+- dan pemecahan masalah.
+
+==================================================
+KETENTUAN LEVEL KELAS
+==================================================
+
+Sesuaikan kompleksitas bahasa dengan kelas ${state.identity.kelas}.
+- SD → konkret dan sederhana
+- SMP → mulai kontekstual dan analitis ringan
+- SMA → analitis mendalam dan argumentatif
+- Olimpiade → analisis bertingkat, interpretatif, dan memiliki distraktor kuat
+
+==================================================
+KUALITAS DISTRAKTOR
+==================================================
+
+Distraktor wajib:
+- masuk akal,
+- tidak terlalu jelas salah,
+- berasal dari miskonsepsi umum siswa,
+- memiliki kedekatan konsep dengan jawaban benar,
+- dan tetap logis dalam konteks materi.
+
+==================================================
+KETENTUAN KESESUAIAN MATERI
+==================================================
+
+- Prioritaskan konsep/subtopik yang paling dominan pada materi mentah.
+- Jangan keluar dari materi utama.
+- Jika materi terlalu dasar atau terlalu tinggi, sesuaikan kedalaman berpikirnya agar tetap sesuai jenjang.
+
+==================================================
+VALIDASI INTERNAL WAJIB
+==================================================
+
+Sebelum menampilkan soal, lakukan pengecekan internal:
+- Apakah soal benar-benar sesuai level Bloom?
+- Apakah soal terlalu mudah?
+- Apakah soal hanya menguji hafalan?
+- Apakah stimulus benar-benar digunakan (jika konteks aktif)?
+- Apakah siswa perlu menganalisis sebelum menjawab?
+- Apakah distraktor cukup kuat?
+- Apakah jawaban tidak bisa ditebak secara langsung?
+
+Jika belum sesuai, revisi dahulu sebelum lanjut.
+
+==================================================
+PARAMETER SOAL
+==================================================
+
+Jumlah soal: __JUMLAH__
+Tingkat kesulitan: ${sec.tingkatKesulitan === 'campuran' ? 'campuran (mudah, sedang, sulit)' : sec.tingkatKesulitan}
+Jenis soal: ${sec.bentuk}
+Jumlah opsi: ${opsi}
 
 ATURAN JAWABAN (WAJIB):
 - Jika tipe "pg": field "answer" harus 1 angka index 0-based (0=A, 1=B, dst).
 - Jika tipe "benar_salah": field "answer" harus 0 (Benar) atau 1 (Salah).
 - Jika tipe "pg_kompleks": field "answer" harus ARRAY angka index 0-based, MINIMAL 2 jawaban benar. Contoh: [0,2] berarti A dan C benar.
 - Jika tipe "menjodohkan": field "pairs" HARUS ada dan berisi ARRAY object { "left": "...", "right": "..." } (teks, bukan angka). Panjang pairs 4–8. Jangan output pasangan angka seperti "1-3" atau "0,3".
+- Jika tipe "isian": field "answer" harus jawaban singkat (1–6 kata ATAU 1 nilai/angka/rumus pendek). Jangan menulis paragraf/uraian. Tanpa nomor/bullet. Hindari kalimat panjang.
+- Jika tipe "uraian": field "answer" harus ringkasan jawaban ideal 2–4 poin (boleh dipisah dengan "\n" di dalam string).
 ${pembahasanRules}
 
 INSTRUKSI FORMAT MATEMATIKA (WAJIB PATUH):
@@ -10076,13 +10311,16 @@ Mapel: ${state.identity.mataPelajaran}
 Sumber Materi Mentah (WAJIB jadi dasar utama stimulus):${topikRawClip ? `\n<<<\n${topikRawClip}\n>>>` : " -"}
 ${levelRules ? `\n${levelRules}\n` : ''}
 ${cp046SoalBlock ? `\n${cp046SoalBlock}\n` : ''}
+${adminPromptRules}
 
 ATURAN STIMULUS (WAJIB):
 1. Stimulus minimal 2 paragraf (dipisahkan 1 baris kosong).
 2. Memuat data/situasi nyata yang bisa dipakai sebagai dasar pertanyaan (angka/nama/objek/tempat/variabel).
+${hasHots ? `- Untuk target C4–C6: masukkan minimal 4 data/fakta/variabel yang dapat dibandingkan/diinterpretasi agar soal bisa bertingkat (mis. angka, kondisi, kebijakan, sebab-akibat, atau aturan).` : ``}
 3. Panjang 450–1100 karakter (jangan melebihi 1100).
 4. ${wantsArabicHarakat ? 'Gunakan Bahasa Arab dengan harakat/tasykīl lengkap.' : 'Gunakan Bahasa Indonesia.'}
 5. Jangan membuat soal, hanya stimulus.
+- Pastikan paragraf terakhir selesai (kalimat lengkap) dan teks tidak terpotong di tengah kata. Akhiri stimulus dengan tanda titik.
 ${wantsArabicHarakat ? '\n6. Jangan menghapus harakat/diakritik pada kata Arab.' : ''}
 
 OUTPUT JSON:
@@ -10098,8 +10336,48 @@ OUTPUT JSON:
                 const it0 = Array.isArray(res?.items) ? res.items[0] : null;
                 ctx = String(it0?.context || it0?.stimulus || '').trim();
               }
-              ctx = applyContextPolicy({ context: ctx })?.context || '';
-              return ctx;
+              const ctxRaw = ctx;
+              let ctxFinal = applyContextPolicy({ context: ctx })?.context || '';
+              if (ctxFinal) {
+                const lastTok = (ctxFinal.split(/\s+/).pop() || '').trim();
+                const endsOk = /[.!?][)\]"'’”]*$/.test(ctxFinal);
+                const has2Para = /\n\s*\n/.test(ctxFinal);
+                const tailLooksCut = !endsOk || (!!lastTok && lastTok.length <= 2 && /[\p{L}\p{N}]/u.test(lastTok));
+                if (!has2Para || tailLooksCut) {
+                  const clip = String(ctxRaw || ctxFinal || '').slice(0, 2400).trim();
+                  const repairPrompt = `Rapikan stimulus berikut agar rapi dan tidak terpotong.
+
+ATURAN (WAJIB):
+- Jangan menambah fakta baru, jangan mengubah inti informasi.
+- Pastikan minimal 2 paragraf (pisah 1 baris kosong).
+- Panjang 450–1100 karakter.
+- Paragraf terakhir harus selesai (kalimat lengkap) dan tidak terpotong di tengah kata.
+- Akhiri stimulus dengan tanda titik.
+
+STIMULUS AWAL:
+<<<
+${clip}
+>>>
+
+OUTPUT JSON:
+{"context":"..."}`
+                  try {
+                    const res2 = await callOpenAI(repairPrompt);
+                    if (res2 && res2._usage) {
+                      pkgTokenIn += Number(res2._usage.in || 0);
+                      pkgTokenOut += Number(res2._usage.out || 0);
+                    }
+                    let repaired = String(res2?.context || res2?.stimulus || '').trim();
+                    if (!repaired) {
+                      const it2 = Array.isArray(res2?.items) ? res2.items[0] : null;
+                      repaired = String(it2?.context || it2?.stimulus || '').trim();
+                    }
+                    const fixed = applyContextPolicy({ context: repaired })?.context || '';
+                    if (fixed) ctxFinal = fixed;
+                  } catch {}
+                }
+              }
+              return ctxFinal;
             } catch {
               return '';
             }
@@ -10301,12 +10579,21 @@ OUTPUT JSON:
 - Jangan menulis Arab tanpa harakat. Jangan hilangkan diakritik pada kata Arab.
 - Jangan gunakan transliterasi latin untuk kata Arab (kecuali jika diminta di aturan tambahan dari guru).\n`
             : ``;
+          const adminPromptRaw = (IS_ADMIN && !!state.adminGeneratePromptEnabled) ? String(state.adminGeneratePrompt || '').trim() : '';
+          const adminPromptRules = adminPromptRaw
+            ? `\nPROMPT WAJIB DARI ADMIN (PRIORITAS TERTINGGI):
+<<<
+${adminPromptRaw}
+>>>
+- Jika prompt admin bertentangan dengan instruksi lain, prioritaskan prompt admin.\n`
+            : ``;
           const prompt = `Buat ulang 1 butir soal sesuai detail berikut:
 Jenis: ${q.type}
 Tingkat Kesulitan: sedang
 Bloom: ${q.bloom || 'C2'}
 Materi: ${q.materi || '-'}
 ${contextBlock}
+${adminPromptRules}
 Instruksi:
 1. ${wantsArabicHarakat ? 'Gunakan Bahasa Arab dengan harakat/tasykīl lengkap.' : 'Gunakan Bahasa Indonesia.'}
 2. Jika tipe "pg" atau "pg_kompleks", buat ${clamp(Number(state.sections.find(s=>s.id===q.sectionId)?.opsiPG || 4), 3, 5)} opsi.
@@ -12500,6 +12787,17 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         updateSection,
         pickLogo,
         clearLogo,
+        setAdminGeneratePrompt: (val) => {
+          if (!IS_ADMIN) return;
+          state.adminGeneratePrompt = String(val ?? '').slice(0, 20000);
+          saveDebounced(true);
+        },
+        setAdminGeneratePromptEnabled: (checked) => {
+          if (!IS_ADMIN) return;
+          state.adminGeneratePromptEnabled = !!checked;
+          saveDebounced(true);
+          render();
+        },
         openUsagePolicy,
         closeUsagePolicy,
         // Modul Ajar
