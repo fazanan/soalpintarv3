@@ -1314,6 +1314,7 @@ session_write_close();
         render();
       };
       const startBuildSoal = () => {
+        if (state._isGenerating) return;
         const chk = validateBuatSoal();
         if (!chk.ok) {
           state.soalError = { tab: chk.tab, msg: chk.msg, path: chk.path };
@@ -3743,10 +3744,10 @@ session_write_close();
                   </label>
                 </div>
               </div>
-              <button class="inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold"
-                onclick="window.__sp.startBuildSoal()">
-                <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
-                Buat Soal Sekarang
+              <button class="${state._isGenerating ? 'inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-gray-200 text-gray-500 text-sm font-bold opacity-60 cursor-not-allowed' : 'inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold'}"
+                ${state._isGenerating ? 'disabled' : 'onclick="window.__sp.startBuildSoal()"'} >
+                <span class="material-symbols-outlined text-[18px] ${state._isGenerating ? 'animate-spin' : ''}">${state._isGenerating ? 'progress_activity' : 'auto_awesome'}</span>
+                ${state._isGenerating ? 'Memproses...' : 'Buat Soal Sekarang'}
               </button>
             </div>
             ${IS_ADMIN ? `
@@ -9768,6 +9769,7 @@ ${baselineModulAjar}
       };
 
       const buildPackage = async () => {
+        if (state._isGenerating) return;
         const chk = validateBuatSoal();
         if (!chk.ok) {
           state.soalError = { tab: chk.tab, msg: chk.msg, path: chk.path };
@@ -9778,6 +9780,9 @@ ${baselineModulAjar}
           return;
         }
         state.soalError = null;
+        state._isGenerating = true;
+        saveDebounced(true);
+        setView("preview");
         autoFillPaket();
         // preflight limit check
         try {
@@ -9786,14 +9791,15 @@ ${baselineModulAjar}
             const limits = await res.json();
             if ((limits?.limitpaket ?? 0) < 2) {
               alert("Kredit tidak mencukupi untuk membuat paket soal (butuh 2 kredit). Hubungi admin untuk menambah kuota.");
+              state._isGenerating = false;
+              saveDebounced(true);
+              render();
               return;
             }
           }
         } catch {}
         state.questions = [];
-        state._isGenerating = true;
         saveDebounced(true);
-        setView("preview");
 
         // loading UI will be rendered by computeView() based on _isGenerating flag
 
