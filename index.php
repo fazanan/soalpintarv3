@@ -863,6 +863,7 @@ session_write_close();
         specialInstruction: "",
         adminGeneratePromptEnabled: false,
         adminGeneratePrompt: "",
+        downloadPdfSeparateFiles: false,
         previewFlags: { kunci: true, kisi: true },
         sections: [
           {
@@ -1307,6 +1308,11 @@ session_write_close();
         saveDebounced(false);
         render();
       };
+      const setDownloadPdfSeparateFiles = (checked) => {
+        state.downloadPdfSeparateFiles = !!checked;
+        saveDebounced(true);
+        render();
+      };
       const startBuildSoal = () => {
         const chk = validateBuatSoal();
         if (!chk.ok) {
@@ -1338,11 +1344,16 @@ session_write_close();
         const btn = document.getElementById("btnSoalDocxTop");
         const orig = btn?.innerHTML;
         try { if (btn) { btn.disabled = true; btn.innerHTML = `<span class="animate-spin material-symbols-outlined text-[18px]">progress_activity</span>`; } } catch {}
-        try { await exportDocx(); } catch {}
-        await new Promise((r) => setTimeout(r, 300));
-        try { await exportKunciDocx(); } catch {}
-        await new Promise((r) => setTimeout(r, 300));
-        try { await exportKisiDocx(); } catch {}
+        const separateFiles = !!state.downloadPdfSeparateFiles;
+        if (separateFiles) {
+          try { await exportDocx(); } catch {}
+          await new Promise((r) => setTimeout(r, 300));
+          try { await exportKisiDocx(); } catch {}
+          await new Promise((r) => setTimeout(r, 300));
+          try { await exportKunciDocx(); } catch {}
+        } else {
+          try { await exportPaketDocx(); } catch {}
+        }
         try { if (btn) { btn.disabled = false; btn.innerHTML = orig || "Download .docx"; } } catch {}
       };
       const downloadSoalPDF = () => {
@@ -1352,7 +1363,7 @@ session_write_close();
           const orig = btn?.innerHTML;
           try { if (btn) { btn.disabled = true; btn.innerHTML = `<span class="animate-spin material-symbols-outlined text-[18px]">progress_activity</span>`; } } catch {}
           try {
-            await exportSoalPDF();
+            await exportSoalPDF({ separateFiles: !!state.downloadPdfSeparateFiles });
           } catch {
             alert("Gagal mengunduh PDF. Silakan coba lagi.");
           } finally {
@@ -1361,12 +1372,14 @@ session_write_close();
         })();
       };
 
-      async function exportSoalPDF() {
+      async function exportSoalPDF(opts = {}) {
         if (!Array.isArray(state.questions) || state.questions.length === 0) return;
         await ensureJsPDF();
         const { jsPDF } = window.jspdf;
+        const separateFiles = !!opts?.separateFiles;
 
         const safe = `${String(state.identity.mataPelajaran || "Mapel").replace(/\s+/g, "_")}_${String(state.identity.kelas || "Kelas").replace(/\s+/g, "_")}_${String(state.paket.judul || "Paket").replace(/[\s/]+/g, "_")}`;
+        const fileGabung = `Paket_${safe}.pdf`;
         const fileSoal = `Soal_${safe}.pdf`;
         const fileKunci = `Kunci_${safe}.pdf`;
         const fileKisi = `KisiKisi_${safe}.pdf`;
@@ -1563,8 +1576,9 @@ session_write_close();
           uraian: "Jawablah pertanyaan-pertanyaan berikut dengan jelas dan benar!",
         };
 
-        const buildSoalPdf = () => {
-          const ctx = makeDoc();
+        const buildSoalPdf = (ctxIn, opts = {}) => {
+          const ctx = ctxIn || makeDoc();
+          const addFooter = Object.prototype.hasOwnProperty.call(opts, 'addFooter') ? !!opts.addFooter : true;
           ctx.drawHeader(String(state.paket.judul || "NASKAH SOAL"), "soal");
 
           let firstTypeRendered = false;
@@ -1681,21 +1695,24 @@ session_write_close();
             });
           }
 
-          const totalPages = ctx.doc.getNumberOfPages();
-          for (let p = 1; p <= totalPages; p++) {
-            ctx.doc.setPage(p);
-            ctx.doc.setFont("times", "normal");
-            ctx.doc.setFontSize(9);
+          if (addFooter) {
+            const totalPages = ctx.doc.getNumberOfPages();
+            for (let p = 1; p <= totalPages; p++) {
+              ctx.doc.setPage(p);
+              ctx.doc.setFont("times", "normal");
+              ctx.doc.setFontSize(9);
+              ctx.doc.setTextColor(0, 0, 0);
+              const footer = `${String(state.identity.mataPelajaran || "")} — ${String(state.identity.namaSekolah || "")} | Halaman ${p}`;
+              ctx.doc.text(footer, ctx.pageW / 2, ctx.footerY, { align: "center" });
+            }
             ctx.doc.setTextColor(0, 0, 0);
-            const footer = `${String(state.identity.mataPelajaran || "")} — ${String(state.identity.namaSekolah || "")} | Halaman ${p}`;
-            ctx.doc.text(footer, ctx.pageW / 2, ctx.footerY, { align: "center" });
           }
-          ctx.doc.setTextColor(0, 0, 0);
           return ctx.doc;
         };
 
-        const buildKunciPdf = () => {
-          const ctx = makeDoc();
+        const buildKunciPdf = (ctxIn, opts = {}) => {
+          const ctx = ctxIn || makeDoc();
+          const addFooter = Object.prototype.hasOwnProperty.call(opts, 'addFooter') ? !!opts.addFooter : true;
           ctx.drawHeader("KUNCI JAWABAN", "meta");
 
           const sections = [
@@ -1747,21 +1764,24 @@ session_write_close();
             ctx.setY((ctx.doc.lastAutoTable?.finalY || ctx.getY()) + 14);
           }
 
-          const totalPages = ctx.doc.getNumberOfPages();
-          for (let p = 1; p <= totalPages; p++) {
-            ctx.doc.setPage(p);
-            ctx.doc.setFont("times", "normal");
-            ctx.doc.setFontSize(9);
+          if (addFooter) {
+            const totalPages = ctx.doc.getNumberOfPages();
+            for (let p = 1; p <= totalPages; p++) {
+              ctx.doc.setPage(p);
+              ctx.doc.setFont("times", "normal");
+              ctx.doc.setFontSize(9);
+              ctx.doc.setTextColor(0, 0, 0);
+              const footer = `${String(state.identity.mataPelajaran || "")} — ${String(state.identity.namaSekolah || "")} | Halaman ${p}`;
+              ctx.doc.text(footer, ctx.pageW / 2, ctx.footerY, { align: "center" });
+            }
             ctx.doc.setTextColor(0, 0, 0);
-            const footer = `${String(state.identity.mataPelajaran || "")} — ${String(state.identity.namaSekolah || "")} | Halaman ${p}`;
-            ctx.doc.text(footer, ctx.pageW / 2, ctx.footerY, { align: "center" });
           }
-          ctx.doc.setTextColor(0, 0, 0);
           return ctx.doc;
         };
 
-        const buildKisiPdf = () => {
-          const ctx = makeDoc();
+        const buildKisiPdf = (ctxIn, opts = {}) => {
+          const ctx = ctxIn || makeDoc();
+          const addFooter = Object.prototype.hasOwnProperty.call(opts, 'addFooter') ? !!opts.addFooter : true;
           ctx.drawHeader("KISI-KISI SOAL", "meta");
 
           const kisiSections = [
@@ -1799,30 +1819,58 @@ session_write_close();
             ctx.setY((ctx.doc.lastAutoTable?.finalY || ctx.getY()) + 26);
           }
 
-          const totalPages = ctx.doc.getNumberOfPages();
-          for (let p = 1; p <= totalPages; p++) {
-            ctx.doc.setPage(p);
-            ctx.doc.setFont("times", "normal");
-            ctx.doc.setFontSize(9);
-            ctx.doc.setTextColor(0, 0, 0);
-            if (cp046PagesForKisi) {
-              ctx.doc.text(`Catatan: sesuai dengan CP046 hal. ${cp046PagesForKisi}`, ctx.pageW / 2, ctx.footerY - 12, { align: "center" });
+          if (addFooter) {
+            const totalPages = ctx.doc.getNumberOfPages();
+            for (let p = 1; p <= totalPages; p++) {
+              ctx.doc.setPage(p);
+              ctx.doc.setFont("times", "normal");
+              ctx.doc.setFontSize(9);
+              ctx.doc.setTextColor(0, 0, 0);
+              if (cp046PagesForKisi) {
+                ctx.doc.text(`Catatan: sesuai dengan CP046 hal. ${cp046PagesForKisi}`, ctx.pageW / 2, ctx.footerY - 12, { align: "center" });
+              }
+              const footer = `${String(state.identity.mataPelajaran || "")} — ${String(state.identity.namaSekolah || "")} | Halaman ${p}`;
+              ctx.doc.text(footer, ctx.pageW / 2, ctx.footerY, { align: "center" });
             }
-            const footer = `${String(state.identity.mataPelajaran || "")} — ${String(state.identity.namaSekolah || "")} | Halaman ${p}`;
-            ctx.doc.text(footer, ctx.pageW / 2, ctx.footerY, { align: "center" });
+            ctx.doc.setTextColor(0, 0, 0);
           }
-          ctx.doc.setTextColor(0, 0, 0);
           return ctx.doc;
         };
 
-        const docSoal = buildSoalPdf();
-        docSoal.save(fileSoal);
-        await new Promise((r) => setTimeout(r, 300));
-        const docKunci = buildKunciPdf();
-        docKunci.save(fileKunci);
-        await new Promise((r) => setTimeout(r, 300));
-        const docKisi = buildKisiPdf();
-        docKisi.save(fileKisi);
+        if (separateFiles) {
+          const docSoal = buildSoalPdf(null, { addFooter: true });
+          docSoal.save(fileSoal);
+          await new Promise((r) => setTimeout(r, 300));
+          const docKisi = buildKisiPdf(null, { addFooter: true });
+          docKisi.save(fileKisi);
+          await new Promise((r) => setTimeout(r, 300));
+          const docKunci = buildKunciPdf(null, { addFooter: true });
+          docKunci.save(fileKunci);
+        } else {
+          const ctxAll = makeDoc();
+          buildSoalPdf(ctxAll, { addFooter: false });
+          ctxAll.newPage();
+          const kisiStart = ctxAll.doc.getNumberOfPages();
+          buildKisiPdf(ctxAll, { addFooter: false });
+          const kisiEnd = ctxAll.doc.getNumberOfPages();
+          ctxAll.newPage();
+          buildKunciPdf(ctxAll, { addFooter: false });
+
+          const totalPages = ctxAll.doc.getNumberOfPages();
+          for (let p = 1; p <= totalPages; p++) {
+            ctxAll.doc.setPage(p);
+            ctxAll.doc.setFont("times", "normal");
+            ctxAll.doc.setFontSize(9);
+            ctxAll.doc.setTextColor(0, 0, 0);
+            if (cp046PagesForKisi && p >= kisiStart && p <= kisiEnd) {
+              ctxAll.doc.text(`Catatan: sesuai dengan CP046 hal. ${cp046PagesForKisi}`, ctxAll.pageW / 2, ctxAll.footerY - 12, { align: "center" });
+            }
+            const footer = `${String(state.identity.mataPelajaran || "")} — ${String(state.identity.namaSekolah || "")} | Halaman ${p}`;
+            ctxAll.doc.text(footer, ctxAll.pageW / 2, ctxAll.footerY, { align: "center" });
+          }
+          ctxAll.doc.setTextColor(0, 0, 0);
+          ctxAll.doc.save(fileGabung);
+        }
       }
       const setModulAjarTab = (tab) => {
         state.modulAjarTab = tab;
@@ -3688,6 +3736,11 @@ session_write_close();
                     <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
                     Download PDF
                   </button>
+                  <label class="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-xs font-bold ${canDownload ? '' : 'opacity-60'} select-none cursor-pointer">
+                    <input type="checkbox" class="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
+                      ${state.downloadPdfSeparateFiles ? 'checked' : ''} onchange="window.__sp.setDownloadPdfSeparateFiles(this.checked)" />
+                    <span>Download File Terpisah</span>
+                  </label>
                 </div>
               </div>
               <button class="inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold"
@@ -8395,7 +8448,7 @@ ${baselineModulAjar}
             <div class="flex items-center gap-2">
               <span class="hidden md:inline-flex items-center gap-2 h-10 px-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 text-sm font-bold">
                 <span class="material-symbols-outlined text-[18px]">info</span>
-                Quiz hanya mendukung soal Pilihan Ganda
+                Quiz mendukung soal PG, PG Kompleks dan Benar/Salah
               </span>
               <button class="inline-flex items-center gap-2 h-10 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
                 onclick="window.__sp.openQuizHelp()"><span class="material-symbols-outlined text-[18px]">help</span><span class="hidden md:inline">Petunjuk</span></button>
@@ -11373,10 +11426,13 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         reader.readAsDataURL(file);
       };
 
-      const exportDocx = async () => {
-        if (state.questions.length === 0) return alert("Belum ada soal!");
+      const exportDocx = async (opts = {}) => {
+        if (state.questions.length === 0) {
+          if (opts && opts.returnSection) return null;
+          return alert("Belum ada soal!");
+        }
         
-        const btnExport = el("btnExport");
+        const btnExport = (opts && opts.returnSection) ? null : el("btnExport");
         const originalText = btnExport ? btnExport.innerHTML : "";
         const originalDisabled = btnExport ? btnExport.disabled : false;
   
@@ -11700,11 +11756,9 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
           };
   
           const naskah = buildNaskahSection();
-          const doc = new Document({
-            sections: [
-              { properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: [naskah.headerTitle, naskah.headerTable, naskah.spacer, ...naskah.questionParagraphs] },
-            ],
-          });
+          const section = { properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: [naskah.headerTitle, naskah.headerTable, naskah.spacer, ...naskah.questionParagraphs] };
+          if (opts && opts.returnSection) return section;
+          const doc = new Document({ sections: [section] });
           const blob = await Packer.toBlob(doc);
           const link = document.createElement("a");
           link.href = URL.createObjectURL(blob);
@@ -11722,10 +11776,13 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         }
       };
 
-      const exportKunciDocx = async () => {
-         if (state.questions.length === 0) return alert("Belum ada soal!");
+      const exportKunciDocx = async (opts = {}) => {
+         if (state.questions.length === 0) {
+           if (opts && opts.returnSection) return null;
+           return alert("Belum ada soal!");
+         }
         
-        const btn = el("btnExportKunci");
+        const btn = (opts && opts.returnSection) ? null : el("btnExportKunci");
         const originalText = btn ? btn.innerHTML : "";
         const originalDisabled = btn ? btn.disabled : false;
   
@@ -11926,13 +11983,9 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                 content.push(new Paragraph({ text: "", spacing: { after: 300 } }));
             }
   
-            const doc = new Document({
-                sections: [{
-                    properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } },
-                    children: [headerTitle, headerTable, spacer, ...content],
-                }],
-            });
-  
+            const section = { properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: [headerTitle, headerTable, spacer, ...content] };
+            if (opts && opts.returnSection) return section;
+            const doc = new Document({ sections: [section] });
             const blob = await Packer.toBlob(doc);
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
@@ -11951,10 +12004,13 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         }
       };
 
-      const exportKisiDocx = async () => {
-        if (state.questions.length === 0) return alert("Belum ada soal!");
+      const exportKisiDocx = async (opts = {}) => {
+        if (state.questions.length === 0) {
+          if (opts && opts.returnSection) return null;
+          return alert("Belum ada soal!");
+        }
         
-        const btn = el("btnExportKisi");
+        const btn = (opts && opts.returnSection) ? null : el("btnExportKisi");
         const originalText = btn ? btn.innerHTML : "";
         const originalDisabled = btn ? btn.disabled : false;
   
@@ -12116,13 +12172,9 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               }));
             }
   
-            const doc = new Document({
-                sections: [{
-                    properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } },
-                    children: [headerTitle, headerTable, spacer, ...content],
-                }],
-            });
-  
+            const section = { properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children: [headerTitle, headerTable, spacer, ...content] };
+            if (opts && opts.returnSection) return section;
+            const doc = new Document({ sections: [section] });
             const blob = await Packer.toBlob(doc);
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
@@ -12139,6 +12191,21 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               btn.disabled = originalDisabled;
             }
         }
+      };
+
+      const exportPaketDocx = async () => {
+        if (state.questions.length === 0) return alert("Belum ada soal!");
+        const { Document, Packer } = docx;
+        const s1 = await exportDocx({ returnSection: true });
+        const s2 = await exportKisiDocx({ returnSection: true });
+        const s3 = await exportKunciDocx({ returnSection: true });
+        const doc = new Document({ sections: [s1, s2, s3].filter(Boolean) });
+        const blob = await Packer.toBlob(doc);
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        const safe = `${String(state.identity.mataPelajaran || "Mapel").replace(/\s+/g, "_")}_${String(state.identity.kelas || "Kelas").replace(/\s+/g, "_")}_${String(state.paket.judul || "Paket").replace(/[\s/]+/g, "_")}`;
+        link.download = `Paket_${safe}.docx`;
+        link.click();
       };
 
       const exportAllDocx = async () => {
@@ -12686,6 +12753,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       window.__sp = {
         setView,
         setPreviewTab,
+        setDownloadPdfSeparateFiles,
         startBuildSoal,
         openNaskahSoalFromKonfigurasi,
         downloadSoalDocx,
@@ -12954,39 +13022,41 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               </div>
             </div>
           </div>
-          <div class="flex items-center justify-between mt-2">
-            <div class="text-sm text-text-sub-light dark:text-text-sub-dark">Riwayat penggunaan kredit (lokal)</div>
-            <div class="flex items-center gap-2">
-              <input id="creditSearch" placeholder="Cari aktivitas..." class="rounded-lg border h-9 px-3 w-56 bg-white dark:bg-surface-dark border-border-light dark:border-border-dark" value="${safeText(state.riwayatKreditSearch || '')}" />
-            </div>
-          </div>
-          <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
-            <div class="px-4 py-3 border-b border-border-light dark:border-border-dark text-xs text-text-sub-light dark:text-text-sub-dark">
-              <span id="creditSummary"></span>
-            </div>
-            <div class="overflow-auto">
-              <table class="min-w-full text-sm border whitespace-nowrap">
-                <thead class="bg-background-light dark:bg-background-dark">
-                  <tr>
-                    <th class="border px-3 py-2 text-center">No</th>
-                    <th class="border px-3 py-2 text-left">Waktu</th>
-                    <th class="border px-3 py-2 text-left">Aktivitas</th>
-                    <th class="border px-3 py-2 text-left">Rincian</th>
-                    <th class="border px-3 py-2 text-center">Kredit</th>
-                  </tr>
-                </thead>
-                <tbody id="creditTBody"></tbody>
-              </table>
-            </div>
-            <div class="flex items-center justify-between px-3 py-2 border-t border-border-light dark:border-border-dark">
-              <div id="creditInfo" class="text-xs text-text-sub-light dark:text-text-sub-dark"></div>
+          ${IS_ADMIN ? `
+            <div class="flex items-center justify-between mt-2">
+              <div class="text-sm text-text-sub-light dark:text-text-sub-dark">Riwayat penggunaan kredit (lokal)</div>
               <div class="flex items-center gap-2">
-                <button id="btnCreditPrev" class="rounded-lg h-8 px-3 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-xs font-bold">Sebelumnya</button>
-                <div id="creditPageInfo" class="text-xs"></div>
-                <button id="btnCreditNext" class="rounded-lg h-8 px-3 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-xs font-bold">Berikutnya</button>
+                <input id="creditSearch" placeholder="Cari aktivitas..." class="rounded-lg border h-9 px-3 w-56 bg-white dark:bg-surface-dark border-border-light dark:border-border-dark" value="${safeText(state.riwayatKreditSearch || '')}" />
               </div>
             </div>
-          </div>
+            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
+              <div class="px-4 py-3 border-b border-border-light dark:border-border-dark text-xs text-text-sub-light dark:text-text-sub-dark">
+                <span id="creditSummary"></span>
+              </div>
+              <div class="overflow-auto">
+                <table class="min-w-full text-sm border whitespace-nowrap">
+                  <thead class="bg-background-light dark:bg-background-dark">
+                    <tr>
+                      <th class="border px-3 py-2 text-center">No</th>
+                      <th class="border px-3 py-2 text-left">Waktu</th>
+                      <th class="border px-3 py-2 text-left">Aktivitas</th>
+                      <th class="border px-3 py-2 text-left">Rincian</th>
+                      <th class="border px-3 py-2 text-center">Kredit</th>
+                    </tr>
+                  </thead>
+                  <tbody id="creditTBody"></tbody>
+                </table>
+              </div>
+              <div class="flex items-center justify-between px-3 py-2 border-t border-border-light dark:border-border-dark">
+                <div id="creditInfo" class="text-xs text-text-sub-light dark:text-text-sub-dark"></div>
+                <div class="flex items-center gap-2">
+                  <button id="btnCreditPrev" class="rounded-lg h-8 px-3 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-xs font-bold">Sebelumnya</button>
+                  <div id="creditPageInfo" class="text-xs"></div>
+                  <button id="btnCreditNext" class="rounded-lg h-8 px-3 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-xs font-bold">Berikutnya</button>
+                </div>
+              </div>
+            </div>
+          ` : ``}
         </div>
       `;
 
@@ -13013,20 +13083,22 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         const nextBtn = el("btnHistoryNext");
         if (prevBtn) prevBtn.onclick = () => { historyPage = Math.max(1, historyPage - 1); renderHistoryTable(); };
         if (nextBtn) nextBtn.onclick = () => { historyPage = historyPage + 1; renderHistoryTable(); };
-        renderCreditHistoryTable();
-        const cSearch = el("creditSearch");
-        if (cSearch) {
-          cSearch.oninput = () => {
-            state.riwayatKreditSearch = cSearch.value || '';
-            creditPage = 1;
-            saveDebounced(false);
-            renderCreditHistoryTable();
-          };
+        if (IS_ADMIN) {
+          renderCreditHistoryTable();
+          const cSearch = el("creditSearch");
+          if (cSearch) {
+            cSearch.oninput = () => {
+              state.riwayatKreditSearch = cSearch.value || '';
+              creditPage = 1;
+              saveDebounced(false);
+              renderCreditHistoryTable();
+            };
+          }
+          const cPrev = el("btnCreditPrev");
+          const cNext = el("btnCreditNext");
+          if (cPrev) cPrev.onclick = () => { creditPage = Math.max(1, creditPage - 1); renderCreditHistoryTable(); };
+          if (cNext) cNext.onclick = () => { creditPage = creditPage + 1; renderCreditHistoryTable(); };
         }
-        const cPrev = el("btnCreditPrev");
-        const cNext = el("btnCreditNext");
-        if (cPrev) cPrev.onclick = () => { creditPage = Math.max(1, creditPage - 1); renderCreditHistoryTable(); };
-        if (cNext) cNext.onclick = () => { creditPage = creditPage + 1; renderCreditHistoryTable(); };
       }
       function renderHistoryTable() {
         const tbody = el("historyTBody");

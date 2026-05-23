@@ -142,7 +142,7 @@ function get_api_key(mysqli $db, string $provider, int $user_id): ?string {
 
 function get_model_config(mysqli $db, string $model, string $modality): ?array {
   if (!table_exists($db, 'api_models')) return null;
-  $sql = "SELECT provider, modality, model, endpoint_url, token_input_price, token_output_price, currency, currency_rate_to_idr, unit, supports_json_mode
+  $sql = "SELECT provider, modality, model, endpoint_url, token_input_price, token_output_price, currency, currency_rate_to_idr, unit, supports_json_mode, max_input_tokens, max_output_tokens
             FROM api_models
            WHERE is_active = 1 AND model = ? AND modality = ?
         ORDER BY updated_at DESC
@@ -157,6 +157,56 @@ function get_model_config(mysqli $db, string $model, string $modality): ?array {
   return $row ?: null;
 }
 
+function approx_token_to_char_limit(int $tokens): int {
+  if ($tokens <= 0) return 0;
+  $n = (int)floor($tokens * 4.0);
+  if ($n < 0) $n = 0;
+  return $n;
+}
+
+function clip_text_by_chars(string $text, int $maxChars): string {
+  $s = trim($text);
+  if ($maxChars <= 0) return $s;
+  if (mb_strlen($s, 'UTF-8') <= $maxChars) return $s;
+  $head = (int)min(2000, (int)floor($maxChars * 0.25));
+  $tail = $maxChars - $head;
+  if ($tail < 200) {
+    $tail = (int)min($maxChars, 2000);
+    $head = $maxChars - $tail;
+  }
+  $a = $head > 0 ? mb_substr($s, 0, $head, 'UTF-8') : '';
+  $b = $tail > 0 ? mb_substr($s, -$tail, null, 'UTF-8') : '';
+  return trim($a . "\n" . $b);
+}
+
+function clip_messages_to_char_limit(array $messages, int $maxChars): array {
+  if ($maxChars <= 0) return $messages;
+  $total = 0;
+  $lens = [];
+  foreach ($messages as $i => $m) {
+    $c = is_array($m) ? (string)($m['content'] ?? '') : '';
+    $l = mb_strlen($c, 'UTF-8');
+    $lens[$i] = $l;
+    $total += $l;
+  }
+  if ($total <= $maxChars) return $messages;
+  $need = $total - $maxChars;
+  for ($i = count($messages) - 1; $i >= 0 && $need > 0; $i--) {
+    if (!isset($messages[$i]) || !is_array($messages[$i])) continue;
+    $role = (string)($messages[$i]['role'] ?? '');
+    if ($role !== 'user') continue;
+    $c = (string)($messages[$i]['content'] ?? '');
+    $l = mb_strlen($c, 'UTF-8');
+    if ($l <= 0) continue;
+    $drop = min($need, (int)floor($l * 0.6));
+    if ($drop < 200) $drop = min($need, min(2000, $l));
+    $keep = max(0, $l - $drop);
+    $messages[$i]['content'] = $keep > 0 ? mb_substr($c, -$keep, null, 'UTF-8') : '';
+    $need -= $drop;
+  }
+  return $messages;
+}
+
 function proxy_chat(mysqli $db, array $payload, int $user_id) {
   $prompt = trim((string)($payload['prompt'] ?? ''));
   $model  = (string)($payload['model'] ?? 'gpt-4o-mini');
@@ -167,6 +217,15 @@ function proxy_chat(mysqli $db, array $payload, int $user_id) {
     return;
   }
   $cfg = get_model_config($db, $model, 'chat');
+  $maxInCfg = (int)($cfg['max_input_tokens'] ?? 0);
+  $maxOutCfg = (int)($cfg['max_output_tokens'] ?? 0);
+  if ($maxInCfg > 0) {
+    $prompt = clip_text_by_chars($prompt, approx_token_to_char_limit($maxInCfg));
+  }
+  $maxTokens = (int)($payload['max_tokens'] ?? 0);
+  if ($maxTokens <= 0) $maxTokens = $maxOutCfg > 0 ? $maxOutCfg : 12000;
+  if ($maxOutCfg > 0 && $maxTokens > $maxOutCfg) $maxTokens = $maxOutCfg;
+  if ($maxTokens < 64) $maxTokens = 64;
   $provider = $cfg['provider'] ?? 'openai';
   $api_key = get_api_key($db, $provider, $user_id);
   if (!$api_key) {
@@ -185,6 +244,7 @@ function proxy_chat(mysqli $db, array $payload, int $user_id) {
     ],
     'response_format' => ['type' => 'json_object'],
     'temperature' => 0.7,
+    'max_tokens' => $maxTokens,
   ], JSON_UNESCAPED_UNICODE);
 
   $ch = curl_init($url);
@@ -353,6 +413,12 @@ if ($type === 'modul_ajar') {
     http_response_code(400); echo json_encode(['error'=>'Messages kosong']); exit;
   }
   $cfg     = get_model_config($mysqli, $model, 'chat');
+  $maxInCfg = (int)($cfg['max_input_tokens'] ?? 0);
+  $maxOutCfg = (int)($cfg['max_output_tokens'] ?? 0);
+  if ($maxOutCfg > 0 && $maxTokens > $maxOutCfg) $maxTokens = $maxOutCfg;
+  if ($maxInCfg > 0) {
+    $messages = clip_messages_to_char_limit($messages, approx_token_to_char_limit($maxInCfg));
+  }
   $provider= $cfg['provider'] ?? 'openai';
   $api_key = get_api_key($mysqli, $provider, $user_id);
   if (!$api_key) {
@@ -399,17 +465,23 @@ if ($type === 'rpp') {
     http_response_code(400); echo json_encode(['error'=>'Messages kosong']); exit;
   }
   $cfg     = get_model_config($mysqli, $model, 'chat');
+  $maxInCfg = (int)($cfg['max_input_tokens'] ?? 0);
+  $maxOutCfg = (int)($cfg['max_output_tokens'] ?? 0);
+  if ($maxInCfg > 0) {
+    $messages = clip_messages_to_char_limit($messages, approx_token_to_char_limit($maxInCfg));
+  }
   $provider= $cfg['provider'] ?? 'openai';
   $api_key = get_api_key($mysqli, $provider, $user_id);
   if (!$api_key) {
     http_response_code(500); echo json_encode(['error'=>'API key tidak tersedia']); exit;
   }
   $url      = $cfg['endpoint_url'] ?? 'https://api.openai.com/v1/chat/completions';
+  $maxTokens = $maxOutCfg > 0 ? min(4000, $maxOutCfg) : 4000;
   $postData = json_encode([
     'model'       => $model,
     'messages'    => $messages,
     'temperature' => 0.7,
-    'max_tokens'  => 4000,
+    'max_tokens'  => $maxTokens,
   ], JSON_UNESCAPED_UNICODE);
   $ch = curl_init($url);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
