@@ -1,147 +1,346 @@
+File: `index.php`
 
-● nginx.service - A high performance web server and a reverse proxy server
-     Loaded: loaded (/usr/lib/systemd/system/nginx.service; enabled; preset: en>
-     Active: active (running) since Mon 2026-04-06 19:32:50 WIB; 1 week 2 days >
-       Docs: man:nginx(8)
-    Process: 955 ExecStartPre=/usr/sbin/nginx -t -q -g daemon on; master_proces>
-    Process: 966 ExecStart=/usr/sbin/nginx -g daemon on; master_process on; (co>
-    Process: 259437 ExecReload=/usr/sbin/nginx -g daemon on; master_process on;>
-   Main PID: 971 (nginx)
-      Tasks: 3 (limit: 4601)
-     Memory: 43.9M (peak: 56.3M)
-        CPU: 3min 30.454s
-     CGroup: /system.slice/nginx.service
-             ├─   971 "nginx: master process /usr/sbin/nginx -g daemon on; mast>
-             ├─259439 "nginx: worker process"
-             └─259440 "nginx: worker process"
+KONTEKS: Halaman Identitas section di renderIdentitas (sekitar baris 8503-8700) berisi 9+ field. Kebanyakan field cuma muncul di kop lembar soal cetak, tidak mempengaruhi soal yang dibuat AI. Saya mau pisahkan field inti (4 saja) dari field cosmetic (sisanya ke Pengaturan Lanjutan).
 
-Apr 06 19:32:50 server.soalpintar.com systemd[1]: Starting nginx.service - A hi>
-Apr 06 19:32:50 server.soalpintar.com systemd[1]: Started nginx.service - A hig>
-Apr 14 13:26:15 server.soalpintar.com systemd[1]: Reloading nginx.service - A h>
-Apr 14 13:26:15 server.soalpintar.com nginx[259437]: 2026/04/14 13:26:15 [notic>
-Apr 14 13:26:15 server.soalpintar.com systemd[1]: Reloaded nginx.service - A hi>
-lines 1-21/21 (END)
-2026/04/16 00:23:33 [error] 259440#259440: *180168 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 103.190.47.73, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 00:24:49 [error] 259440#259440: *180170 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 103.190.47.73, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 00:28:22 [error] 259439#259439: *180189 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 125.165.136.229, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 00:38:20 [error] 259439#259439: *180281 open() "/var/www/soalpintar/server.js" failed (2: No such file or directory), client: 198.41.227.183, server: pinterin.my.id, request: "GET /server.js HTTP/1.1", host: "endlesslove.id"
-2026/04/16 00:49:12 [error] 259439#259439: *180390 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.47.21, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 01:08:05 [error] 259440#259440: *180783 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 180.242.14.59, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 01:15:57 [error] 259439#259439: *180826 directory index of "/var/www/soalpintar/.git/" is forbidden, client: 94.26.88.31, server: pinterin.my.id, request: "GET /.git/ HTTP/1.1", host: "203.194.113.151"
-2026/04/16 01:48:50 [error] 259439#259439: *181073 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 81.29.142.100, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "203.194.113.151"
-2026/04/16 01:54:28 [error] 259440#259440: *181208 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 104.23.209.80, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "endlesslove.id"
-2026/04/16 01:57:36 [error] 259439#259439: *181226 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 104.23.199.164, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "endlesslove.id", referrer: "https://endlesslove.id"
-2026/04/16 04:12:15 [error] 259440#259440: *182089 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.85.219.250, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 04:14:34 [error] 259439#259439: *182112 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.10.129.125, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 04:23:08 [error] 259440#259440: *182158 directory index of "/var/www/soalpintar/uploads/" is forbidden, client: 161.97.158.68, server: pinterin.my.id, request: "GET /uploads/ HTTP/1.1", host: "pinterin.my.id", referrer: "binance.com"
-2026/04/16 04:28:49 [error] 259439#259439: *182174 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.5.146.199, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 04:32:38 [error] 259439#259439: *182199 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 103.251.8.191, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 04:39:02 [error] 259440#259440: *182228 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.76.195.24, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 04:50:25 [error] 259440#259440: *182282 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.85.219.250, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 04:59:13 [error] 259439#259439: *182327 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.85.219.250, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 05:02:57 [error] 259440#259440: *182349 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.83.127.201, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 05:02:57 [error] 259440#259440: *182349 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.83.127.201, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 05:02:58 [error] 259440#259440: *182352 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.83.127.201, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 05:03:02 [error] 259440#259440: *182350 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.83.113.183, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 05:03:03 [error] 259440#259440: *182352 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.83.127.201, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 05:03:57 [error] 259440#259440: *182350 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.83.113.183, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 05:03:57 [error] 259440#259440: *182352 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.83.127.201, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 05:13:48 [error] 259439#259439: *182401 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.2.100.149, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 05:28:17 [error] 259440#259440: *182515 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.170.126, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 05:28:28 [error] 259440#259440: *182519 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.2.38.21, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 05:29:35 [error] 259440#259440: *182529 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.170.126, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 05:31:37 [error] 259439#259439: *182573 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.170.126, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 05:32:04 [error] 259439#259439: *182587 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.170.126, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 05:33:01 [error] 259439#259439: *182587 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.170.126, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 05:42:31 [error] 259439#259439: *182696 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 157.10.4.19, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 05:58:25 [error] 259439#259439: *182814 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.125.232.146, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 05:59:47 [error] 259440#259440: *182826 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 103.165.250.19, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:00:12 [error] 259440#259440: *182829 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.125.232.146, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:03:56 [error] 259439#259439: *182946 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.125.232.146, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:05:41 [error] 259439#259439: *182981 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.125.232.146, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:07:18 [error] 259440#259440: *182996 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 121.101.130.143, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:21:07 [error] 259439#259439: *183044 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 158.140.171.89, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:22:20 [error] 259439#259439: *183051 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.70.49.79, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:23:00 [error] 259439#259439: *183054 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 180.253.141.236, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:27:36 [error] 259440#259440: *183095 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 140.213.133.247, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:28:05 [error] 259440#259440: *183100 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 163.61.201.87, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:29:12 [error] 259440#259440: *183127 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.125.232.114, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:33:01 [error] 259439#259439: *183195 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.79.38.168, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:34:19 [error] 259440#259440: *183204 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.170.126, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 06:34:20 [error] 259440#259440: *183204 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.170.126, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 06:35:29 [error] 259440#259440: *183221 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.170.126, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 06:35:49 [error] 259440#259440: *183228 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.65.110, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:39:20 [error] 259439#259439: *183278 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.79.38.168, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 06:42:36 [error] 259440#259440: *183321 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.170.126, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 06:43:40 [error] 259440#259440: *183332 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.182.201, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/soal_view.php?id=585"
-2026/04/16 06:44:23 [error] 259440#259440: *183338 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.183.110, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/soal_view.php?id=585"
-2026/04/16 06:45:10 [error] 259440#259440: *183350 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.157.202, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php?e=busy"
-2026/04/16 06:45:10 [error] 259440#259440: *183353 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.157.202, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 06:45:20 [error] 259440#259440: *183350 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.157.202, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 06:45:21 [error] 259440#259440: *183353 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.157.202, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 06:45:42 [error] 259440#259440: *183351 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.157.202, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 06:45:43 [error] 259440#259440: *183353 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.157.202, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 06:46:21 [error] 259439#259439: *183375 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.157.202, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:46:42 [error] 259439#259439: *183380 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.122.231.252, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:47:07 [error] 259439#259439: *183386 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.157.202, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 06:47:07 [error] 259439#259439: *183391 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.157.202, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 06:48:50 [error] 259440#259440: *183408 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.157.202, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 06:48:51 [error] 259440#259440: *183414 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.157.202, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 06:51:07 [error] 259439#259439: *183461 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 119.235.220.219, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:51:45 [error] 259439#259439: *183477 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.170.126, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/soal_view.php?id=585"
-2026/04/16 06:52:32 [error] 259440#259440: *183491 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.76.128.49, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:52:32 [error] 259439#259439: *183486 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.170.126, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 06:55:57 [error] 259440#259440: *183534 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.8.97.80, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:57:33 [error] 259439#259439: *183549 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.125.170.99, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/soal_view.php?id=560"
-2026/04/16 06:57:36 [error] 259439#259439: *183555 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 103.71.161.34, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/soal_view.php?id=504"
-2026/04/16 06:58:41 [error] 259440#259440: *183577 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.181.253, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 06:58:45 [error] 259440#259440: *183578 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.170.126, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 07:00:07 [error] 259440#259440: *183593 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.132.152, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:03:15 [error] 259439#259439: *183625 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.2.202.8, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:06:10 [error] 259439#259439: *183666 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 125.163.79.243, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:06:11 [error] 259439#259439: *183666 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 125.163.79.243, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:06:12 [error] 259440#259440: *183668 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 125.163.79.243, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 07:06:14 [error] 259439#259439: *183666 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 125.163.79.243, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 07:06:15 [error] 259440#259440: *183668 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 125.163.79.243, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 07:06:35 [error] 259439#259439: *183666 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 125.163.79.243, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 07:06:36 [error] 259440#259440: *183668 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 125.163.79.243, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 07:07:32 [error] 259439#259439: *183691 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.70.49.79, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:08:41 [error] 259439#259439: *183723 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.2.202.8, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:14:16 [error] 259440#259440: *183860 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 180.241.30.165, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:16:55 [error] 259440#259440: *183916 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 180.242.104.184, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:17:17 [error] 259440#259440: *183922 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.73.101.52, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:18:45 [error] 259439#259439: *183954 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 104.22.18.10, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "endlesslove.id", referrer: "https://endlesslove.id/login.php"
-2026/04/16 07:19:20 [error] 259439#259439: *183969 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.2.202.8, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:22:59 [error] 259439#259439: *184045 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 103.184.167.10, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:24:08 [error] 259440#259440: *184079 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 103.184.167.10, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:33:05 [error] 259439#259439: *184216 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.77.170.77, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:33:25 [error] 259439#259439: *184223 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.73.101.52, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:40:49 [error] 259440#259440: *184365 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.135.188, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:44:50 [error] 259439#259439: *184463 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 140.213.31.66, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:45:27 [error] 259439#259439: *184491 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 36.70.49.79, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:45:40 [error] 259439#259439: *184493 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 140.213.133.189, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:45:53 [error] 259440#259440: *184499 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 140.213.21.38, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:45:53 [error] 259440#259440: *184500 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 140.213.21.38, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:47:19 [error] 259440#259440: *184551 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.5.236.200, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:47:27 [error] 259439#259439: *184563 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 125.166.95.157, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:48:03 [error] 259439#259439: *184577 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.125.31.147, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:49:00 [error] 259439#259439: *184640 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.122.105.247, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:49:10 [error] 259439#259439: *184656 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.65.110, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:49:30 [error] 259439#259439: *184661 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.10.65.110, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 07:50:02 [error] 259440#259440: *184678 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 180.242.57.129, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:50:32 [error] 259440#259440: *184699 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.185.230, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:51:25 [error] 259439#259439: *184752 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 114.125.31.147, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:51:26 [error] 259439#259439: *184759 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 125.166.95.157, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:53:21 [error] 259439#259439: *184831 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 125.166.95.157, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:55:10 [error] 259439#259439: *184882 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 125.162.213.105, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:55:11 [error] 259440#259440: *184884 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 202.65.224.135, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:55:12 [error] 259440#259440: *184884 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 202.65.224.135, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:55:12 [error] 259440#259440: *184890 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 202.65.224.135, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 07:55:29 [error] 259440#259440: *184884 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 202.65.224.135, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 07:55:30 [error] 259440#259440: *184890 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 202.65.224.135, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-2026/04/16 07:58:01 [error] 259440#259440: *184987 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.5.250, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:59:08 [error] 259439#259439: *185029 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 111.68.24.114, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 07:59:50 [error] 259440#259440: *185064 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 182.1.20.238, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/login.php"
-2026/04/16 08:00:57 [error] 259439#259439: *185123 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 202.65.224.135, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id", referrer: "https://pinterin.my.id/index.php"
-2026/04/16 08:00:58 [error] 259439#259439: *185130 open() "/var/www/soalpintar/favicon.ico" failed (2: No such file or directory), client: 202.65.224.135, server: pinterin.my.id, request: "GET /favicon.ico HTTP/1.1", host: "pinterin.my.id"
-root@server:/var/www/soalpintar#
+---
+
+## A. KLASIFIKASI FIELD
+
+### Field INTI (selalu terlihat, di section utama):
+1. **Jenjang** — mempengaruhi vocabulary & kompleksitas AI
+2. **Kelas** — mempengaruhi tingkat kesulitan AI
+3. **Mata Pelajaran** — domain knowledge AI
+4. **Sumber Materi / Acuan Utama** — topik soal yang akan dibuat
+
+### Field LANJUTAN (collapse, default tertutup):
+
+**Sub-grup 1: "Identitas Kop Lembar Soal"**
+- Nama Guru
+- Nama Sekolah
+- Logo Sekolah
+- Tahun Ajaran
+- Judul Paket Soal
+- Semester (kalau ada)
+
+**Sub-grup 2: "Untuk Power User"**
+- Perintah Khusus
+
+### Field yang DIHAPUS dari UI:
+- **Fase** — auto-derive dari Jenjang + Kelas (logic backend tetap ada, tapi tidak ditampilkan input-nya)
+
+---
+
+## B. STRUKTUR HTML BARU
+
+Cari renderIdentitas (sekitar baris 8503). Ubah struktur jadi:
+
+```html
+<!-- SECTION UTAMA -->
+<div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark p-5 md:p-6 mb-3">
+  
+  <div class="flex items-start justify-between mb-5">
+    <div>
+      <div class="text-lg font-medium">Identitas Soal</div>
+      <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-0.5">
+        Yang mempengaruhi soal yang dibuat AI
+      </div>
+    </div>
+  </div>
+
+  <!-- Row 1: 3 kolom utama -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+    <div>
+      <label class="text-sm font-medium block mb-2">Jenjang</label>
+      <select onchange="..." class="w-full h-10 ...">
+        <!-- options -->
+      </select>
+    </div>
+    <div>
+      <label class="text-sm font-medium block mb-2">Kelas</label>
+      <select onchange="..." class="w-full h-10 ...">
+        <!-- options -->
+      </select>
+    </div>
+    <div>
+      <label class="text-sm font-medium block mb-2">Mata Pelajaran</label>
+      <select onchange="..." class="w-full h-10 ...">
+        <!-- options -->
+      </select>
+    </div>
+  </div>
+
+  <!-- Sumber Materi (textarea besar) -->
+  <div>
+    <label class="text-sm font-medium block mb-2">Sumber Materi / Acuan Utama</label>
+    <textarea onchange="..." 
+              class="w-full min-h-[110px] px-3 py-2.5 text-sm rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark resize-y"
+              placeholder="Tempel materi pelajaran di sini atau unggah dari file/buku..."></textarea>
+    
+    <div class="flex gap-2 mt-2.5 flex-wrap">
+      <button onclick="window.__sp.openFotoBuku()" class="h-9 px-3.5 text-xs ...">
+        <span class="material-symbols-outlined text-[16px] -mt-0.5 mr-1">photo_camera</span>
+        Foto Buku
+      </button>
+      <button onclick="window.__sp.openUploadFile()" class="h-9 px-3.5 text-xs ...">
+        <span class="material-symbols-outlined text-[16px] -mt-0.5 mr-1">upload_file</span>
+        Unggah PDF/Word
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<!-- PENGATURAN LANJUTAN (collapse) -->
+<details class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark group">
+  <summary class="px-5 md:px-6 py-4 cursor-pointer flex items-center gap-3 list-none">
+    <span class="material-symbols-outlined text-[22px] text-text-sub-light dark:text-text-sub-dark flex-shrink-0">settings</span>
+    <div class="flex-1 min-w-0">
+      <div class="text-sm md:text-base font-medium">Pengaturan Lanjutan</div>
+      <div class="text-xs md:text-sm text-text-sub-light dark:text-text-sub-dark mt-0.5">
+        Identitas kop, semester, perintah khusus
+      </div>
+    </div>
+    <span class="bg-background-light dark:bg-background-dark text-text-sub-light dark:text-text-sub-dark px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0">
+      7 pengaturan
+    </span>
+    <span class="material-symbols-outlined text-[18px] text-text-sub-light dark:text-text-sub-dark group-open:rotate-180 transition-transform">expand_more</span>
+  </summary>
+
+  <div class="px-5 md:px-6 pb-6 border-t border-border-light dark:border-border-dark">
+    
+    <!-- Sub-grup 1: Identitas Kop -->
+    <div class="pt-4">
+      <div class="text-xs font-medium text-text-sub-light dark:text-text-sub-dark uppercase tracking-wide mb-3">
+        Identitas Kop Lembar Soal
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 mb-3.5">
+        <div>
+          <label class="text-xs md:text-sm font-medium block mb-1.5">Nama Guru</label>
+          <input type="text" 
+                 value="${escapeHtml(p.namaGuru || __userProfile.nama || '')}"
+                 onchange="updatePaket('namaGuru', this.value)"
+                 class="w-full h-9 md:h-10 px-3 text-sm ..." />
+        </div>
+        <div>
+          <label class="text-xs md:text-sm font-medium block mb-1.5">Nama Sekolah</label>
+          <input type="text" 
+                 value="${escapeHtml(p.namaSekolah || __userProfile.nama_sekolah || '')}"
+                 onchange="updatePaket('namaSekolah', this.value)"
+                 class="w-full h-9 md:h-10 px-3 text-sm ..." />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 mb-3.5">
+        <div>
+          <label class="text-xs md:text-sm font-medium block mb-1.5">Logo Sekolah</label>
+          <!-- Logo uploader yang sudah ada, tinggal copy-paste -->
+        </div>
+        <div>
+          <label class="text-xs md:text-sm font-medium block mb-1.5">Tahun Ajaran</label>
+          <input type="text" 
+                 value="${escapeHtml(p.tahunAjaran || '')}"
+                 onchange="updatePaket('tahunAjaran', this.value)"
+                 class="w-full h-9 md:h-10 px-3 text-sm ..." />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+        <div class="md:col-span-2">
+          <label class="text-xs md:text-sm font-medium block mb-1.5">Judul Paket Soal</label>
+          <input type="text" 
+                 value="${escapeHtml(p.judul || '')}"
+                 onchange="updatePaket('judul', this.value)"
+                 placeholder="Contoh: Penilaian Harian Sistem Pencernaan"
+                 class="w-full h-9 md:h-10 px-3 text-sm ..." />
+        </div>
+        <div>
+          <label class="text-xs md:text-sm font-medium block mb-1.5">Semester</label>
+          <select onchange="updatePaket('semester', this.value)" class="w-full h-9 md:h-10 text-sm ...">
+            <option value="">— Pilih —</option>
+            <option value="ganjil" ${p.semester === 'ganjil' ? 'selected' : ''}>Ganjil</option>
+            <option value="genap" ${p.semester === 'genap' ? 'selected' : ''}>Genap</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sub-grup 2: Power User -->
+    <div class="pt-5 mt-4 border-t border-border-light dark:border-border-dark">
+      <div class="text-xs font-medium text-text-sub-light dark:text-text-sub-dark uppercase tracking-wide mb-3">
+        Untuk Power User
+      </div>
+
+      <div>
+        <label class="text-xs md:text-sm font-medium block mb-1.5">Perintah Khusus untuk AI</label>
+        <textarea onchange="updatePaket('perintahKhusus', this.value)"
+                  class="w-full min-h-[70px] px-3 py-2 text-sm rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark resize-y"
+                  placeholder='Contoh: "Perbanyak soal cerita" atau "Gunakan Bahasa Jawa ngoko"'>${escapeHtml(p.perintahKhusus || '')}</textarea>
+      </div>
+    </div>
+
+  </div>
+</details>
+```
+
+---
+
+## C. AUTO-DERIVE FASE DARI JENJANG + KELAS
+
+Field "Fase" dihapus dari UI tapi state.paket.fase harus tetap terisi otomatis.
+
+Tambahkan fungsi helper:
+
+```javascript
+function deriveFase(jenjang, kelas) {
+  // Fase Kurikulum Merdeka
+  if (jenjang === 'PAUD') return 'Fondasi';
+  if (jenjang === 'TK') return 'Fondasi';
+  
+  if (jenjang === 'SD/MI') {
+    if (['Kelas 1', 'Kelas 2'].includes(kelas)) return 'Fase A';
+    if (['Kelas 3', 'Kelas 4'].includes(kelas)) return 'Fase B';
+    if (['Kelas 5', 'Kelas 6'].includes(kelas)) return 'Fase C';
+  }
+  
+  if (jenjang === 'SMP/MTs') {
+    return 'Fase D';
+  }
+  
+  if (jenjang === 'SMA/MA') {
+    if (kelas === 'Kelas 10') return 'Fase E';
+    if (['Kelas 11', 'Kelas 12'].includes(kelas)) return 'Fase F';
+  }
+  
+  if (jenjang === 'SMK/MAK') {
+    if (kelas === 'Kelas 10') return 'Fase E';
+    if (['Kelas 11', 'Kelas 12', 'Kelas 13'].includes(kelas)) return 'Fase F';
+  }
+  
+  return '';
+}
+```
+
+Lalu di handler onChange Jenjang & Kelas, panggil:
+
+```javascript
+state.paket.fase = deriveFase(state.paket.jenjang, state.paket.kelas);
+saveDebounced(true);
+render();
+```
+
+PENTING: Pastikan logic lain yang pakai `state.paket.fase` (mis. prompt OpenAI, kop dokumen Word/PDF) tetap berfungsi dengan fase yang auto-derived.
+
+---
+
+## D. TAMBAHKAN BADGE DI PENGATURAN LANJUTAN
+
+Saat user sudah mengisi setting di Pengaturan Lanjutan, tampilkan indicator visual supaya jelas:
+
+```html
+<span class="...badge..." id="lanjutanBadge">
+  ${countFilledLanjutan()} pengaturan
+</span>
+```
+
+Di mana `countFilledLanjutan()`:
+
+```javascript
+function countFilledLanjutan() {
+  const p = state.paket || {};
+  let count = 0;
+  if ((p.namaGuru || '').trim()) count++;
+  if ((p.namaSekolah || '').trim()) count++;
+  if (p.logo) count++;
+  if ((p.tahunAjaran || '').trim()) count++;
+  if ((p.judul || '').trim()) count++;
+  if ((p.semester || '').trim()) count++;
+  if ((p.perintahKhusus || '').trim()) count++;
+  return count > 0 ? `${count} terisi` : '7 pengaturan';
+}
+```
+
+Saat ada yang terisi, badge berubah jadi "3 terisi" dengan warna primary (biru) untuk visual feedback.
+
+---
+
+## E. PRE-FILL DARI PROFIL USER (Phase 5 sebelumnya)
+
+Saat first time buka halaman, pre-fill dari profil:
+
+```javascript
+function initIdentitasFromProfile() {
+  if (!state.paket.namaGuru && __userProfile.nama) {
+    state.paket.namaGuru = __userProfile.nama;
+  }
+  if (!state.paket.namaSekolah && __userProfile.nama_sekolah) {
+    state.paket.namaSekolah = __userProfile.nama_sekolah;
+  }
+  if (!state.paket.jenjang && __userProfile.jenjang) {
+    state.paket.jenjang = __userProfile.jenjang;
+  }
+  if (!state.paket.tahunAjaran) {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth() + 1;
+    state.paket.tahunAjaran = m >= 7 ? `${y}/${y+1}` : `${y-1}/${y}`;
+  }
+}
+```
+
+Panggil di state init.
+
+---
+
+## F. CARA VERIFIKASI
+
+1. ✅ Section utama: cuma 4 field (Jenjang, Kelas, Mata Pelajaran, Sumber Materi)
+2. ✅ Field "Fase" tidak tampil di UI, tapi state.paket.fase tetap terisi otomatis
+3. ✅ "Pengaturan Lanjutan" collapse by default, ada badge "7 pengaturan"
+4. ✅ Klik expand → muncul 2 sub-grup (Identitas Kop, Power User)
+5. ✅ Sub-grup "Identitas Kop": 6 field (Nama Guru, Nama Sekolah, Logo, Tahun Ajaran, Judul Paket, Semester)
+6. ✅ Sub-grup "Power User": 1 field (Perintah Khusus)
+7. ✅ Saat ada setting yang terisi, badge berubah "3 terisi" (warna primary)
+8. ✅ Pre-fill profil bekerja saat first time buka
+9. ✅ Generate soal tetap berfungsi (cek prompt OpenAI sudah include semua data yang perlu)
+10. ✅ Export Word/PDF tetap include kop dengan benar (Nama Guru, Sekolah, Logo, Tahun Ajaran, Judul, Semester)
+
+---
+
+## G. VALIDASI SEBELUM GENERATE
+
+Pastikan validasi `validateIdentitas()` tetap berfungsi. Cek field wajib:
+- Jenjang ✓
+- Kelas ✓
+- Mata Pelajaran ✓
+- Sumber Materi ✓
+
+Untuk field di Pengaturan Lanjutan (Nama Guru, Sekolah, dll.), tetap validasi kalau ada di prompt original tapi:
+- Kalau kosong: kasih default value yang masuk akal
+- ATAU: skip kop di lembar soal kalau benar-benar kosong
+
+JANGAN PAKSA user buka Pengaturan Lanjutan kalau cuma untuk validasi yang sebelumnya wajib (mis. Tahun Ajaran).
+
+Sarankan: Tahun Ajaran auto-fill, Judul Paket auto-generate dari mapel+materi kalau kosong.
+
+---
+
+## H. YANG TIDAK BOLEH DIUBAH
+
+- JANGAN hapus state.paket field manapun (semua field tetap ada di data)
+- JANGAN ubah API endpoint atau database schema
+- JANGAN ubah logic generate soal
+- JANGAN ubah export Word/PDF (semua field kop tetap dipakai)
+- JANGAN ubah modal Help yang sudah ada
+
+## I. FILE YANG DIEDIT
+
+- `index.php` saja
+
+## J. OUTPUT YANG DIHARAPKAN
+
+1. Diff sebelum/sesudah untuk renderIdentitas
+2. Konfirmasi 4 field inti di section utama
+3. Konfirmasi 7 field cosmetic di Pengaturan Lanjutan
+4. Konfirmasi field Fase auto-derive bekerja
+5. Test generate soal sukses dengan & tanpa expand Pengaturan Lanjutan

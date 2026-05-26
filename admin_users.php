@@ -15,6 +15,8 @@ $hasAccessQuizCol = false;
 $hasAccessRekapCol = false;
 $hasAccessBuatSoalCol = false;
 $hasAccessModulAjarCol = false;
+$hasAccessBahanAjarCol = false;
+$hasAccessLkpdInteraktifCol = false;
 $hasAccessRppCol = false;
 $hasNamaCol = false;
 $hasJenjangCol = false;
@@ -24,8 +26,24 @@ try {
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_rekap_nilai'")) { $hasAccessRekapCol = $rs->num_rows > 0; $rs->close(); }
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_buat_soal'")) { $hasAccessBuatSoalCol = $rs->num_rows > 0; $rs->close(); }
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_modul_ajar'")) { $hasAccessModulAjarCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_bahan_ajar'")) { $hasAccessBahanAjarCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_lkpd_interaktif'")) { $hasAccessLkpdInteraktifCol = $rs->num_rows > 0; $rs->close(); }
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_rpp'")) { $hasAccessRppCol = $rs->num_rows > 0; $rs->close(); }
-  $hasAccessCols = $hasAccessQuizCol || $hasAccessRekapCol || $hasAccessBuatSoalCol || $hasAccessModulAjarCol || $hasAccessRppCol;
+  $hasAccessCols = $hasAccessQuizCol || $hasAccessRekapCol || $hasAccessBuatSoalCol || $hasAccessModulAjarCol || $hasAccessBahanAjarCol || $hasAccessLkpdInteraktifCol || $hasAccessRppCol;
+
+  if (!$hasAccessBahanAjarCol) {
+    try {
+      $mysqli->query("ALTER TABLE users ADD COLUMN access_bahan_ajar TINYINT(1) NOT NULL DEFAULT 1");
+      $hasAccessBahanAjarCol = true;
+    } catch (mysqli_sql_exception $e) {}
+  }
+  if (!$hasAccessLkpdInteraktifCol) {
+    try {
+      $mysqli->query("ALTER TABLE users ADD COLUMN access_lkpd_interaktif TINYINT(1) NOT NULL DEFAULT 1");
+      $hasAccessLkpdInteraktifCol = true;
+    } catch (mysqli_sql_exception $e) {}
+  }
+
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'no_hp'")) { $hasNoHpCol = $rs->num_rows > 0; $rs->close(); }
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'nama'")) { $hasNamaCol = $rs->num_rows > 0; $rs->close(); }
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'jenjang'")) { $hasJenjangCol = $rs->num_rows > 0; $rs->close(); }
@@ -37,6 +55,8 @@ try {
   $hasAccessRekapCol = false;
   $hasAccessBuatSoalCol = false;
   $hasAccessModulAjarCol = false;
+  $hasAccessBahanAjarCol = false;
+  $hasAccessLkpdInteraktifCol = false;
   $hasAccessRppCol = false;
   $hasNamaCol = false;
   $hasJenjangCol = false;
@@ -85,8 +105,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accessRekap = isset($_POST['access_rekap_nilai']) ? 1 : 0;
     $accessBuatSoal = isset($_POST['access_buat_soal']) ? 1 : 0;
     $accessModulAjar = isset($_POST['access_modul_ajar']) ? 1 : 0;
+    $accessBahanAjar = isset($_POST['access_bahan_ajar']) ? 1 : 0;
+    $accessLkpdInteraktif = isset($_POST['access_lkpd_interaktif']) ? 1 : 0;
     $accessRpp = isset($_POST['access_rpp']) ? 1 : 0;
-    if ($role === 'admin') { $accessQuiz = 1; $accessRekap = 1; $accessBuatSoal = 1; $accessModulAjar = 1; $accessRpp = 1; }
+    if ($role === 'admin') { $accessQuiz = 1; $accessRekap = 1; $accessBuatSoal = 1; $accessModulAjar = 1; $accessBahanAjar = 1; $accessLkpdInteraktif = 1; $accessRpp = 1; }
 
     if ($username === '' || $password === '') {
       $error = 'Username dan password wajib diisi.';
@@ -120,6 +142,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($hasAccessRekapCol) { $cols[] = 'access_rekap_nilai'; $types .= 'i'; $values[] = $accessRekap; }
         if ($hasAccessBuatSoalCol) { $cols[] = 'access_buat_soal'; $types .= 'i'; $values[] = $accessBuatSoal; }
         if ($hasAccessModulAjarCol) { $cols[] = 'access_modul_ajar'; $types .= 'i'; $values[] = $accessModulAjar; }
+        if ($hasAccessBahanAjarCol) { $cols[] = 'access_bahan_ajar'; $types .= 'i'; $values[] = $accessBahanAjar; }
+        if ($hasAccessLkpdInteraktifCol) { $cols[] = 'access_lkpd_interaktif'; $types .= 'i'; $values[] = $accessLkpdInteraktif; }
         if ($hasAccessRppCol) { $cols[] = 'access_rpp'; $types .= 'i'; $values[] = $accessRpp; }
         $cols[] = 'limitpaket'; $types .= 'i'; $values[] = $lp;
         $cols[] = 'limitgambar'; $types .= 'i'; $values[] = $lg;
@@ -165,6 +189,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accessRekap = isset($_POST['access_rekap_nilai']) ? 1 : 0;
     $accessBuatSoal = isset($_POST['access_buat_soal']) ? 1 : 0;
     $accessModulAjar = isset($_POST['access_modul_ajar']) ? 1 : 0;
+    $accessBahanAjar = isset($_POST['access_bahan_ajar']) ? 1 : 0;
+    $accessLkpdInteraktif = isset($_POST['access_lkpd_interaktif']) ? 1 : 0;
     $accessRpp = isset($_POST['access_rpp']) ? 1 : 0;
     if (strlen($nama) > 120) {
       $error = 'Nama terlalu panjang.';
@@ -192,6 +218,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       if ($hasAccessRekapCol) { $sets[] = 'access_rekap_nilai=?'; $types .= 'i'; $values[] = $accessRekap; }
       if ($hasAccessBuatSoalCol) { $sets[] = 'access_buat_soal=?'; $types .= 'i'; $values[] = $accessBuatSoal; }
       if ($hasAccessModulAjarCol) { $sets[] = 'access_modul_ajar=?'; $types .= 'i'; $values[] = $accessModulAjar; }
+      if ($hasAccessBahanAjarCol) { $sets[] = 'access_bahan_ajar=?'; $types .= 'i'; $values[] = $accessBahanAjar; }
+      if ($hasAccessLkpdInteraktifCol) { $sets[] = 'access_lkpd_interaktif=?'; $types .= 'i'; $values[] = $accessLkpdInteraktif; }
       if ($hasAccessRppCol) { $sets[] = 'access_rpp=?'; $types .= 'i'; $values[] = $accessRpp; }
       $values[] = $id; $types .= 'i';
       $sql = "UPDATE users SET " . implode(',', $sets) . " WHERE id=?";
@@ -301,8 +329,10 @@ try {
   $selAR = $hasAccessRekapCol ? 'access_rekap_nilai' : '1';
   $selABS = $hasAccessBuatSoalCol ? 'access_buat_soal' : '1';
   $selAMA = $hasAccessModulAjarCol ? 'access_modul_ajar' : '1';
+  $selABA = $hasAccessBahanAjarCol ? 'access_bahan_ajar' : '1';
+  $selALI = $hasAccessLkpdInteraktifCol ? 'access_lkpd_interaktif' : '1';
   $selARPP = $hasAccessRppCol ? 'access_rpp' : '1';
-  $baseSelect = "SELECT id, username, ($selNama) AS nama, ($selJenjang) AS jenjang, ($selNamaSekolah) AS nama_sekolah, ($selNoHp) AS no_hp, role, ($selAQ) AS access_quiz, ($selAR) AS access_rekap_nilai, ($selABS) AS access_buat_soal, ($selAMA) AS access_modul_ajar, ($selARPP) AS access_rpp, limitpaket, limitgambar, created_at FROM users";
+  $baseSelect = "SELECT id, username, ($selNama) AS nama, ($selJenjang) AS jenjang, ($selNamaSekolah) AS nama_sekolah, ($selNoHp) AS no_hp, role, ($selAQ) AS access_quiz, ($selAR) AS access_rekap_nilai, ($selABS) AS access_buat_soal, ($selAMA) AS access_modul_ajar, ($selABA) AS access_bahan_ajar, ($selALI) AS access_lkpd_interaktif, ($selARPP) AS access_rpp, limitpaket, limitgambar, created_at FROM users";
   if ($q !== '') {
     $like = '%' . $q . '%';
     if (ctype_digit($q)) {
@@ -387,6 +417,8 @@ if ($stmt) {
               <th class="border px-3 py-2 text-left">Role</th>
               <th class="border px-3 py-2 text-left">Akses Buat Soal</th>
               <th class="border px-3 py-2 text-left">Akses Modul Ajar</th>
+              <th class="border px-3 py-2 text-left">Akses Bahan Ajar</th>
+              <th class="border px-3 py-2 text-left">Akses LKPD Interaktif</th>
               <th class="border px-3 py-2 text-left">Akses RPP</th>
               <th class="border px-3 py-2 text-left">Akses Quiz</th>
               <th class="border px-3 py-2 text-left">Akses Rekap</th>
@@ -398,7 +430,7 @@ if ($stmt) {
           </thead>
           <tbody>
             <?php foreach ($users as $u): ?>
-              <tr data-row="<?php echo (int)$u['id']; ?>" data-u="<?php echo htmlspecialchars($u['username']); ?>" data-nama="<?php echo htmlspecialchars($u['nama'] ?? ''); ?>" data-jenjang="<?php echo htmlspecialchars($u['jenjang'] ?? ''); ?>" data-sekolah="<?php echo htmlspecialchars($u['nama_sekolah'] ?? ''); ?>" data-hp="<?php echo htmlspecialchars($u['no_hp'] ?? ''); ?>" data-role="<?php echo htmlspecialchars($u['role'] ?: 'user'); ?>" data-lp="<?php echo (int)($u['limitpaket'] ?? 0); ?>" data-lg="<?php echo (int)($u['limitgambar'] ?? 0); ?>" data-abs="<?php echo (int)($u['access_buat_soal'] ?? 1); ?>" data-ama="<?php echo (int)($u['access_modul_ajar'] ?? 1); ?>" data-arpp="<?php echo (int)($u['access_rpp'] ?? 1); ?>" data-aq="<?php echo (int)($u['access_quiz'] ?? 1); ?>" data-ar="<?php echo (int)($u['access_rekap_nilai'] ?? 1); ?>">
+              <tr data-row="<?php echo (int)$u['id']; ?>" data-u="<?php echo htmlspecialchars($u['username']); ?>" data-nama="<?php echo htmlspecialchars($u['nama'] ?? ''); ?>" data-jenjang="<?php echo htmlspecialchars($u['jenjang'] ?? ''); ?>" data-sekolah="<?php echo htmlspecialchars($u['nama_sekolah'] ?? ''); ?>" data-hp="<?php echo htmlspecialchars($u['no_hp'] ?? ''); ?>" data-role="<?php echo htmlspecialchars($u['role'] ?: 'user'); ?>" data-lp="<?php echo (int)($u['limitpaket'] ?? 0); ?>" data-lg="<?php echo (int)($u['limitgambar'] ?? 0); ?>" data-abs="<?php echo (int)($u['access_buat_soal'] ?? 1); ?>" data-ama="<?php echo (int)($u['access_modul_ajar'] ?? 1); ?>" data-aba="<?php echo (int)($u['access_bahan_ajar'] ?? 1); ?>" data-ali="<?php echo (int)($u['access_lkpd_interaktif'] ?? 1); ?>" data-arpp="<?php echo (int)($u['access_rpp'] ?? 1); ?>" data-aq="<?php echo (int)($u['access_quiz'] ?? 1); ?>" data-ar="<?php echo (int)($u['access_rekap_nilai'] ?? 1); ?>">
                 <td class="border px-3 py-2"><?php echo (int)$u['id']; ?></td>
                 <td class="border px-3 py-2"><?php echo htmlspecialchars($u['username']); ?></td>
                 <td class="border px-3 py-2"><?php echo htmlspecialchars($u['nama'] ?? ''); ?></td>
@@ -408,6 +440,8 @@ if ($stmt) {
                 <td class="border px-3 py-2"><?php echo htmlspecialchars($u['role'] ?: 'user'); ?></td>
                 <td class="border px-3 py-2"><?php echo ((int)($u['access_buat_soal'] ?? 1) === 1) ? 'Aktif' : 'Nonaktif'; ?></td>
                 <td class="border px-3 py-2"><?php echo ((int)($u['access_modul_ajar'] ?? 1) === 1) ? 'Aktif' : 'Nonaktif'; ?></td>
+                <td class="border px-3 py-2"><?php echo ((int)($u['access_bahan_ajar'] ?? 1) === 1) ? 'Aktif' : 'Nonaktif'; ?></td>
+                <td class="border px-3 py-2"><?php echo ((int)($u['access_lkpd_interaktif'] ?? 1) === 1) ? 'Aktif' : 'Nonaktif'; ?></td>
                 <td class="border px-3 py-2"><?php echo ((int)($u['access_rpp'] ?? 1) === 1) ? 'Aktif' : 'Nonaktif'; ?></td>
                 <td class="border px-3 py-2"><?php echo ((int)($u['access_quiz'] ?? 1) === 1) ? 'Aktif' : 'Nonaktif'; ?></td>
                 <td class="border px-3 py-2"><?php echo ((int)($u['access_rekap_nilai'] ?? 1) === 1) ? 'Aktif' : 'Nonaktif'; ?></td>
@@ -440,7 +474,7 @@ if ($stmt) {
               </tr>
             <?php endforeach; ?>
             <?php if (empty($users)): ?>
-              <tr><td colspan="16" class="border px-3 py-6 text-center text-gray-500">Belum ada pengguna.</td></tr>
+              <tr><td colspan="18" class="border px-3 py-6 text-center text-gray-500">Belum ada pengguna.</td></tr>
             <?php endif; ?>
           </tbody>
         </table>
@@ -515,6 +549,14 @@ if ($stmt) {
           <label class="inline-flex items-center gap-2 text-sm">
             <input id="modalAccessModulAjar" name="access_modul_ajar" type="checkbox">
             <span>Akses Modul Ajar</span>
+          </label>
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input id="modalAccessBahanAjar" name="access_bahan_ajar" type="checkbox">
+            <span>Akses Bahan Ajar</span>
+          </label>
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input id="modalAccessLkpdInteraktif" name="access_lkpd_interaktif" type="checkbox">
+            <span>Akses LKPD Interaktif</span>
           </label>
           <label class="inline-flex items-center gap-2 text-sm">
             <input id="modalAccessRpp" name="access_rpp" type="checkbox">
@@ -656,6 +698,14 @@ if ($stmt) {
             <span>Akses Modul Ajar</span>
           </label>
           <label class="inline-flex items-center gap-2 text-sm">
+            <input id="createAccessBahanAjar" name="access_bahan_ajar" type="checkbox">
+            <span>Akses Bahan Ajar</span>
+          </label>
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input id="createAccessLkpdInteraktif" name="access_lkpd_interaktif" type="checkbox">
+            <span>Akses LKPD Interaktif</span>
+          </label>
+          <label class="inline-flex items-center gap-2 text-sm">
             <input id="createAccessRpp" name="access_rpp" type="checkbox" checked>
             <span>Akses RPP</span>
           </label>
@@ -688,6 +738,8 @@ if ($stmt) {
     const inputLG = document.getElementById('modalLimitGambar');
     const inputABS = document.getElementById('modalAccessBuatSoal');
     const inputAMA = document.getElementById('modalAccessModulAjar');
+    const inputABA = document.getElementById('modalAccessBahanAjar');
+    const inputALI = document.getElementById('modalAccessLkpdInteraktif');
     const inputARPP = document.getElementById('modalAccessRpp');
     const inputAQ = document.getElementById('modalAccessQuiz');
     const inputAR = document.getElementById('modalAccessRekap');
@@ -716,6 +768,8 @@ if ($stmt) {
     const createLimitGambar = document.getElementById('createLimitGambar');
     const createAccessBuatSoal = document.getElementById('createAccessBuatSoal');
     const createAccessModulAjar = document.getElementById('createAccessModulAjar');
+    const createAccessBahanAjar = document.getElementById('createAccessBahanAjar');
+    const createAccessLkpdInteraktif = document.getElementById('createAccessLkpdInteraktif');
     const createAccessRpp = document.getElementById('createAccessRpp');
     const createAccessQuiz = document.getElementById('createAccessQuiz');
     const createAccessRekap = document.getElementById('createAccessRekap');
@@ -731,6 +785,8 @@ if ($stmt) {
       inputLG.value = row.getAttribute('data-lg') || '0';
       inputABS.checked = (row.getAttribute('data-abs') || '1') === '1';
       inputAMA.checked = (row.getAttribute('data-ama') || '1') === '1';
+      inputABA.checked = (row.getAttribute('data-aba') || '1') === '1';
+      inputALI.checked = (row.getAttribute('data-ali') || '1') === '1';
       inputARPP.checked = (row.getAttribute('data-arpp') || '1') === '1';
       inputAQ.checked = (row.getAttribute('data-aq') || '1') === '1';
       inputAR.checked = (row.getAttribute('data-ar') || '1') === '1';
@@ -775,6 +831,8 @@ if ($stmt) {
       createLimitGambar.value = '';
       createAccessBuatSoal.checked = true;
       createAccessModulAjar.checked = true;
+      createAccessBahanAjar.checked = false;
+      createAccessLkpdInteraktif.checked = false;
       createAccessRpp.checked = true;
       createAccessQuiz.checked = true;
       createAccessRekap.checked = true;

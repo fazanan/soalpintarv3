@@ -295,6 +295,17 @@ session_write_close();
           margin: 0 !important;
         }
       }
+      label.text-sm {
+        font-size: 1rem;
+      }
+      span.text-sm.font-semibold,
+      span.text-sm.font-medium {
+        font-size: 1rem;
+      }
+      .text-xs.text-text-sub-light,
+      .text-xs.text-text-sub-dark {
+        font-size: 0.875rem;
+      }
     </style>
   </head>
   <body
@@ -540,6 +551,10 @@ session_write_close();
     <input id="topikImgUpload" type="file" accept="image/*" multiple class="hidden" />
     <input id="topikTxtUpload" type="file" accept=".txt,.md,.markdown,.csv,.json,.html,.htm" class="hidden" />
     <input id="topikPdfUpload" type="file" accept="application/pdf" class="hidden" />
+    <input id="bahanAjarModulPdfUpload" type="file" accept="application/pdf" class="hidden" />
+    <input id="bahanAjarImagesUpload" type="file" accept="image/*" multiple class="hidden" />
+    <input id="lkpdInteraktifModulPdfUpload" type="file" accept="application/pdf" class="hidden" />
+    <input id="lkpdInteraktifImagesUpload" type="file" accept="image/*" multiple class="hidden" />
     <input id="rosterPicker" type="file" accept=".csv,.txt" class="hidden" />
     <input id="rekapExcelPicker" type="file" accept=".xlsx,.xls" class="hidden" />
     <input id="rekapPrintLogoPicker" type="file" accept="image/*" class="hidden" />
@@ -552,11 +567,15 @@ session_write_close();
       const ACCESS_REKAP = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_rekap_nilai']) && (int)$_SESSION['access_rekap_nilai'] === 0) ? 'false' : 'true'); ?>;
       const ACCESS_BUAT_SOAL = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_buat_soal']) && (int)$_SESSION['access_buat_soal'] === 0) ? 'false' : 'true'); ?>;
       const ACCESS_MODUL_AJAR = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_modul_ajar']) && (int)$_SESSION['access_modul_ajar'] === 0) ? 'false' : 'true'); ?>;
+      const ACCESS_BAHAN_AJAR = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_bahan_ajar']) && (int)$_SESSION['access_bahan_ajar'] === 0) ? 'false' : 'true'); ?>;
+      const ACCESS_LKPD_INTERAKTIF = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_lkpd_interaktif']) && (int)$_SESSION['access_lkpd_interaktif'] === 0) ? 'false' : 'true'); ?>;
       const ACCESS_RPP = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_rpp']) && (int)$_SESSION['access_rpp'] === 0) ? 'false' : 'true'); ?>;
       const HAS_QUIZ_ACCESS = IS_ADMIN || ACCESS_QUIZ;
       const HAS_REKAP_ACCESS = IS_ADMIN || ACCESS_REKAP;
       const HAS_BUAT_SOAL_ACCESS = IS_ADMIN || ACCESS_BUAT_SOAL;
       const HAS_MODUL_AJAR_ACCESS = IS_ADMIN || ACCESS_MODUL_AJAR;
+      const HAS_BAHAN_AJAR_ACCESS = IS_ADMIN || ACCESS_BAHAN_AJAR;
+      const HAS_LKPD_INTERAKTIF_ACCESS = IS_ADMIN || ACCESS_LKPD_INTERAKTIF;
       const HAS_RPP_ACCESS = IS_ADMIN || ACCESS_RPP;
       const USER_PROFILE = <?php echo json_encode($__userProfile, JSON_UNESCAPED_UNICODE); ?>;
       const LOGIN_NAME = <?php echo json_encode(trim((string)(($_SESSION['nama'] ?? '') !== '' ? $_SESSION['nama'] : ($_SESSION['username'] ?? ''))), JSON_UNESCAPED_UNICODE); ?>;
@@ -570,6 +589,8 @@ session_write_close();
       const VIEWS = [
         { id: "preview", label: "Buat Soal", icon: "description" },
         { id: "modul_ajar", label: "Modul Ajar", icon: "menu_book" },
+        { id: "bahan_ajar", label: "Bahan Ajar", icon: "library_books" },
+        { id: "lkpd_interaktif", label: "LKPD Interaktif", icon: "auto_stories" },
         { id: "rpp", label: "RPP", icon: "event_note" },
         { id: "quiz", label: "Quiz", icon: "quiz" },
         { id: "lkpd", label: "LKPD", icon: "assignment" },
@@ -796,9 +817,13 @@ session_write_close();
         previewTab: "identitas",
         modulAjarTab: "informasi",
         rppTab: "informasi",
+        bahanAjarTab: "info",
+        lkpdInteraktifTab: "info",
         soalError: null,
         modulAjarError: null,
         _isGenerating: false,
+        bahanAjarGabung: { modulPdfName: "", imageNames: [], mergedOk: false, mergedUrl: "", mergedFileName: "" },
+        lkpdInteraktifGabung: { modulPdfName: "", imageNames: [], mergedOk: false, mergedUrl: "", mergedFileName: "" },
         lkpd: {
           sumber: "topik",
           topik: "",
@@ -811,6 +836,37 @@ session_write_close();
           jenisAktivitas: "Eksperimen / Praktikum",
           tujuan: "",
           link: "",
+        },
+        bahanAjar: {
+          sumber: "modul_ajar",
+          jenjang: "",
+          kesetaraanPaket: "",
+          fase: "",
+          kelas: "",
+          mataPelajaran: "",
+          topikUtama: "",
+          subtopikSpesifik: "",
+          modePembuatan: "cepat",
+          jenisCarousel: "literasi",
+          formatRasio: "story_9_16",
+          usernameWatermark: "",
+          namaSekolah: "",
+          generatedPrompt: "",
+        },
+        lkpdInteraktif: {
+          sumber: "modul_ajar",
+          jenjang: "",
+          kesetaraanPaket: "",
+          fase: "",
+          kelas: "",
+          mataPelajaran: "",
+          topikUtama: "",
+          subtopikSpesifik: "",
+          modePembuatan: "cepat",
+          jenisCarousel: "literasi",
+          formatRasio: "story_9_16",
+          usernameWatermark: "",
+          namaSekolah: "",
         },
         modulAjar: {
           namaGuru: "", institusi: "",
@@ -852,6 +908,7 @@ session_write_close();
           topik_ringkas: "",
           topik: "",
           logo: "",
+          logoName: "",
         },
         paket: {
           judul: "",
@@ -868,16 +925,17 @@ session_write_close();
         sections: [
           {
             id: uuid(),
-            judul: "Bagian 1",
+            judul: "Bentuk Soal 1",
             bentuk: "pg",
             opsiPG: 4,
             jumlahPG: 10,
-            jumlahIsian: 3,
-            tingkatKesulitan: "campuran",
+            jumlahIsian: 0,
+            tingkatKesulitan: "sedang",
             cakupanBloom: "level_standar",
             dimensi: ["C1", "C2", "C3", "C4"],
             soalKonteks: false,
             pakaiGambar: false,
+            soalPerStimulus: 3,
           },
         ],
         globalSeed: Math.floor(Math.random() * 1e9),
@@ -893,10 +951,19 @@ session_write_close();
         quizPublications: [],
         quizResults: [],
         quizResultsQuery: "",
+        quizResultsCategoryFilter: "semua",
         quizResultsLoadedAt: "",
         quizSelectedSlug: "",
         quizPreviewCount: 10,
         quizShowPreview: false,
+        quizPaketId: null,
+        quizPaketSnapshot: null,
+        _showPaketBrowseModal: false,
+        _paketBrowseList: [],
+        _paketBrowseSearch: "",
+        _paketBrowseLoading: false,
+        _showPubBrowseModal: false,
+        _pubBrowseSearch: "",
         riwayatKreditSearch: "",
         rekap: { 
           raw: [], 
@@ -1143,19 +1210,17 @@ session_write_close();
         const P = state.paket || {};
         const miss = (msg, tab, path) => ({ ok: false, msg, tab, path: path || "" });
 
-        if (!String(I.namaSekolah || "").trim()) return miss("Langkah 1 belum lengkap: isi Nama Sekolah dulu ya.", "identitas", "identity.namaSekolah");
+        autoFillPaket();
         if (!String(I.jenjang || "").trim()) return miss("Langkah 1 belum lengkap: pilih Jenjang dulu ya.", "identitas", "identity.jenjang");
         if (String(I.jenjang || "").trim() === "Kesetaraan" && !String(I.kesetaraanPaket || "").trim()) {
           return miss("Langkah 1 belum lengkap: pilih Paket Kesetaraan dulu ya.", "identitas", "identity.kesetaraanPaket");
         }
-        if (!String(I.fase || "").trim()) return miss("Langkah 1 belum lengkap: pilih Fase dulu ya.", "identitas", "identity.fase");
         if (!String(I.kelas || "").trim()) return miss("Langkah 1 belum lengkap: isi Kelas dulu ya.", "identitas", "identity.kelas");
         if (!String(I.mataPelajaran || "").trim()) return miss("Langkah 1 belum lengkap: pilih Mata Pelajaran dulu ya.", "identitas", "identity.mataPelajaran");
-        if (!String(P.judul || "").trim()) return miss("Langkah 1 belum lengkap: isi Judul Paket dulu ya.", "identitas", "paket.judul");
-        if (!String(P.tahunAjaran || "").trim()) return miss("Langkah 1 belum lengkap: isi Tahun Ajaran dulu ya.", "identitas", "paket.tahunAjaran");
+        if (!String(I.topik_raw || "").trim()) return miss("Langkah 1 belum lengkap: isi Sumber Materi dulu ya.", "identitas", "identity.topik_raw");
 
         const sections = Array.isArray(state.sections) ? state.sections : [];
-        if (!sections.length) return miss("Langkah 2 belum lengkap: tambah minimal 1 Bagian di Konfigurasi dulu ya.", "konfigurasi", "");
+        if (!sections.length) return miss("Langkah 2 belum lengkap: tambah minimal 1 Bentuk Soal di Konfigurasi dulu ya.", "konfigurasi", "");
         const total = sections.reduce((acc, s) => {
           const bentuk = String(s?.bentuk || "");
           const isObjective = ["pg", "benar_salah", "pg_kompleks", "menjodohkan"].includes(bentuk);
@@ -1200,21 +1265,20 @@ session_write_close();
       };
 
       const identityTopikDisplay = (I) => {
-        const raw = String(I?.topik_raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
-        if (!raw) return "";
-        const oneLine = raw.replace(/\s+/g, " ").trim();
-        const stop = new Set([
-          "dan","yang","dari","di","ke","untuk","pada","dengan","atau","sebagai","dalam","adalah","yaitu","yakni",
-          "ini","itu","tersebut","oleh","para","agar","bagi","tentang","serta","karena","maka","jika","sehingga",
-        ]);
-        const tokenize = (s) => s
-          .split(" ")
-          .map(w => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "").trim())
-          .filter(Boolean);
-        const words = tokenize(oneLine);
-        const filtered = words.filter(w => !stop.has(w.toLowerCase()));
-        const pick = (arr) => arr.slice(0, 5).join(" ").trim();
-        return pick(filtered.length ? filtered : words);
+        return String(I?.topik || "").trim();
+      };
+
+      const countFilledLanjutan = () => {
+        const I = state.identity || {};
+        const P = state.paket || {};
+        let count = 0;
+        if (String(I.namaGuru || "").trim()) count++;
+        if (String(I.namaSekolah || "").trim()) count++;
+        if (String(I.logo || "").trim()) count++;
+        if (String(P.tahunAjaran || "").trim()) count++;
+        if (String(P.judul || "").trim()) count++;
+        if (String(P.semester || "").trim()) count++;
+        return { count, label: count > 0 ? `${count} terisi` : "6 pengaturan" };
       };
 
       const inputText = (label, path, value, placeholder) => `
@@ -1313,6 +1377,133 @@ session_write_close();
         saveDebounced(true);
         render();
       };
+
+      const loadPaketForQuiz = async (paketId) => {
+        if (!paketId) return false;
+        try {
+          const saved = {
+            theme: state.theme,
+            quizPublishForm: JSON.parse(JSON.stringify(state.quizPublishForm || {})),
+            quizSubtab: state.quizSubtab,
+            quizShareTab: state.quizShareTab,
+            quizShowPreview: state.quizShowPreview,
+          };
+
+          const r = await fetch("api/soal_user.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: "get", id: Number(paketId) }),
+          });
+          if (!r.ok) throw new Error("Network error");
+          const d = await r.json();
+          if (!d?.ok || !d?.state) {
+            alert("Gagal memuat paket.");
+            return false;
+          }
+
+          state = { ...DEFAULT_STATE(), ...d.state };
+
+          state.theme = saved.theme || state.theme || "light";
+          state.quizPublishForm = saved.quizPublishForm || {};
+          state.quizSubtab = saved.quizSubtab || "share";
+          state.quizShareTab = saved.quizShareTab || "buat_link";
+          state.quizShowPreview = saved.quizShowPreview || false;
+          state.activeView = "quiz";
+
+          state.quizPaketId = Number(paketId);
+          state.quizPaketSnapshot = {
+            id: Number(paketId),
+            title: String(state.paket?.judul || state.identity?.mataPelajaran || "Paket"),
+            question_count: Array.isArray(state.questions) ? state.questions.length : 0,
+          };
+          state._showPaketBrowseModal = false;
+
+          saveDebounced(true);
+          render();
+          return true;
+        } catch (err) {
+          console.error("Load paket untuk Quiz error:", err);
+          alert("Gagal memuat paket. Coba lagi.");
+          return false;
+        }
+      };
+
+      const fetchPaketListForQuiz = async () => {
+        state._paketBrowseLoading = true;
+        render();
+        try {
+          const r = await fetch("api/soal_user.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: "list" }),
+          });
+          const d = await r.json().catch(() => ({}));
+          state._paketBrowseList = Array.isArray(d?.items) ? d.items : [];
+        } catch (err) {
+          console.error("Fetch list error:", err);
+          state._paketBrowseList = [];
+        } finally {
+          state._paketBrowseLoading = false;
+          render();
+        }
+      };
+
+      const openPaketBrowseModal = async () => {
+        state._showPaketBrowseModal = true;
+        state._paketBrowseSearch = "";
+        render();
+        if (!Array.isArray(state._paketBrowseList) || state._paketBrowseList.length === 0) {
+          await fetchPaketListForQuiz();
+        }
+      };
+
+      const closePaketBrowseModal = () => {
+        state._showPaketBrowseModal = false;
+        render();
+      };
+
+      const updatePaketBrowseSearch = (val) => {
+        state._paketBrowseSearch = String(val || "");
+        render();
+      };
+
+      const openPubBrowseModal = async () => {
+        state._showPubBrowseModal = true;
+        state._pubBrowseSearch = "";
+        render();
+        if (!Array.isArray(state.quizPublications) || state.quizPublications.length === 0) {
+          await loadPublications();
+          render();
+        }
+      };
+
+      const closePubBrowseModal = () => {
+        state._showPubBrowseModal = false;
+        render();
+      };
+
+      const updatePubBrowseSearch = (val) => {
+        state._pubBrowseSearch = String(val || "");
+        render();
+      };
+
+      const pickQuizPublication = async (slug) => {
+        const s = String(slug || '').trim();
+        if (!s) return;
+        state.quizSelectedSlug = s;
+        state._showPubBrowseModal = false;
+        saveDebounced(false);
+        render();
+        try { await loadResults(); } catch {}
+      };
+
+      const resetQuizPaket = () => {
+        state.quizPaketId = null;
+        state.quizPaketSnapshot = null;
+        saveDebounced(true);
+        render();
+      };
+
       const startBuildSoal = () => {
         if (state._isGenerating) return;
         const chk = validateBuatSoal();
@@ -1601,7 +1792,7 @@ session_write_close();
               const startIndex = chunkIdx * 10;
               const normKey = (t) => String(t || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\s+/g, ' ').trim();
               const renderOne = (q, num) => {
-                ctx.addHanging(`${num}.`, String(q.question || "").trim(), 12, "normal", 0, 8);
+                ctx.addHanging(`${num}.`, String(formatQuestionText(q.type, q.question) || "").trim(), 12, "normal", 0, 8);
                 if (q._pdfImg) {
                   try {
                     const img = q._pdfImg;
@@ -1623,10 +1814,61 @@ session_write_close();
 
                 if (q.type === "pg" || q.type === "benar_salah" || q.type === "pg_kompleks") {
                   const opts = Array.isArray(q.options) ? q.options : [];
-                  for (let oi = 0; oi < opts.length; oi++) {
-                    ctx.addHanging(`${String.fromCharCode(65 + oi)}.`, String(opts[oi] || ""), 11, "normal", 30, 4);
+                  const twoCols = (q.type === "pg" || q.type === "pg_kompleks") && opts.length >= 4;
+                  const twoColsTF = q.type === "benar_salah" && opts.length >= 2;
+                  if (twoColsTF) {
+                    const x0 = ctx.margin + 30;
+                    const gap = 30;
+                    const colW = Math.max(120, (ctx.maxW - 30 - gap) / 2);
+                    const x1 = x0 + colW + gap;
+                    const lineH = 13;
+                    const leftText = String(opts[0] || "Benar");
+                    const rightText = String(opts[1] || "Salah");
+                    const leftLines = leftText ? ctx.doc.splitTextToSize(leftText, Math.max(10, colW)) : [""];
+                    const rightLines = rightText ? ctx.doc.splitTextToSize(rightText, Math.max(10, colW)) : [""];
+                    const rowLines = Math.max(leftLines.length, rightLines.length, 1);
+                    ctx.newPageIfNeeded(rowLines * lineH + 2);
+                    ctx.doc.setFont("times", "normal");
+                    ctx.doc.setFontSize(11);
+                    ctx.doc.text(leftLines, x0, ctx.getY());
+                    ctx.doc.text(rightLines, x1, ctx.getY());
+                    ctx.setY(ctx.getY() + rowLines * lineH + 10);
+                  } else
+                  if (twoCols) {
+                    const n = opts.length;
+                    const leftCount = Math.ceil(n / 2);
+                    const gap = 30;
+                    const x0 = ctx.margin + 30;
+                    const colW = Math.max(120, (ctx.maxW - 30 - gap) / 2);
+                    const x1 = x0 + colW + gap;
+                    const labelW = 18;
+                    const lineH = 13;
+                    for (let r = 0; r < leftCount; r++) {
+                      const li = r;
+                      const ri = r + leftCount;
+                      const leftText = li < n ? String(opts[li] || "") : "";
+                      const rightText = ri < n ? String(opts[ri] || "") : "";
+                      const leftLines = leftText ? ctx.doc.splitTextToSize(leftText, Math.max(10, colW - labelW)) : [""];
+                      const rightLines = rightText ? ctx.doc.splitTextToSize(rightText, Math.max(10, colW - labelW)) : [""];
+                      const rowLines = Math.max(leftLines.length, rightLines.length, 1);
+                      ctx.newPageIfNeeded(rowLines * lineH + 2);
+                      ctx.doc.setFont("times", "normal");
+                      ctx.doc.setFontSize(11);
+                      ctx.doc.text(`${String.fromCharCode(65 + li)}.`, x0, ctx.getY());
+                      ctx.doc.text(leftLines, x0 + labelW, ctx.getY());
+                      if (rightText) {
+                        ctx.doc.text(`${String.fromCharCode(65 + ri)}.`, x1, ctx.getY());
+                        ctx.doc.text(rightLines, x1 + labelW, ctx.getY());
+                      }
+                      ctx.setY(ctx.getY() + rowLines * lineH);
+                    }
+                    ctx.setY(ctx.getY() + 8);
+                  } else {
+                    for (let oi = 0; oi < opts.length; oi++) {
+                      ctx.addHanging(`${String.fromCharCode(65 + oi)}.`, String(opts[oi] || ""), 11, "normal", 30, 4);
+                    }
+                    ctx.setY(ctx.getY() + 6);
                   }
-                  ctx.setY(ctx.getY() + 6);
                 } else if (q.type === "menjodohkan") {
                   const leftList = Array.isArray(q.options) ? q.options : [];
                   const rightList = Array.isArray(q.answer) ? q.answer : [];
@@ -2285,11 +2527,11 @@ session_write_close();
         if (bodyEl) {
           bodyEl.innerHTML = `
             <div class="space-y-3">
-              <div>Fitur ini membuat <b>1 stimulus/bacaan</b> yang dipakai oleh sebagian soal dalam bagian yang sama.</div>
+              <div>Fitur ini membuat <b>1 stimulus/bacaan</b> yang dipakai oleh sebagian soal dalam Bentuk Soal yang sama.</div>
               <ul class="list-disc pl-5 space-y-1">
-                <li>Dalam 1 bagian: <b>hanya 1 konteks</b>.</li>
+                <li>Dalam 1 Bentuk Soal: <b>hanya 1 konteks</b>.</li>
                 <li>Jumlah soal yang memakai konteks: maksimal <b>30%</b> dari jumlah soal (minimal <b>3 soal</b> jika memungkinkan).</li>
-                ${cnt ? `<li>Bagian ini: 1 konteks untuk <b>${cnt} soal</b>.</li>` : ``}
+                ${cnt ? `<li>Bentuk Soal ini: 1 konteks untuk <b>${cnt} soal</b>.</li>` : ``}
                 <li>Konteks dibuat minimal <b>2 paragraf</b> (dipisahkan 1 baris kosong).</li>
               </ul>
             </div>
@@ -2510,10 +2752,10 @@ session_write_close();
           { id: 'i3', title: 'Perintah Khusus: Contoh Penggunaan', src: 'tutorial/buatsoal/PerintahKhusus.wav' },
         ],
         konfigurasi: [
-          { id: 'k1', title: 'Konsep Multi-bagian', src: 'tutorial/buatsoal/KonsepMultiBagian.wav' },
+          { id: 'k1', title: 'Konsep Multi Bentuk Soal', src: 'tutorial/buatsoal/KonsepMultiBagian.wav' },
           { id: 'k2', title: 'Atur Bentuk & Jumlah Soal', src: 'tutorial/buatsoal/BagiandanJumlahSoal.wav' },
           { id: 'k3', title: 'Tingkat Kesulitan & Bloom', src: 'tutorial/buatsoal/TingkatKesulitanDanBloom.wav' },
-          { id: 'k4', title: 'Duplikat & Hapus Bagian', src: 'tutorial/buatsoal/DuplikatDanHapusBagian.wav' },
+          { id: 'k4', title: 'Hapus Bentuk Soal', src: 'tutorial/buatsoal/DuplikatDanHapusBagian.wav' },
           { id: 'k5', title: 'Lanjut ke Naskah Soal', src: 'tutorial/buatsoal/NaskahSoal.wav' },
         ],
         naskah: [
@@ -2979,32 +3221,45 @@ session_write_close();
       const addSection = () => {
         state.sections.push({
           id: uuid(),
-          judul: `Bagian ${state.sections.length + 1}`,
+          judul: `Bentuk Soal ${state.sections.length + 1}`,
           bentuk: "pg",
           opsiPG: 4,
           jumlahPG: 10,
-          jumlahIsian: 3,
-          tingkatKesulitan: "campuran",
+          jumlahIsian: 0,
+          tingkatKesulitan: "sedang",
           cakupanBloom: "level_standar",
           dimensi: ["C1", "C2", "C3", "C4"],
           soalKonteks: false,
           pakaiGambar: false,
+          soalPerStimulus: 3,
         });
-        saveDebounced(true);
+        saveDebounced(true, true);
         render();
       };
 
       const removeSection = (id) => {
+        const section = state.sections.find((x) => x.id === id);
+        if (!section) return;
+        const judul = String(section.judul || "Bentuk Soal ini").trim() || "Bentuk Soal ini";
+        const hasContent = (Number(section.jumlahPG || 0) > 0) || (Number(section.jumlahIsian || 0) > 0);
+        if (hasContent) {
+          if (!confirm(`Yakin hapus "${judul}"?\n\nSemua pengaturan pada Bentuk Soal ini akan hilang.`)) {
+            return;
+          }
+        }
         state.sections = state.sections.filter((x) => x.id !== id);
-        saveDebounced(true);
+        saveDebounced(true, true);
         render();
+        try {
+          if (typeof window.showToast === "function") window.showToast(`"${judul}" dihapus`, "info", 2500);
+        } catch {}
       };
 
       const duplicateSection = (id) => {
         const s = state.sections.find((x) => x.id === id);
         if (!s) return;
         state.sections.push({ ...structuredClone(s), id: uuid(), judul: `${s.judul} (Copy)` });
-        saveDebounced(true);
+        saveDebounced(true, true);
         render();
       };
 
@@ -3026,32 +3281,63 @@ session_write_close();
         saveDebounced(false);
         if (renderNow) {
           render();
-          saveDebounced(true);
+          saveDebounced(true, true);
         }
+      };
+
+      const stepInput = (id, key, delta, min, max) => {
+        const s = state.sections.find((x) => x.id === id);
+        if (!s) return;
+        const d = Number(delta) || 0;
+        const mn = Number(min);
+        const mx = (max === null || max === undefined || max === '') ? null : Number(max);
+        const current = Number(s[key] || 0);
+        let next = current + d;
+        if (Number.isFinite(mn)) next = Math.max(mn, next);
+        if (mx !== null && Number.isFinite(mx)) next = Math.min(mx, next);
+        s[key] = next;
+        saveDebounced(true, true);
+        render();
       };
 
       let saveTimer = null;
       let storageFullWarned = false;
+      let lastSaveToastAt = 0;
 
-      const save = () => {
+      const save = (notify = false) => {
         try {
           localStorage.setItem(APP_KEY, JSON.stringify(structuredClone(state)));
           el("badgeSaved").classList.remove("hidden");
           setTimeout(() => el("badgeSaved").classList.add("hidden"), 1200);
           storageFullWarned = false;
+          if (notify) {
+            const now = Date.now();
+            if (now - lastSaveToastAt > 2200) {
+              lastSaveToastAt = now;
+              try {
+                if (typeof window.showToast === "function") window.showToast("Tersimpan otomatis", "success", 2000);
+              } catch {}
+            }
+          }
         } catch (e) {
           console.error("Gagal menyimpan otomatis (Storage Penuh?):", e);
           if (!storageFullWarned) {
-             alert("Penyimpanan browser penuh! Silakan 'Simpan' proyek sebagai file JSON agar data aman.");
+             const msg = "Penyimpanan browser penuh! Silakan 'Simpan' proyek sebagai file JSON agar data aman.";
+             try {
+               if (typeof window.showToast === "function") window.showToast(msg, "error", 6000);
+               else alert(msg);
+             } catch {
+               alert(msg);
+             }
              storageFullWarned = true;
           }
         }
       };
 
-      const saveDebounced = (flush) => {
+      const saveDebounced = (flush, notify = false) => {
         clearTimeout(saveTimer);
-        if (flush) return save();
-        saveTimer = setTimeout(save, 1000);
+        if (flush) return save(!!notify);
+        saveTimer = setTimeout(() => save(false), 1000);
       };
 
       const load = () => {
@@ -3069,14 +3355,8 @@ session_write_close();
             I.kesetaraanPaket = pj;
             I.jenjang = 'Kesetaraan';
           }
-          if (!String(I.topik_raw || "").trim() && !String(I.topik_ringkas || "").trim() && String(I.topik || "").trim()) {
-            I.topik_raw = String(I.topik || "");
-            I.topik_ringkas = String(I.topik || "");
-          }
-          if (String(I.topik_raw || "").trim() && !String(I.topik_ringkas || "").trim()) {
-            const rawTxt = String(I.topik_raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-            const firstLine = rawTxt.split("\n").map(s => s.trim()).filter(Boolean)[0] || "";
-            I.topik_ringkas = (firstLine || rawTxt.slice(0, 180)).trim();
+          if (!String(I.topik || "").trim() && String(I.topik_ringkas || "").trim()) {
+            I.topik = String(I.topik_ringkas || "");
           }
         } catch {}
         try {
@@ -3086,7 +3366,25 @@ session_write_close();
           if (state.modulAjar && String(state.modulAjar.jenjang || '').trim() === 'SMK') state.modulAjar.jenjang = 'SMK/MAK';
         } catch {}
         try {
+          if (state.bahanAjar && String(state.bahanAjar.jenjang || '').trim() === 'SMK') state.bahanAjar.jenjang = 'SMK/MAK';
+        } catch {}
+        try {
+          if (state.lkpdInteraktif && String(state.lkpdInteraktif.jenjang || '').trim() === 'SMK') state.lkpdInteraktif.jenjang = 'SMK/MAK';
+        } catch {}
+        try {
           if (state.rpp && String(state.rpp.jenjang || '').trim() === 'SMK') state.rpp.jenjang = 'SMK/MAK';
+        } catch {}
+        try {
+          state.bahanAjarGabung = state.bahanAjarGabung || { modulPdfName: "", imageNames: [], mergedOk: false, mergedUrl: "", mergedFileName: "" };
+          state.bahanAjarGabung.mergedOk = false;
+          state.bahanAjarGabung.mergedUrl = "";
+          state.bahanAjarGabung.mergedFileName = "";
+        } catch {}
+        try {
+          state.lkpdInteraktifGabung = state.lkpdInteraktifGabung || { modulPdfName: "", imageNames: [], mergedOk: false, mergedUrl: "", mergedFileName: "" };
+          state.lkpdInteraktifGabung.mergedOk = false;
+          state.lkpdInteraktifGabung.mergedUrl = "";
+          state.lkpdInteraktifGabung.mergedFileName = "";
         } catch {}
         try {
           if (state.lkpd) {
@@ -3198,6 +3496,20 @@ session_write_close();
         return 0;
       };
 
+      const formatQuestionText = (type, text) => {
+        const t0 = String(text ?? "");
+        const ty = String(type || "").trim();
+        if (ty !== "pg" && ty !== "pg_kompleks") return t0;
+        let t = t0.replace(/\s+$/g, "");
+        if (!t) return t;
+        if (/[?؟]/.test(t.slice(-3))) {
+          t = t.replace(/[!?.؟\u061F\s]+$/g, "");
+          t = t.replace(/\s+$/g, "");
+          return t ? `${t}...` : "...";
+        }
+        return t;
+      };
+
       const normalizeQuestion = (item, sec) => {
         const cleanInlineHtml = (input) => {
           let t = String(input ?? "");
@@ -3268,7 +3580,8 @@ session_write_close();
         if (sec?.bentuk) type = sec.bentuk;
         
         const context = cleanMultilineHtml(item?.context ?? item?.stimulus ?? "");
-        const question = cleanInlineHtml(item?.question ?? "");
+        let question = cleanInlineHtml(item?.question ?? "");
+        question = formatQuestionText(type, question);
         const explanation = cleanInlineHtml(item?.explanation ?? "");
         const difficulty = cleanInlineHtml(item?.difficulty ?? "");
         const bloom = cleanInlineHtml(item?.bloom ?? "");
@@ -3501,14 +3814,8 @@ session_write_close();
             try {
               state.identity = state.identity || {};
               const I = state.identity;
-              if (!String(I.topik_raw || "").trim() && !String(I.topik_ringkas || "").trim() && String(I.topik || "").trim()) {
-                I.topik_raw = String(I.topik || "");
-                I.topik_ringkas = String(I.topik || "");
-              }
-              if (String(I.topik_raw || "").trim() && !String(I.topik_ringkas || "").trim()) {
-                const rawTxt = String(I.topik_raw || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-                const firstLine = rawTxt.split("\n").map(s => s.trim()).filter(Boolean)[0] || "";
-                I.topik_ringkas = (firstLine || rawTxt.slice(0, 180)).trim();
+              if (!String(I.topik || "").trim() && String(I.topik_ringkas || "").trim()) {
+                I.topik = String(I.topik_ringkas || "");
               }
             } catch {}
             try {
@@ -3720,6 +4027,33 @@ session_write_close();
 
       const renderNaskah = () => {
         const canDownload = Array.isArray(state.questions) && state.questions.length > 0 && !state._isGenerating;
+        const genBox = state._isGenerating ? `
+          <div class="no-print bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
+            <div class="p-6 space-y-5">
+              <div class="flex items-start gap-4">
+                <div class="size-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                  <span class="material-symbols-outlined animate-spin">progress_activity</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <div class="font-bold">Sedang membuat soal...</div>
+                  <div id="genSummary" class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Mohon tunggu beberapa saat</div>
+                </div>
+                <div id="genPercent" class="text-2xl font-extrabold text-primary">0%</div>
+              </div>
+              <div class="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
+                <div id="genBar" class="h-2 bg-primary rounded-full" style="width:0%"></div>
+              </div>
+              <div class="text-xs font-extrabold text-text-sub-light dark:text-text-sub-dark">DETAIL PER BENTUK SOAL</div>
+              <div id="genDetail" class="space-y-2"></div>
+              <div class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
+                <div class="flex items-start gap-3 p-4">
+                  <span class="material-symbols-outlined text-amber-500 mt-0.5">warning</span>
+                  <div class="text-sm text-amber-700 dark:text-amber-200">Jangan tutup halaman ini. Pastikan layar perangkat tidak mati selama proses berlangsung agar pembuatan soal tidak terputus.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ` : ``;
         const buildNow = `
           <div class="no-print bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm">
             <div class="p-6 flex items-center justify-between gap-3">
@@ -3747,7 +4081,7 @@ session_write_close();
               <button class="${state._isGenerating ? 'inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-gray-200 text-gray-500 text-sm font-bold opacity-60 cursor-not-allowed' : 'inline-flex items-center gap-2 h-10 px-5 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold'}"
                 ${state._isGenerating ? 'disabled' : 'onclick="window.__sp.startBuildSoal()"'} >
                 <span class="material-symbols-outlined text-[18px] ${state._isGenerating ? 'animate-spin' : ''}">${state._isGenerating ? 'progress_activity' : 'auto_awesome'}</span>
-                ${state._isGenerating ? 'Memproses...' : 'Buat Soal Sekarang'}
+                ${state._isGenerating ? 'Sedang membuat soal... mohon tunggu' : 'Buat Soal Sekarang'}
               </button>
             </div>
             ${IS_ADMIN ? `
@@ -3773,39 +4107,248 @@ session_write_close();
             ` : ``}
           </div>
         `;
-        if (state.questions.length === 0) return `<div class="space-y-3">${buildNow}<div class="p-10 text-center">Belum ada soal. Klik "Buat Soal Sekarang".</div></div>`;
+        if (state._isGenerating) return `<div class="space-y-3">${buildNow}${genBox}</div>`;
+        if (state.questions.length === 0) {
+          return `<div class="space-y-3">${buildNow}<div class="p-10 text-center">Belum ada soal. Klik "Buat Soal Sekarang".</div></div>`;
+        }
         
-        const renderItem = (q, i) => `
-          <div class="relative group break-inside-avoid">
-            <div class="flex gap-4">
-              <span class="font-bold text-lg min-w-[1.5rem]">${i + 1}.</span>
-              <div class="flex-1 relative group/soal max-h-[60vh] overflow-y-auto pr-2 print:max-h-none print:overflow-visible custom-scrollbar">
-                <div class="no-print">
-                  <div class="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 w-[180px] bg-white/90 dark:bg-surface-dark/80 backdrop-blur-sm px-2 py-1 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
-                    <button ${q._loadingText ? "disabled" : ""} onclick="regenSingle('${q.id}')" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md ${q._loadingText ? "bg-primary text-white opacity-80" : "bg-primary/10 text-primary hover:bg-primary hover:text-white"} text-xs font-bold transition-all">
-                      <span class="material-symbols-outlined text-[16px] ${q._loadingText ? "animate-spin" : ""}">${q._loadingText ? "progress_activity" : "autorenew"}</span>
-                      <span>${q._loadingText ? "Memproses..." : "Buat Ulang Soal"}</span>
-                    </button>
-                    ${
-                      q.pakaiGambar
-                        ? `
-                          <button ${q._loadingImage ? "disabled" : ""} onclick="regenImage('${q.id}')" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md ${q._loadingImage ? "bg-green-600 text-white opacity-80" : "bg-green-500/10 text-green-600 hover:bg-green-600 hover:text-white"} text-xs font-bold transition-all">
-                            <span class="material-symbols-outlined text-[16px] ${q._loadingImage ? "animate-spin" : ""}">${q._loadingImage ? "progress_activity" : "image"}</span>
-                            <span>${q._loadingImage ? "Memproses..." : q.image ? "Buat Ulang Gambar" : "Buat Gambar"}</span>
-                          </button>
-                          ${q.image ? `
-                            <button onclick="deleteImage('${q.id}')" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-red-500/10 text-red-600 hover:bg-red-600 hover:text-white text-xs font-bold transition-all">
-                              <span class="material-symbols-outlined text-[16px]">delete</span>
-                              <span>Hapus Gambar</span>
-                            </button>
-                          ` : ``}
-                        `
-                        : ``
-                    }
+        const renderOpsiRow = (opt, oi) => `
+          <div class="flex gap-3 items-start">
+            <span class="font-semibold pt-0.5">${String.fromCharCode(65 + oi)}.</span>
+            <span class="leading-relaxed">${safeMathHtml(opt)}</span>
+          </div>`;
+
+        const renderPilihanObjektif = (opts, type) => {
+          const list = Array.isArray(opts) ? opts : [];
+          const n = list.length;
+          if (type === 'benar_salah') {
+            const a = String(list[0] ?? 'Benar');
+            const b = String(list[1] ?? 'Salah');
+            return `
+              <div class="grid grid-cols-2 gap-x-16 gap-y-2 pl-1">
+                <div class="font-semibold">${safeMathHtml(a)}</div>
+                <div class="font-semibold">${safeMathHtml(b)}</div>
+              </div>
+            `;
+          }
+          const twoCols = (type === 'pg' || type === 'pg_kompleks') && n >= 4;
+          if (!twoCols) {
+            return `
+              <div class="grid grid-cols-1 gap-2 pl-1">
+                ${list.map((opt, oi) => renderOpsiRow(opt, oi)).join("")}
+              </div>
+            `;
+          }
+          const leftCount = Math.ceil(n / 2);
+          const left = list.slice(0, leftCount);
+          const right = list.slice(leftCount);
+          return `
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-16 gap-y-2 pl-1">
+              <div class="space-y-2">
+                ${left.map((opt, oi) => renderOpsiRow(opt, oi)).join("")}
+              </div>
+              <div class="space-y-2">
+                ${right.map((opt, oi) => renderOpsiRow(opt, oi + leftCount)).join("")}
+              </div>
+            </div>
+          `;
+        };
+
+        const renderEditFieldsForType = (q) => {
+          const t = String(q?.type || '').trim();
+          if (t === 'pg' || t === 'pg_kompleks') {
+            const opts = Array.isArray(q.options) ? q.options : [];
+            const selectedArr = Array.isArray(q.answer) ? q.answer.map(n => Number(n)).filter(n => Number.isFinite(n)) : [];
+            const selectedOne = Number.isFinite(Number(q.answer)) ? Number(q.answer) : 0;
+            const pickUI = t === 'pg'
+              ? opts.map((_, i) => `
+                  <label class="inline-flex items-center gap-2 text-sm">
+                    <input id="editAns-${q.id}-${i}" name="editAns-${q.id}" type="radio" ${i === selectedOne ? 'checked' : ''} />
+                    <span class="text-xs font-bold">${String.fromCharCode(65 + i)}</span>
+                  </label>
+                `).join('')
+              : opts.map((_, i) => `
+                  <label class="inline-flex items-center gap-2 text-sm">
+                    <input id="editAns-${q.id}-${i}" type="checkbox" ${selectedArr.includes(i) ? 'checked' : ''} />
+                    <span class="text-xs font-bold">${String.fromCharCode(65 + i)}</span>
+                  </label>
+                `).join('');
+            const label = t === 'pg' ? 'Jawaban benar' : 'Jawaban benar (minimal 2)';
+            return `
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <div class="text-xs font-bold text-text-sub-light mb-2 uppercase tracking-wide">Opsi</div>
+                  <div class="space-y-2">
+                    ${opts.map((opt, i) => `
+                      <div class="flex items-center gap-2">
+                        <div class="w-7 text-xs font-bold">${String.fromCharCode(65 + i)}.</div>
+                        <input id="editOpt-${q.id}-${i}" class="flex-1 h-10 px-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-surface-dark text-sm" value="${safeText(String(opt ?? ''))}" />
+                      </div>
+                    `).join('')}
                   </div>
                 </div>
-                <div class="pr-44">
-                  <p class="mb-4 pr-10 text-justify leading-relaxed text-lg">${safeMathHtml(q.question)}</p>
+                <div>
+                  <div class="text-xs font-bold text-text-sub-light mb-2 uppercase tracking-wide">${label}</div>
+                  <div class="grid grid-cols-3 gap-2">
+                    ${pickUI}
+                  </div>
+                </div>
+              </div>
+            `;
+          }
+          if (t === 'benar_salah') {
+            const ans = Number(q.answer) === 1 ? 1 : 0;
+            return `
+              <div>
+                <div class="text-xs font-bold text-text-sub-light mb-2 uppercase tracking-wide">Jawaban benar</div>
+                <div class="grid grid-cols-2 gap-3">
+                  <label class="flex items-center gap-2 p-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-surface-dark cursor-pointer">
+                    <input id="editBS-${q.id}-0" name="editBS-${q.id}" type="radio" ${ans === 0 ? 'checked' : ''} />
+                    <span class="font-semibold">Benar</span>
+                  </label>
+                  <label class="flex items-center gap-2 p-3 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-surface-dark cursor-pointer">
+                    <input id="editBS-${q.id}-1" name="editBS-${q.id}" type="radio" ${ans === 1 ? 'checked' : ''} />
+                    <span class="font-semibold">Salah</span>
+                  </label>
+                </div>
+              </div>
+            `;
+          }
+          if (t === 'isian' || t === 'uraian') {
+            const ph = t === 'isian' ? 'Isi jawaban singkat...' : 'Isi jawaban uraian...';
+            return `
+              <div>
+                <div class="text-xs font-bold text-text-sub-light mb-2 uppercase tracking-wide">Jawaban</div>
+                <textarea id="editAns-${q.id}" class="w-full p-2.5 text-base leading-relaxed border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-surface-dark resize-y min-h-[70px] focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" placeholder="${safeText(ph)}">${safeText(String(q.answer ?? ''))}</textarea>
+              </div>
+            `;
+          }
+          return ``;
+        };
+
+        const renderItemEditMode = (q, i) => {
+          return `
+            <div class="relative break-inside-avoid border-2 border-primary rounded-lg p-4 my-2 bg-blue-50/30">
+              <div class="mb-3 flex items-center gap-2 text-sm">
+                <span class="material-symbols-outlined text-[16px] text-primary">edit</span>
+                <span class="text-primary font-bold">Mode Edit Aktif</span>
+                <span class="text-xs text-text-sub-light">— Ubah konten, lalu klik Simpan</span>
+              </div>
+              <div class="flex gap-3">
+                <span class="font-bold text-lg min-w-[1.5rem]">${i + 1}.</span>
+                <div class="flex-1 space-y-3">
+                  <div>
+                    <div class="block text-xs font-bold text-text-sub-light mb-1 uppercase tracking-wide">Pertanyaan</div>
+                    <textarea id="editQuestion-${q.id}" class="w-full p-2.5 text-base leading-relaxed border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-surface-dark resize-y min-h-[80px] focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" placeholder="Tulis pertanyaan...">${safeText(String(q.question || ''))}</textarea>
+                  </div>
+                  ${renderEditFieldsForType(q)}
+                  <div>
+                    <div class="block text-xs font-bold text-text-sub-light mb-1 uppercase tracking-wide">Pembahasan Singkat</div>
+                    <textarea id="editExplain-${q.id}" class="w-full p-2.5 text-base leading-relaxed border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-surface-dark resize-y min-h-[70px] focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" placeholder="Tulis pembahasan singkat...">${safeText(String(q.explanation || ''))}</textarea>
+                  </div>
+                  <div class="flex justify-end gap-2 pt-2">
+                    <button onclick="cancelQuestionInline('${q.id}')" class="h-9 px-4 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-semibold">
+                      <span class="material-symbols-outlined text-[16px] align-middle mr-1">close</span>
+                      Batal
+                    </button>
+                    <button onclick="saveQuestionInline('${q.id}')" class="h-9 px-4 rounded-md bg-green-600 hover:bg-green-700 text-white text-sm font-bold">
+                      <span class="material-symbols-outlined text-[16px] align-middle mr-1">check</span>
+                      Simpan
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        };
+
+        const renderItem = (q, i) => {
+          if (q && q._editMode) return renderItemEditMode(q, i);
+          return `
+            <div class="relative group break-inside-avoid">
+              <div class="flex gap-4">
+                <span class="font-bold text-lg min-w-[1.5rem]">${i + 1}.</span>
+                <div class="flex-1 relative group/soal max-h-[60vh] overflow-y-auto pr-2 print:max-h-none print:overflow-visible custom-scrollbar">
+                  <div class="relative">
+                    <div class="no-print absolute right-2 top-2 flex items-center gap-1 bg-white dark:bg-surface-dark border border-gray-200 dark:border-gray-700 rounded-lg p-1 shadow-sm">
+                      <button
+                        ${q._loadingText ? "disabled" : ""}
+                        onclick="editQuestionInline('${q.id}')"
+                        class="h-8 px-2.5 rounded-md ${q._loadingText ? 'bg-gray-100 text-gray-400' : 'bg-primary/10 text-primary hover:bg-primary hover:text-white'} text-xs font-bold flex items-center gap-1 transition-all"
+                        title="Edit soal secara manual">
+                        <span class="material-symbols-outlined text-[14px]">edit</span>
+                        <span>Edit</span>
+                      </button>
+                      <div class="relative">
+                        <button
+                          ${q._loadingText ? "disabled" : ""}
+                          onclick="toggleSoalMenu('${q.id}', event)"
+                          class="h-8 w-8 rounded-md ${q._loadingText ? 'text-gray-400' : 'text-text-sub-light hover:bg-gray-100 dark:hover:bg-gray-700'} flex items-center justify-center transition-colors"
+                          title="Pilihan lain">
+                          <span class="material-symbols-outlined text-[16px]">more_vert</span>
+                        </button>
+                        <div id="soalMenu-${q.id}" class="hidden absolute right-0 top-full mt-1 w-64 bg-white dark:bg-surface-dark border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 overflow-hidden">
+                          <div class="px-3 py-2">
+                            <div class="text-[10px] uppercase tracking-wide text-text-sub-light font-bold">Edit Soal Ini</div>
+                          </div>
+                          <button onclick="editQuestionInline('${q.id}'); closeSoalMenu('${q.id}')" class="w-full flex items-start gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 text-left">
+                            <span class="material-symbols-outlined text-[18px] text-primary flex-shrink-0 mt-0.5">edit</span>
+                            <div>
+                              <div class="text-sm font-semibold">Edit Langsung</div>
+                              <div class="text-xs text-text-sub-light">Ubah text soal, opsi, atau jawaban</div>
+                            </div>
+                          </button>
+                          <button onclick="regenSingle('${q.id}'); closeSoalMenu('${q.id}')" class="w-full flex items-start gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 text-left">
+                            <span class="material-symbols-outlined text-[18px] text-purple-600 flex-shrink-0 mt-0.5">auto_awesome</span>
+                            <div>
+                              <div class="text-sm font-semibold">Buat Soal Serupa</div>
+                              <div class="text-xs text-text-sub-light">AI buat ulang dengan taksonomi sama</div>
+                            </div>
+                          </button>
+                          <button onclick="openChangeTaksonomi('${q.id}'); closeSoalMenu('${q.id}')" class="w-full flex items-start gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800 text-left">
+                            <span class="material-symbols-outlined text-[18px] text-amber-600 flex-shrink-0 mt-0.5">target</span>
+                            <div>
+                              <div class="text-sm font-semibold">Ganti Taksonomi</div>
+                              <div class="text-xs text-text-sub-light">Pilih level Bloom baru → AI buat ulang</div>
+                            </div>
+                          </button>
+                          <div class="border-t border-gray-100 dark:border-gray-700"></div>
+                          <div class="px-3 py-2 bg-gray-50 dark:bg-gray-800">
+                            <div class="text-[10px] uppercase tracking-wide text-text-sub-light font-bold mb-1.5">Info Soal</div>
+                            <div class="space-y-0.5 text-xs">
+                              <div class="flex justify-between">
+                                <span class="text-text-sub-light">Tingkat berpikir:</span>
+                                <span class="font-semibold">${safeText(q.bloom || 'C2')}</span>
+                              </div>
+                              <div class="flex justify-between">
+                                <span class="text-text-sub-light">Materi:</span>
+                                <span class="font-semibold truncate ml-2 max-w-[140px]" title="${safeText(q.materi || '-')}">${safeText(q.materi || '-')}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      ${q.pakaiGambar ? `
+                        <div class="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-0.5"></div>
+                        <button
+                          ${q._loadingImage ? "disabled" : ""}
+                          onclick="regenImage('${q.id}')"
+                          class="h-8 w-8 rounded-md ${q._loadingImage ? 'text-gray-400' : 'text-green-600 hover:bg-green-50'} flex items-center justify-center transition-colors"
+                          title="${q.image ? 'Buat ulang gambar' : 'Buat gambar'}">
+                          <span class="material-symbols-outlined text-[16px] ${q._loadingImage ? 'animate-spin' : ''}">${q._loadingImage ? 'progress_activity' : 'image'}</span>
+                        </button>
+                        ${q.image ? `
+                          <button
+                            onclick="deleteImage('${q.id}')"
+                            class="h-8 w-8 rounded-md text-red-600 hover:bg-red-50 flex items-center justify-center transition-colors"
+                            title="Hapus gambar">
+                            <span class="material-symbols-outlined text-[16px]">delete</span>
+                          </button>
+                        ` : ``}
+                      ` : ``}
+                    </div>
+                    <p class="mb-4 pr-44 text-justify leading-relaxed text-lg">${safeMathHtml(formatQuestionText(q.type, q.question))}</p>
+                  </div>
                   ${q.image ? `<img src="${q.image}" class="w-64 h-64 object-contain rounded-lg mb-2 border shadow-sm">` : ""}
                   ${q._showImagePrompt && !q.image && q.imagePrompt ? `
                     <div class="mb-3 italic text-xs text-text-sub-light flex items-center gap-2">
@@ -3828,15 +4371,7 @@ session_write_close();
                   ${!q.image && !q.asciiDiagram && !q.svgSource && q._imageError ? `<div class="mb-4 text-xs px-2 py-1 rounded bg-red-100 text-red-700 inline-flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">error</span><span>${safeText(q._imageError)}</span></div>` : ""}
                   ${
                     (q.type === "pg" || q.type === "benar_salah" || q.type === "pg_kompleks")
-                      ? `
-                        <div class="grid grid-cols-1 gap-2 pl-1">
-                          ${q.options.map((opt, oi) => `
-                            <div class="flex gap-3 items-start">
-                              <span class="font-semibold pt-0.5">${String.fromCharCode(65 + oi)}.</span>
-                              <span class="leading-relaxed">${safeMathHtml(opt)}</span>
-                            </div>`).join("")}
-                        </div>
-                      `
+                      ? renderPilihanObjektif(q.options, q.type)
                       : q.type === "menjodohkan"
                       ? `
                         <div class="grid grid-cols-2 gap-8 text-sm">
@@ -3863,8 +4398,34 @@ session_write_close();
                 </div>
               </div>
             </div>
+          `;
+        };
+
+        const taksonomiModal = state._taksonomiModal ? `
+          <div class="fixed inset-0 flex items-center justify-center" style="background: rgba(0,0,0,0.5); z-index:60;">
+            <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[560px] overflow-hidden">
+              <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                <div class="font-bold text-lg flex items-center gap-2">
+                  <span class="material-symbols-outlined">target</span>
+                  Ganti Taksonomi
+                </div>
+                <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="closeChangeTaksonomi()">&times;</button>
+              </div>
+              <div class="p-5 space-y-4">
+                <div class="text-sm text-text-sub-light dark:text-text-sub-dark">Pilih level Bloom baru, lalu AI akan membuat ulang soal.</div>
+                <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  ${['C1','C2','C3','C4','C5','C6'].map(b=>`
+                    <button onclick="selectBloomLevel('${b}')" class="h-10 rounded-lg border ${String(state._taksonomiModal?.selectedBloom||'')===b ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-surface-dark border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark'} font-bold">${b}</button>
+                  `).join('')}
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                  <button onclick="closeChangeTaksonomi()" class="h-10 px-4 rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark font-bold">Batal</button>
+                  <button onclick="confirmChangeTaksonomi()" class="h-10 px-5 rounded-lg bg-primary hover:bg-blue-600 text-white font-bold">Terapkan</button>
+                </div>
+              </div>
+            </div>
           </div>
-        `;
+        ` : ``;
 
         const pg = state.questions.filter(q => q.type === 'pg');
         const essay = state.questions.filter(q => q.type !== 'pg');
@@ -3872,6 +4433,7 @@ session_write_close();
         return `
           <div class="space-y-3">
           ${buildNow}
+          ${taksonomiModal}
           <div id="paper" class="bg-white text-black p-4 md:p-10 md:shadow-paper md:min-h-[297mm] font-serif border border-gray-200 mx-auto print:border-none print:shadow-none print:p-0">
             <div class="border-b-2 border-black pb-6 mb-8 relative">
               ${state.identity.logo ? `<img src="${state.identity.logo}" class="absolute right-0 top-0 h-16 w-auto">` : ``}
@@ -4231,6 +4793,443 @@ session_write_close();
         `;
       };
 
+      const renderBahanAjar = () => {
+        const B = state.bahanAjar || {};
+        const jenjangEfektif = resolveJenjang(B.jenjang, B.kesetaraanPaket);
+        const isKesetaraan = String(B.jenjang || "").trim() === "Kesetaraan";
+        const faseOpts = MA_FASE_MAP[jenjangEfektif] || [];
+        const tabRaw = String(state.bahanAjarTab || "").trim();
+        const tab = (tabRaw === "info" || tabRaw === "gabung") ? tabRaw : "info";
+        const gabung = state.bahanAjarGabung || {};
+        const pdfName = String(gabung.modulPdfName || "").trim();
+        const imageNames = Array.isArray(gabung.imageNames) ? gabung.imageNames : [];
+        const desktopTabs = `
+          <div class="flex items-center justify-between gap-3">
+            <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
+              ${[
+                { id: "info", label: "1. Informasi Bahan Ajar" },
+                { id: "gabung", label: "2. Gabungkan ke Modul Ajar" },
+              ].map(t => {
+                const active = tab === t.id;
+                return `<button class="${active ? 'bg-primary text-white' : 'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setBahanAjarTab('${t.id}')">${t.label}</button>`;
+              }).join("")}
+            </div>
+          </div>
+        `;
+
+        const infoHtml = `
+          <div class="p-6 space-y-6">
+            <div>
+              <div class="text-xl font-bold">Bahan Ajar</div>
+              <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Lengkapi informasi bahan ajar, lalu salin prompt untuk dibuatkan konten</div>
+            </div>
+            <div class="flex items-center justify-between gap-3 rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-4">
+              <div class="text-sm text-text-sub-light dark:text-text-sub-dark">
+                Ambil data dari Modul Ajar yang sudah diisi (Jenjang/Kelas/Mapel/Institusi/Judul) atau Buat Baru.
+              </div>
+              <button class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold"
+                onclick="window.__sp.copyFromModulAjarToBahanAjar()">
+                <span class="material-symbols-outlined text-[18px]">content_copy</span>
+                Ambil
+              </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
+                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="bahanAjar.jenjang">
+                  <option value="">Pilih...</option>
+                  ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(B.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                </select>
+                <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
+                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
+                  <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="bahanAjar.kesetaraanPaket">
+                    <option value="">Pilih Paket...</option>
+                    ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(B.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                  </select>
+                </div>
+              </div>
+              ${selectField("Fase", "bahanAjar.fase", B.fase, faseOpts)}
+              ${selectField("Kelas", "bahanAjar.kelas", B.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              ${selectField("Mata Pelajaran", "bahanAjar.mataPelajaran", B.mataPelajaran, SUBJECT_OPTIONS[jenjangEfektif] || [])}
+              ${inputText("Nama Sekolah", "bahanAjar.namaSekolah", B.namaSekolah, "Contoh: SMA Negeri 1 Bandung")}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              ${inputText("Topik utama", "bahanAjar.topikUtama", B.topikUtama, "Contoh: Sistem Pencernaan")}
+              ${inputText("Subtopik spesifik", "bahanAjar.subtopikSpesifik", B.subtopikSpesifik, "Contoh: Kenapa lambung bisa sakit?")}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Mode pembuatan</label>
+                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm" data-path="bahanAjar.modePembuatan">
+                  <option value="cepat"${String(B.modePembuatan||'')==='cepat'?' selected':''}>Cepat</option>
+                  <option value="lengkap"${String(B.modePembuatan||'')==='lengkap'?' selected':''}>Lengkap</option>
+                </select>
+              </div>
+              <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenis carousel</label>
+                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm" data-path="bahanAjar.jenisCarousel">
+                  <option value="literasi"${String(B.jenisCarousel||'')==='literasi'?' selected':''}>Literasi</option>
+                  <option value="numerasi"${String(B.jenisCarousel||'')==='numerasi'?' selected':''}>Numerasi</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Format rasio</label>
+                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm" data-path="bahanAjar.formatRasio">
+                  <option value="story_9_16"${String(B.formatRasio||'')==='story_9_16'?' selected':''}>Story 9:16</option>
+                  <option value="portrait_4_5"${String(B.formatRasio||'')==='portrait_4_5'?' selected':''}>Portrait 4:5</option>
+                </select>
+              </div>
+              ${inputText("Username Instagram/TikTok untuk watermark", "bahanAjar.usernameWatermark", B.usernameWatermark, "Contoh: @gurusains.id")}
+            </div>
+            <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5 space-y-3">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-bold">Prompt Bahan Ajar</div>
+                  <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5">Nilai mengikuti input pada form</div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button class="inline-flex items-center justify-center h-9 w-10 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark"
+                    onclick="window.__sp.copyBahanAjarPrompt(this)" title="Salin">
+                    <span class="material-symbols-outlined text-[18px]">content_copy</span>
+                  </button>
+                  <button class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold"
+                    onclick="window.open('https://chatgpt.com/g/g-6a12a09069248191a7d76d45beb44c50-komik-pembelajaran-by-gurupintar','_blank','noopener')">
+                    <span class="material-symbols-outlined text-[18px]">smart_toy</span>
+                    Buat Bahan Ajar
+                  </button>
+                </div>
+              </div>
+              <textarea class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm min-h-[180px]"
+                readonly
+                placeholder="Prompt otomatis mengikuti input di atas"
+              >${safeText(getBahanAjarPromptText(B) || "")}</textarea>
+            </div>
+          </div>
+        `;
+
+        const hasImages = imageNames.length > 0;
+        const gabungHtml = `
+          <div class="p-6 space-y-6">
+            <div>
+              <div class="text-xl font-bold">Gabungkan ke Modul Ajar</div>
+              <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Upload file, lalu klik Gabungkan</div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5 space-y-3">
+                <div class="text-sm font-bold">Upload Modul Ajar (PDF)</div>
+                <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${pdfName ? `Terpilih: ${safeText(pdfName)}` : 'Belum ada file.'}</div>
+                <button id="btnBahanAjarUploadPdf" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors"
+                  onclick="window.__sp.pickBahanAjarModulPdf()">
+                  <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                  Upload PDF
+                </button>
+              </div>
+              <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5 space-y-3">
+                <div class="text-sm font-bold">Upload Bahan Ajar (Image)</div>
+                <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${imageNames.length ? `Terpilih: ${safeText(imageNames.length)} file` : 'Belum ada file.'}</div>
+                <button id="btnBahanAjarUploadImages" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors"
+                  onclick="window.__sp.pickBahanAjarImages()">
+                  <span class="material-symbols-outlined text-[18px]">image</span>
+                  Upload Image
+                </button>
+              </div>
+            </div>
+            <div class="${imageNames.length ? '' : 'hidden'} rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5 space-y-3">
+              <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <div class="text-sm font-bold">Urutan Halaman Bahan Ajar</div>
+                  <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Urutan ini menentukan halaman setelah PDF berakhir (mis. halaman 11, 12, dst).</div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button class="h-9 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                    onclick="window.__sp.sortBahanAjarImages('name_asc')">Urutkan A–Z</button>
+                  <button class="h-9 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                    onclick="window.__sp.sortBahanAjarImages('name_desc')">Urutkan Z–A</button>
+                </div>
+              </div>
+              <div class="overflow-auto rounded-lg border border-border-light dark:border-border-dark">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-background-light dark:bg-background-dark">
+                    <tr>
+                      <th class="px-3 py-2 text-left w-16">No</th>
+                      <th class="px-3 py-2 text-left">Nama File</th>
+                      <th class="px-3 py-2 text-center w-28">Urut</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${(imageNames || []).map((nm, idx) => `
+                      <tr class="border-t border-border-light dark:border-border-dark">
+                        <td class="px-3 py-2 font-semibold">${idx + 1}</td>
+                        <td class="px-3 py-2">${safeText(String(nm || ''))}</td>
+                        <td class="px-3 py-2">
+                          <div class="flex items-center justify-center gap-2">
+                            <button class="${idx === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-background-light dark:hover:bg-background-dark'} size-9 rounded-lg border bg-white dark:bg-surface-dark flex items-center justify-center"
+                              ${idx === 0 ? 'disabled' : `onclick="window.__sp.moveBahanAjarImage(${idx},-1)"`} title="Naik">
+                              <span class="material-symbols-outlined text-[18px]">arrow_upward</span>
+                            </button>
+                            <button class="${idx === (imageNames.length - 1) ? 'opacity-40 cursor-not-allowed' : 'hover:bg-background-light dark:hover:bg-background-dark'} size-9 rounded-lg border bg-white dark:bg-surface-dark flex items-center justify-center"
+                              ${idx === (imageNames.length - 1) ? 'disabled' : `onclick="window.__sp.moveBahanAjarImage(${idx},1)"`} title="Turun">
+                              <span class="material-symbols-outlined text-[18px]">arrow_downward</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    `).join("")}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="pt-2">
+              <div class="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+                <button id="btnBahanAjarMerge" class="w-full md:w-auto flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors"
+                  onclick="window.__sp.gabungkanBahanAjarKeModulAjar()">
+                <span class="material-symbols-outlined text-[18px]">merge</span>
+                Gabungkan
+              </button>
+                <button id="btnBahanAjarDownloadOnly" class="w-full md:w-auto flex items-center justify-center gap-2 rounded-lg h-10 px-4 ${hasImages ? 'bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark' : 'bg-gray-200 text-gray-500 cursor-not-allowed'} text-sm font-bold shadow-sm transition-colors"
+                  ${hasImages ? `onclick="window.__sp.downloadBahanAjarPdfOnly()"` : 'disabled'}>
+                  <span class="material-symbols-outlined text-[18px]">download</span>
+                  Download Bahan Ajar (PDF)
+                </button>
+              </div>
+              <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-2">Hasil gabungan akan otomatis terunduh setelah proses gabung berhasil.</div>
+            </div>
+          </div>
+        `;
+        return `
+          <div class="space-y-6">
+            ${desktopTabs}
+            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
+              ${tab === "gabung" ? gabungHtml : infoHtml}
+            </div>
+          </div>
+        `;
+      };
+
+      const renderLKPDInteraktif = () => {
+        const X = state.lkpdInteraktif || {};
+        const jenjangEfektif = resolveJenjang(X.jenjang, X.kesetaraanPaket);
+        const isKesetaraan = String(X.jenjang || "").trim() === "Kesetaraan";
+        const faseOpts = MA_FASE_MAP[jenjangEfektif] || [];
+        const tabRaw = String(state.lkpdInteraktifTab || "").trim();
+        const tab = (tabRaw === "info" || tabRaw === "gabung") ? tabRaw : "info";
+        const gabung = state.lkpdInteraktifGabung || {};
+        const pdfName = String(gabung.modulPdfName || "").trim();
+        const imageNames = Array.isArray(gabung.imageNames) ? gabung.imageNames : [];
+        const hasImages = imageNames.length > 0;
+
+        const desktopTabs = `
+          <div class="flex items-center justify-between gap-3">
+            <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
+              ${[
+                { id: "info", label: "1. Informasi LKPD Interaktif" },
+                { id: "gabung", label: "2. Gabungkan ke Modul Ajar" },
+              ].map(t => {
+                const active = tab === t.id;
+                return `<button class="${active ? 'bg-primary text-white' : 'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setLkpdInteraktifTab('${t.id}')">${t.label}</button>`;
+              }).join("")}
+            </div>
+          </div>
+        `;
+
+        const infoHtml = `
+          <div class="p-6 space-y-6">
+            <div>
+              <div class="text-xl font-bold">LKPD Interaktif</div>
+              <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Lengkapi informasi, lalu salin prompt untuk dibuatkan konten LKPD interaktif</div>
+            </div>
+            <div class="flex items-center justify-between gap-3 rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-4">
+              <div class="text-sm text-text-sub-light dark:text-text-sub-dark">
+                Ambil data dari Modul Ajar yang sudah diisi (Jenjang/Kelas/Mapel/Institusi/Judul) atau Buat Baru.
+              </div>
+              <button class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold"
+                onclick="window.__sp.copyFromModulAjarToLkpdInteraktif()">
+                <span class="material-symbols-outlined text-[18px]">content_copy</span>
+                Ambil
+              </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
+                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="lkpdInteraktif.jenjang">
+                  <option value="">Pilih...</option>
+                  ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(X.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                </select>
+                <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
+                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
+                  <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="lkpdInteraktif.kesetaraanPaket">
+                    <option value="">Pilih Paket...</option>
+                    ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(X.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                  </select>
+                </div>
+              </div>
+              ${selectField("Fase", "lkpdInteraktif.fase", X.fase, faseOpts)}
+              ${selectField("Kelas", "lkpdInteraktif.kelas", X.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              ${selectField("Mata Pelajaran", "lkpdInteraktif.mataPelajaran", X.mataPelajaran, SUBJECT_OPTIONS[jenjangEfektif] || [])}
+              ${inputText("Nama Sekolah", "lkpdInteraktif.namaSekolah", X.namaSekolah, "Contoh: SMA Negeri 1 Bandung")}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              ${inputText("Topik utama", "lkpdInteraktif.topikUtama", X.topikUtama, "Contoh: Sistem Pencernaan")}
+              ${inputText("Subtopik spesifik", "lkpdInteraktif.subtopikSpesifik", X.subtopikSpesifik, "Contoh: Kenapa lambung bisa sakit?")}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Mode pembuatan</label>
+                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm" data-path="lkpdInteraktif.modePembuatan">
+                  <option value="cepat"${String(X.modePembuatan||'')==='cepat'?' selected':''}>Cepat</option>
+                  <option value="lengkap"${String(X.modePembuatan||'')==='lengkap'?' selected':''}>Lengkap</option>
+                </select>
+              </div>
+              <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenis carousel</label>
+                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm" data-path="lkpdInteraktif.jenisCarousel">
+                  <option value="literasi"${String(X.jenisCarousel||'')==='literasi'?' selected':''}>Literasi</option>
+                  <option value="numerasi"${String(X.jenisCarousel||'')==='numerasi'?' selected':''}>Numerasi</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Format rasio</label>
+                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm" data-path="lkpdInteraktif.formatRasio">
+                  <option value="story_9_16"${String(X.formatRasio||'')==='story_9_16'?' selected':''}>Story 9:16</option>
+                  <option value="portrait_4_5"${String(X.formatRasio||'')==='portrait_4_5'?' selected':''}>Portrait 4:5</option>
+                </select>
+              </div>
+              ${inputText("Username Instagram/TikTok untuk watermark", "lkpdInteraktif.usernameWatermark", X.usernameWatermark, "Contoh: @gurusains.id")}
+            </div>
+
+            <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5 space-y-3">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-bold">Prompt LKPD Interaktif</div>
+                  <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5">Nilai mengikuti input pada form</div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button class="inline-flex items-center justify-center h-9 w-10 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark"
+                    onclick="window.__sp.copyLkpdInteraktifPrompt(this)" title="Salin">
+                    <span class="material-symbols-outlined text-[18px]">content_copy</span>
+                  </button>
+                  <button class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold"
+                    onclick="window.open('https://chatgpt.com/g/g-6a13d61020b08191910e219eb19937f9-lkpd-interaktif-by-gurupintar','_blank','noopener')">
+                    <span class="material-symbols-outlined text-[18px]">smart_toy</span>
+                    Buat LKPD Interaktif
+                  </button>
+                </div>
+              </div>
+              <textarea class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm min-h-[180px]"
+                readonly
+                placeholder="Prompt otomatis mengikuti input di atas"
+              >${safeText(getLkpdInteraktifPromptText(X) || "")}</textarea>
+            </div>
+          </div>
+        `;
+
+        const gabungHtml = `
+          <div class="p-6 space-y-6">
+            <div>
+              <div class="text-xl font-bold">Gabungkan ke Modul Ajar</div>
+              <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Upload file, atur urutan halaman, lalu klik Gabungkan</div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5 space-y-3">
+                <div class="text-sm font-bold">Upload Modul Ajar (PDF)</div>
+                <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${pdfName ? `Terpilih: ${safeText(pdfName)}` : 'Belum ada file.'}</div>
+                <button id="btnLkpdInteraktifUploadPdf" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors"
+                  onclick="window.__sp.pickLkpdInteraktifModulPdf()">
+                  <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                  Upload PDF
+                </button>
+              </div>
+              <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5 space-y-3">
+                <div class="text-sm font-bold">Upload LKPD Interaktif (Image)</div>
+                <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${imageNames.length ? `Terpilih: ${safeText(imageNames.length)} file` : 'Belum ada file.'}</div>
+                <button id="btnLkpdInteraktifUploadImages" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors"
+                  onclick="window.__sp.pickLkpdInteraktifImages()">
+                  <span class="material-symbols-outlined text-[18px]">image</span>
+                  Upload Image
+                </button>
+              </div>
+            </div>
+            <div class="${imageNames.length ? '' : 'hidden'} rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5 space-y-3">
+              <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <div class="text-sm font-bold">Urutan Halaman LKPD Interaktif</div>
+                  <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Urutan ini menentukan halaman setelah PDF berakhir (mis. halaman 11, 12, dst).</div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button class="h-9 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                    onclick="window.__sp.sortLkpdInteraktifImages('name_asc')">Urutkan A–Z</button>
+                  <button class="h-9 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                    onclick="window.__sp.sortLkpdInteraktifImages('name_desc')">Urutkan Z–A</button>
+                </div>
+              </div>
+              <div class="overflow-auto rounded-lg border border-border-light dark:border-border-dark">
+                <table class="min-w-full text-sm">
+                  <thead class="bg-background-light dark:bg-background-dark">
+                    <tr>
+                      <th class="px-3 py-2 text-left w-16">No</th>
+                      <th class="px-3 py-2 text-left">Nama File</th>
+                      <th class="px-3 py-2 text-center w-28">Urut</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${(imageNames || []).map((nm, idx) => `
+                      <tr class="border-t border-border-light dark:border-border-dark">
+                        <td class="px-3 py-2 font-semibold">${idx + 1}</td>
+                        <td class="px-3 py-2">${safeText(String(nm || ''))}</td>
+                        <td class="px-3 py-2">
+                          <div class="flex items-center justify-center gap-2">
+                            <button class="${idx === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-background-light dark:hover:bg-background-dark'} size-9 rounded-lg border bg-white dark:bg-surface-dark flex items-center justify-center"
+                              ${idx === 0 ? 'disabled' : `onclick="window.__sp.moveLkpdInteraktifImage(${idx},-1)"`} title="Naik">
+                              <span class="material-symbols-outlined text-[18px]">arrow_upward</span>
+                            </button>
+                            <button class="${idx === (imageNames.length - 1) ? 'opacity-40 cursor-not-allowed' : 'hover:bg-background-light dark:hover:bg-background-dark'} size-9 rounded-lg border bg-white dark:bg-surface-dark flex items-center justify-center"
+                              ${idx === (imageNames.length - 1) ? 'disabled' : `onclick="window.__sp.moveLkpdInteraktifImage(${idx},1)"`} title="Turun">
+                              <span class="material-symbols-outlined text-[18px]">arrow_downward</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    `).join("")}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="pt-2">
+              <div class="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+                <button id="btnLkpdInteraktifMerge" class="w-full md:w-auto flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors"
+                  onclick="window.__sp.gabungkanLkpdInteraktifKeModulAjar()">
+                  <span class="material-symbols-outlined text-[18px]">merge</span>
+                  Gabungkan
+                </button>
+                <button id="btnLkpdInteraktifDownloadOnly" class="w-full md:w-auto flex items-center justify-center gap-2 rounded-lg h-10 px-4 ${hasImages ? 'bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark' : 'bg-gray-200 text-gray-500 cursor-not-allowed'} text-sm font-bold shadow-sm transition-colors"
+                  ${hasImages ? `onclick="window.__sp.downloadLkpdInteraktifPdfOnly()"` : 'disabled'}>
+                  <span class="material-symbols-outlined text-[18px]">download</span>
+                  Download LKPD Interaktif (PDF)
+                </button>
+              </div>
+              <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-2">Hasil gabungan akan otomatis terunduh setelah proses gabung berhasil.</div>
+            </div>
+          </div>
+        `;
+
+        return `
+          <div class="space-y-6">
+            ${desktopTabs}
+            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
+              ${tab === "gabung" ? gabungHtml : infoHtml}
+            </div>
+          </div>
+        `;
+      };
+
       
 
       // ═══════════════════════════════════════════════
@@ -4524,7 +5523,8 @@ session_write_close();
         const hasilAda  = !!M.hasil;
         const isRefiningKegiatan = !!M.isRefiningKegiatan;
         const kegiatanRefinedOnce = !!M.kegiatanRefinedOnce;
-        const tab = state.modulAjarTab || (hasilAda ? 'modul' : 'informasi');
+        const tabRaw = state.modulAjarTab || (hasilAda ? 'modul' : 'informasi');
+        const tab = (tabRaw === 'informasi' || tabRaw === 'detail' || tabRaw === 'modul') ? tabRaw : (hasilAda ? 'modul' : 'informasi');
         const maErr = state.modulAjarError;
         const pendekatanOpts = ['Standar','CTL (Contextual Teaching and Learning)','Deep Learning','Deep Learning + CTL','Berbasis Cinta (KBC)','Deep Learning + KBC'];
         if (M.pendekatan && !pendekatanOpts.includes(M.pendekatan)) pendekatanOpts.unshift(M.pendekatan);
@@ -4564,10 +5564,6 @@ session_write_close();
           </label>`;
         }).join('');
 
-        const helpOnClick = tab === 'informasi'
-          ? "window.__sp.openMAHelp1()"
-          : (tab === 'detail' ? "window.__sp.openMAHelp2()" : "window.__sp.openMAHelp3()");
-
         const desktopTabs = `
           <div class="hidden md:flex items-center justify-between gap-3 mb-4">
             <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
@@ -4592,23 +5588,24 @@ session_write_close();
                 <span class="ml-2 hidden lg:inline">Muat</span>
               </button>
               <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
-                onclick="${helpOnClick}" title="Petunjuk">
-                <span class="material-symbols-outlined text-[18px]">help</span>
-                <span class="ml-2">Petunjuk</span>
-              </button>
-              <button class="inline-flex items-center justify-center h-10 px-4 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
                 onclick="window.__sp.openModulAjarTutorial()" title="Tutorial">
                 <span class="material-symbols-outlined text-[18px]">volume_up</span>
-                <span class="ml-2 hidden lg:inline">Tutorial</span>
               </button>
             </div>
           </div>
         `;
 
         const mobileNav = (cur) => {
-          const prev = cur === 'detail' ? 'informasi' : (cur === 'modul' ? 'detail' : null);
-          const next = cur === 'informasi' ? 'detail' : (cur === 'detail' ? 'modul' : null);
-          const rightLabel = cur === 'informasi' ? 'Detail Pembelajaran' : (cur === 'detail' ? 'Modul Ajar' : '');
+          const order = ['informasi','detail','modul'];
+          const idx = Math.max(0, order.indexOf(cur));
+          const prev = idx > 0 ? order[idx - 1] : null;
+          const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;
+          const labels = {
+            informasi: 'Detail Pembelajaran',
+            detail: 'Modul Ajar',
+            modul: '',
+          };
+          const rightLabel = labels[cur] || '';
           const rightOnClick = cur === 'detail'
             ? `onclick="window.__sp.openModulAjarFromDetail()"`
             : (next ? `onclick="window.__sp.setModulAjarTab('${next}')"` : '');
@@ -7791,6 +8788,8 @@ ${baselineModulAjar}
         `;
         if (state.activeView === "preview" && !HAS_BUAT_SOAL_ACCESS) return noAccessBox("Buat Soal");
         if (state.activeView === "modul_ajar" && !HAS_MODUL_AJAR_ACCESS) return noAccessBox("Modul Ajar");
+        if (state.activeView === "bahan_ajar" && !HAS_BAHAN_AJAR_ACCESS) return noAccessBox("Bahan Ajar");
+        if (state.activeView === "lkpd_interaktif" && !HAS_LKPD_INTERAKTIF_ACCESS) return noAccessBox("LKPD Interaktif");
         if (state.activeView === "rpp" && !HAS_RPP_ACCESS) return noAccessBox("RPP");
         if (state.activeView === "preview") {
           const helpOnClick = "window.__sp.openBuatSoalHelp()";
@@ -7805,7 +8804,7 @@ ${baselineModulAjar}
             <div class="hidden md:flex items-center justify-between gap-3 mb-2">
               <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
                 ${["identitas","konfigurasi","naskah"].map(t=>{
-                  const label = t==="identitas"?"1. Identitas":(t==="konfigurasi"?"2. Konfigurasi":"3. Naskah Soal");
+                  const label = t==="identitas"?"1. Identitas Soal":(t==="konfigurasi"?"2. Bentuk Soal":"3. Naskah Soal");
                   const active = state.previewTab===t;
                   return `<button class="${active?'bg-primary text-white':'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setPreviewTab('${t}')">${label}</button>`;
                 }).join('')}
@@ -7834,7 +8833,7 @@ ${baselineModulAjar}
           const mobileStepNav = (tab) => {
             const prev = tab === 'konfigurasi' ? 'identitas' : (tab === 'naskah' ? 'konfigurasi' : null);
             const next = tab === 'identitas' ? 'konfigurasi' : (tab === 'konfigurasi' ? 'naskah' : null);
-            const rightLabel = tab === 'identitas' ? 'Konfigurasi' : (tab === 'konfigurasi' ? 'Naskah Soal' : '');
+            const rightLabel = tab === 'identitas' ? 'Bentuk Soal' : (tab === 'konfigurasi' ? 'Naskah Soal' : '');
             const rightOnClick = tab === 'konfigurasi'
               ? `onclick="window.__sp.openNaskahSoalFromKonfigurasi()"`
               : (next ? `onclick="window.__sp.setPreviewTab('${next}')"` : '');
@@ -7851,9 +8850,7 @@ ${baselineModulAjar}
           };
 
           let body = "";
-          if (state._isGenerating) {
-            body = generatingPreviewHtml();
-          } else if (state.previewTab === "identitas") body = renderIdentitas() + mobileStepNav("identitas");
+          if (state.previewTab === "identitas") body = renderIdentitas() + mobileStepNav("identitas");
           else if (state.previewTab === "konfigurasi") body = renderKonfigurasi() + mobileStepNav("konfigurasi");
           else {
             const parts = [renderNaskah()];
@@ -7874,7 +8871,7 @@ ${baselineModulAjar}
                     <div class="font-bold mb-1">Alur singkat</div>
                     <ol class="list-decimal pl-5 space-y-1">
                       <li>Isi Identitas (jenjang/fase/kelas/mapel + Sumber Materi).</li>
-                      <li>Atur Konfigurasi bagian (bentuk soal & jumlah soal).</li>
+                      <li>Atur Konfigurasi Bentuk Soal (bentuk soal & jumlah soal).</li>
                       <li>Buat Naskah Soal, lalu unduh/cetak bila diperlukan.</li>
                     </ol>
                   </div>
@@ -7890,15 +8887,15 @@ ${baselineModulAjar}
                     <div class="font-bold mb-1">Input wajib (mandatory)</div>
                     <ul class="list-disc pl-5 space-y-1">
                       <li>Identitas: Nama Sekolah, Jenjang, Fase, Kelas, Mata Pelajaran, Judul Paket, Tahun Ajaran.</li>
-                      <li>Konfigurasi: minimal 1 Bagian dan Jumlah Soal minimal 1.</li>
+                      <li>Konfigurasi: minimal 1 Bentuk Soal dan Jumlah Soal minimal 1.</li>
                       <li>Sumber Materi: opsional, tetapi sangat disarankan agar soal lebih relevan.</li>
                     </ul>
                   </div>
                   <div>
                     <div class="font-bold mb-1">Fungsi tiap tab</div>
                     <ul class="list-disc pl-5 space-y-1">
-                      <li>1. Identitas: mengatur konteks soal (level & mapel) dan memasukkan Sumber Materi.</li>
-                      <li>2. Konfigurasi: mengatur bentuk soal per bagian (PG/Isian/Uraian, dll), jumlah soal, kesulitan, dan opsi gambar.</li>
+                      <li>1. Identitas Soal: mengatur konteks soal (level & mapel) dan memasukkan Sumber Materi.</li>
+                      <li>2. Bentuk Soal: mengatur Bentuk Soal (PG/Isian/Uraian, dll), jumlah soal, kesulitan, dan opsi gambar.</li>
                       <li>3. Naskah Soal: melihat hasil soal, melakukan perbaikan, lalu unduh/cetak.</li>
                     </ul>
                   </div>
@@ -7940,6 +8937,8 @@ ${baselineModulAjar}
           return `<div class="pb-6 md:pb-0">${tabBar}${body}${globalHelp}${tutorialModal}</div>`;
         }
         if (state.activeView === "lkpd") return renderLKPD();
+        if (state.activeView === "bahan_ajar") return renderBahanAjar();
+        if (state.activeView === "lkpd_interaktif") return renderLKPDInteraktif();
         if (state.activeView === "modul_ajar") return renderModulAjar();
         if (state.activeView === "rpp") return renderRPP();
         if (state.activeView === "quiz") return renderQuizLanding();
@@ -8007,165 +9006,177 @@ ${baselineModulAjar}
         const p = state.paket;
         const jenjangEfektif = resolveJenjang(i.jenjang, i.kesetaraanPaket);
         const isKesetaraan = String(i.jenjang || "").trim() === "Kesetaraan";
-        const faseOpts = MA_FASE_MAP[jenjangEfektif] || [];
+        const lanjutan = countFilledLanjutan();
+        const lanjutanBadgeClass = lanjutan.count > 0
+          ? "bg-primary text-white"
+          : "bg-background-light dark:bg-background-dark text-text-sub-light dark:text-text-sub-dark";
         return `
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="lg:col-span-2 bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
               <div class="p-6 space-y-6">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="inline-flex items-center gap-2">
+                      <div class="text-[10px] font-bold text-primary bg-primary/10 inline-flex px-2 py-0.5 rounded-full">Langkah 1</div>
+                      <div class="text-sm font-bold">Identitas</div>
+                    </div>
+                    <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Masukan identitas, dan informasi soal yang akan dibuat.</div>
+                  </div>
+                  <div class="flex items-center justify-end gap-2">
+                    <button class="h-10 w-10 rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark inline-flex items-center justify-center"
+                      title="Petunjuk pengisian identitas"
+                      onclick="window.__sp.openIdentitasHelp()">
+                      <span class="material-symbols-outlined text-[18px]">help</span>
+                    </button>
+                    <button
+                      class="hidden md:flex items-center gap-2 rounded-lg h-10 px-4 bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors"
+                      onclick="window.__sp.setPreviewTab('konfigurasi')"
+                    >
+                      <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+                      Bentuk Soal
+                    </button>
+                  </div>
+                </div>
                 ${state.soalError && state.soalError.tab === 'identitas' ? `
                   <div class="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300">
                     ${safeText(state.soalError.msg || '')}
                   </div>` : ``}
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <div>
+
+                <details class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark group overflow-hidden">
+                  <summary class="px-5 md:px-6 py-4 cursor-pointer flex items-center gap-3 list-none">
+                    <span class="material-symbols-outlined text-[22px] text-text-sub-light dark:text-text-sub-dark flex-shrink-0">settings</span>
+                    <div class="flex-1 min-w-0">
+                      <div class="text-sm md:text-base font-bold">Identitas Kop Lembar Soal (Klik disini)</div>
+                      <div class="text-xs md:text-sm text-text-sub-light dark:text-text-sub-dark mt-0.5">Nama guru, sekolah, logo, tahun ajaran, judul paket, semester</div>
+                    </div>
+                    <span class="${lanjutanBadgeClass} px-2.5 py-1 rounded-full text-xs font-bold flex-shrink-0">
+                      ${safeText(lanjutan.label)}
+                    </span>
+                    <span class="material-symbols-outlined text-[18px] text-text-sub-light dark:text-text-sub-dark group-open:rotate-180 transition-transform">expand_more</span>
+                  </summary>
+                  <div class="px-5 md:px-6 pb-6 border-t border-border-light dark:border-border-dark">
+                    <div class="pt-4">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        ${inputText("Nama Guru", "identity.namaGuru", i.namaGuru, "Contoh: Budi Santoso, S.Pd")}
+                        ${inputText("Nama Sekolah", "identity.namaSekolah", i.namaSekolah, "Masukkan nama sekolah")}
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div class="flex flex-col gap-2">
+                          <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Logo Sekolah (≤ 200KB)</label>
+                          <div class="flex items-center gap-4">
+                            <div class="flex-1 min-w-0 h-11 px-4 rounded-lg border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 flex items-center gap-2">
+                              <span class="material-symbols-outlined text-[18px] text-text-sub-light dark:text-text-sub-dark">attach_file</span>
+                              <div class="text-sm text-text-sub-light dark:text-text-sub-dark truncate">
+                                ${i.logo ? safeText(String(i.logoName || "").trim() || "Logo tersimpan") : "Belum ada file"}
+                              </div>
+                            </div>
+                            <div class="flex gap-2">
+                              <button class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickLogo()">
+                                <span class="material-symbols-outlined text-[18px]">upload</span>
+                                Unggah
+                              </button>
+                              ${i.logo ? `
+                                <button class="flex items-center gap-2 rounded-lg h-10 px-4 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.clearLogo()">
+                                  <span class="material-symbols-outlined text-[18px]">delete</span>
+                                  Hapus
+                                </button>` : ``}
+                            </div>
+                          </div>
+                        </div>
+                        ${inputText("Tahun Ajaran", "paket.tahunAjaran", p.tahunAjaran, "Contoh: 2025/2026")}
+                      </div>
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        ${inputText("Judul Paket Soal", "paket.judul", p.judul, "Contoh: Ulangan Harian")}
+                        ${inputText("Semester (opsional)", "paket.semester", p.semester, "Contoh: Semester 2")}
+                      </div>
+                    </div>
+                  </div>
+                </details>
+
+                <div class="space-y-4">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="flex flex-col gap-2">
+                      <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
+                      <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="identity.jenjang">
+                        <option value="">Pilih...</option>
+                        ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(i.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                      </select>
+                      <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
+                        <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
+                        <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="identity.kesetaraanPaket">
+                          <option value="">Pilih Paket...</option>
+                          ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(i.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                        </select>
+                      </div>
+                    </div>
+                    ${selectField("Kelas", "identity.kelas", i.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
+                  </div>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    ${selectField("Mata Pelajaran", "identity.mataPelajaran", i.mataPelajaran, SUBJECT_OPTIONS[jenjangEfektif] || [])}
+                    ${inputText("Topik/Sub-Materi", "identity.topik", i.topik, "Contoh: Peristiwa Rengasdengklok")}
+                  </div>
+                  <div class="space-y-2">
                     <div class="flex items-center gap-2">
-                      <div class="text-[10px] font-bold text-primary bg-primary/10 inline-flex px-2 py-0.5 rounded-full">Langkah 1</div>
-                      <button class="h-6 w-6 rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark inline-flex items-center justify-center"
-                        title="Petunjuk pengisian identitas"
-                        onclick="window.__sp.openIdentitasHelp()">
+                      <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Sumber Materi (Wajib diisi agar soal sesuai materi)</label>
+                      <button type="button"
+                        class="flex size-7 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors"
+                        title="Petunjuk Sumber Materi"
+                        onclick="window.__sp.openSumberMateriHelp();"
+                      >
                         <span class="material-symbols-outlined text-[16px]">help</span>
                       </button>
                     </div>
-                    <div class="text-xl font-bold mt-2">Identitas Soal</div>
-                    <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Data identitas disimpan otomatis</div>
+                    <textarea
+                      class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm min-h-[90px] md:min-h-[110px]"
+                      data-path="identity.topik_raw"
+                      placeholder="Paste materi lengkap di sini, atau upload gambar/file teks."
+                    >${safeText(i.topik_raw ?? "")}</textarea>
+                    <div class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
+                      <button id="btnTopikUploadImg" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikImage()">
+                        <span class="material-symbols-outlined text-[18px]">image</span>
+                        Foto Materi dari Buku
+                      </button>
+                      <button id="btnTopikUploadTxt" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikText()">
+                        <span class="material-symbols-outlined text-[18px]">upload_file</span>
+                        Upload File Teks
+                      </button>
+                      <button id="btnTopikUploadPdf" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikPdf()">
+                        <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
+                        Upload Materi (PDF)
+                      </button>
+                    </div>
                   </div>
-                  <div class="flex gap-2">
-                    <button
-                      class="hidden md:flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors"
-                      onclick="window.__sp.setPreviewTab('konfigurasi')"
-                    >
-                      <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
-                      Konfigurasi
-                    </button>
-                  </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  ${inputText("Nama Guru", "identity.namaGuru", i.namaGuru, "Contoh: Budi Santoso, S.Pd")}
-                  ${inputText("Nama Sekolah", "identity.namaSekolah", i.namaSekolah, "Masukkan nama sekolah")}
                   <div class="flex flex-col gap-2">
-                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Logo Sekolah (≤ 200KB)</label>
-                    <div class="flex items-center gap-4">
-                      <div class="w-20 h-20 rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-gray-800 flex items-center justify-center overflow-hidden">
-                        ${i.logo ? `<img src="${i.logo}" class="max-w-full max-h-full">` : `<span class="material-symbols-outlined text-[24px] text-text-sub-light dark:text-text-sub-dark">imagesmode</span>`}
+                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Perintah Khusus</label>
+                    <input
+                      class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
+                      data-path="specialInstruction"
+                      placeholder='Contoh: "Perbanyak soal cerita" atau "Gunakan Bahasa Jawa ngoko"'
+                      value="${safeAttr(state.specialInstruction ?? "")}"
+                    />
+                  </div>
+                </div>
+
+                <div id="modalSumberMateriHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+                  <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-height-[85vh] overflow-auto">
+                    <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                      <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Sumber Materi</div>
+                      <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeSumberMateriHelp()">&times;</button>
+                    </div>
+                    <div class="p-5 space-y-4 text-sm leading-relaxed">
+                      <div>
+                        <div class="font-bold mb-1">Fungsi</div>
+                        <ul class="list-disc pl-5 space-y-1">
+                          <li>Sumber Materi adalah acuan utama untuk membuat soal.</li>
+                          <li>Semakin lengkap materinya, soal biasanya makin relevan dan tidak terlalu umum.</li>
+                          <li>Sistem tetap menyesuaikan level sesuai Jenjang, Fase, dan Kelas.</li>
+                        </ul>
                       </div>
-                      <div class="flex gap-2">
-                        <button class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickLogo()">
-                          <span class="material-symbols-outlined text-[18px]">upload</span>
-                          Unggah
-                        </button>
-                        ${i.logo ? `
-                          <button class="flex items-center gap-2 rounded-lg h-10 px-4 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.clearLogo()">
-                            <span class="material-symbols-outlined text-[18px]">delete</span>
-                            Hapus
-                          </button>` : ``}
+                      <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
+                        Tips: Jika materi sangat panjang, cukup ambil bagian inti/topik utama agar soal lebih fokus.
                       </div>
                     </div>
                   </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div class="flex flex-col gap-2">
-                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
-                    <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="identity.jenjang">
-                      <option value="">Pilih...</option>
-                      ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(i.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
-                    </select>
-                    <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
-                      <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
-                      <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="identity.kesetaraanPaket">
-                        <option value="">Pilih Paket...</option>
-                        ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(i.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
-                      </select>
-                    </div>
-                  </div>
-                  ${selectField("Fase", "identity.fase", i.fase, faseOpts)}
-                  ${selectField("Kelas", "identity.kelas", i.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  ${selectField("Mata Pelajaran", "identity.mataPelajaran", i.mataPelajaran, SUBJECT_OPTIONS[jenjangEfektif] || [])}
-                  ${inputText("Semester (opsional)", "paket.semester", p.semester, "Contoh: Semester 2")}
-                </div>
-                <div class="grid grid-cols-1 gap-5">
-                  <div class="space-y-3">
-                    <details id="detailsTopikRaw" open class="rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark overflow-hidden">
-                      <summary class="cursor-pointer select-none px-4 py-4 flex items-center justify-between gap-3">
-                        <span class="flex items-center gap-2">
-                          <span class="text-sm font-bold">Sumber Materi</span>
-                          <button type="button"
-                            class="flex size-7 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors"
-                            title="Petunjuk Sumber Materi"
-                            onclick="event.preventDefault(); event.stopPropagation(); window.__sp.openSumberMateriHelp();"
-                          >
-                            <span class="material-symbols-outlined text-[16px]">help</span>
-                          </button>
-                        </span>
-                        <span class="flex items-center gap-2 text-xs text-text-sub-light dark:text-text-sub-dark">
-                          <span>${safeText(String(i.topik_raw || '').trim() ? `${String(i.topik_raw || '').trim().length} karakter` : 'kosong')}</span>
-                          <span class="material-symbols-outlined text-[18px]">expand_more</span>
-                        </span>
-                      </summary>
-                      <div class="p-4 space-y-3 border-t border-border-light dark:border-border-dark">
-                        <div class="flex flex-col gap-2">
-                          <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Acuan Utama Soal</label>
-                          <textarea
-                            class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm min-h-[180px] md:min-h-[220px]"
-                            data-path="identity.topik_raw"
-                            placeholder="Paste materi lengkap di sini, atau upload gambar/file teks."
-                          >${safeText(i.topik_raw ?? "")}</textarea>
-                        </div>
-                        <div class="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
-                          <button id="btnTopikUploadImg" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikImage()">
-                            <span class="material-symbols-outlined text-[18px]">image</span>
-                            Upload Gambar
-                          </button>
-                          <button id="btnTopikUploadTxt" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikText()">
-                            <span class="material-symbols-outlined text-[18px]">upload_file</span>
-                            Upload File Teks
-                          </button>
-                          <button id="btnTopikUploadPdf" class="w-full sm:w-auto justify-center flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors" onclick="window.__sp.pickTopikPdf()">
-                            <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-                            Upload PDF
-                          </button>
-                        </div>
-                      </div>
-                    </details>
-                    <div id="modalSumberMateriHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
-                      <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-height-[85vh] overflow-auto">
-                        <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
-                          <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Sumber Materi</div>
-                          <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeSumberMateriHelp()">&times;</button>
-                        </div>
-                        <div class="p-5 space-y-4 text-sm leading-relaxed">
-                          <div>
-                            <div class="font-bold mb-1">Fungsi</div>
-                            <ul class="list-disc pl-5 space-y-1">
-                              <li>Sumber Materi adalah acuan utama untuk membuat soal.</li>
-                              <li>Semakin lengkap materinya, soal biasanya makin relevan dan tidak terlalu umum.</li>
-                              <li>Sistem tetap menyesuaikan level sesuai Jenjang, Fase, dan Kelas.</li>
-                            </ul>
-                          </div>
-                          <div>
-                            <div class="font-bold mb-1">Cara pakai</div>
-                            <ol class="list-decimal pl-5 space-y-1">
-                              <li>Tempel materi ke kolom Acuan Utama Soal, atau upload Gambar/File Teks.</li>
-                              <li>Atur Jenjang, Fase, Kelas, dan Mata Pelajaran.</li>
-                              <li>Lanjutkan Konfigurasi Bagian, lalu buat paket soal.</li>
-                            </ol>
-                          </div>
-                          <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
-                            Tips: Jika materi sangat panjang, cukup ambil bagian inti/topik utama agar soal lebih fokus.
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Topik untuk tampilan akan dibuat otomatis (maks. 5 kata) dari Sumber Materi.</div>
-                    <div class="pt-2">
-                      ${inputText("Perintah Khusus (opsional)", "specialInstruction", state.specialInstruction || "", "Contoh: Perbanyak soal cerita. / Soal Bahasa Jawa ngoko, huruf latin.")}
-                    </div>
-                  </div>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-                  ${inputText("Judul Paket", "paket.judul", p.judul, "Contoh: Ulangan Harian")}
-                  ${inputText("Tahun Ajaran", "paket.tahunAjaran", p.tahunAjaran, "Contoh: 2025/2026")}
                 </div>
                 
               </div>
@@ -8208,35 +9219,6 @@ ${baselineModulAjar}
             <div class="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300">
               ${safeText(state.soalError.msg || '')}
             </div>` : ``}
-          <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm p-6">
-          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div class="flex items-center gap-2">
-              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">Langkah 2</span>
-              <button class="h-6 w-6 rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark inline-flex items-center justify-center"
-                title="Petunjuk konfigurasi paket"
-                onclick="window.__sp.openKonfigurasiHelp()">
-                <span class="material-symbols-outlined text-[16px]">help</span>
-              </button>
-              <div class="hidden md:block text-sm text-text-sub-light dark:text-text-sub-dark">Multi-bagian (bertingkat) dalam satu paket</div>
-            </div>
-            <div class="flex gap-2">
-              <button
-                class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors"
-                onclick="window.__sp.addSection()"
-              >
-                <span class="material-symbols-outlined text-[18px]">add</span>
-                Tambah Bagian
-              </button>
-              <button id="btnBuild"
-                class="hidden md:flex items-center gap-2 rounded-lg h-10 px-4 bg-primary hover:bg-blue-600 text-primary-content text-sm font-bold shadow-sm transition-colors"
-                onclick="window.__sp.openNaskahSoalFromKonfigurasi()"
-              >
-                <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
-                Naskah Soal
-              </button>
-            </div>
-          </div>
-          </div>
           <div id="modalKonfigurasiHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
             <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-height-[85vh] overflow-auto">
               <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
@@ -8245,16 +9227,16 @@ ${baselineModulAjar}
               </div>
               <div class="p-5 space-y-3 text-sm leading-relaxed">
                 <ol class="list-decimal pl-5 space-y-2">
-                  <li>Klik Tambah Bagian untuk membuat bagian baru (A, B, C, ...).</li>
-                  <li>Pilih Bentuk Soal per bagian: Pilihan Ganda, PG Kompleks, Menjodohkan, Isian, atau Uraian.</li>
+                  <li>Klik Tambah Bentuk Soal untuk membuat Bentuk Soal baru (A, B, C, ...).</li>
+                  <li>Pilih jenis soal per Bentuk Soal: Pilihan Ganda, PG Kompleks, Menjodohkan, Isian, atau Uraian.</li>
                   <li>Atur Jumlah Soal. Jika PG, tentukan juga Jumlah Opsi (3–5).</li>
                   <li>Pilih Tingkat Kesulitan dan Cakupan Dimensi Bloom untuk variasi kognitif.</li>
                   <li>Aktifkan Ilustrasi/Gambar jika diperlukan agar sistem menyiapkan diagram/ascii/svg.</li>
-                  <li>Ulangi untuk setiap bagian sesuai kebutuhan paket.</li>
+                  <li>Ulangi untuk setiap Bentuk Soal sesuai kebutuhan paket.</li>
                   <li>Setelah selesai, klik Naskah Soal untuk menghasilkan naskah lengkap.</li>
                 </ol>
                 <div class="rounded-md border border-blue-200 bg-blue-50 text-blue-800 p-3 text-xs">
-                  Tips: Anda dapat menduplikasi bagian yang sudah sesuai lalu melakukan penyesuaian kecil.
+                  Tips: Anda dapat menduplikasi Bentuk Soal yang sudah sesuai lalu melakukan penyesuaian kecil.
                 </div>
               </div>
             </div>
@@ -8266,7 +9248,7 @@ ${baselineModulAjar}
       `;
 
       const renderSectionCard = (s, idx) => {
-        const diff = s.tingkatKesulitan || "campuran";
+        const diff = s.tingkatKesulitan || "sedang";
         const bloomPreset = s.cakupanBloom || "level_standar";
         
         const isObjective = ["pg", "benar_salah", "pg_kompleks", "menjodohkan"].includes(s.bentuk);
@@ -8278,45 +9260,69 @@ ${baselineModulAjar}
         return `
           <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
             <div class="p-6 space-y-6">
+              ${idx === 0 ? `
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div class="flex items-center gap-2">
+                    <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">Langkah 2</span>
+                    <button class="h-6 w-6 rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark inline-flex items-center justify-center"
+                      title="Petunjuk konfigurasi paket"
+                      onclick="window.__sp.openKonfigurasiHelp()">
+                      <span class="material-symbols-outlined text-[16px]">help</span>
+                    </button>
+                  </div>
+                  <div class="flex gap-2">
+                    <button
+                      class="flex items-center gap-2 rounded-lg h-10 px-4 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors"
+                      onclick="window.__sp.addSection()"
+                    >
+                      <span class="material-symbols-outlined text-[18px]">add</span>
+                      Tambah Bentuk Soal
+                    </button>
+                    <button id="btnBuild"
+                      class="hidden md:flex items-center gap-2 rounded-lg h-10 px-4 bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors"
+                      onclick="window.__sp.openNaskahSoalFromKonfigurasi()"
+                    >
+                      <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+                      Naskah Soal
+                    </button>
+                  </div>
+                </div>
+                <div class="h-px bg-border-light dark:bg-border-dark"></div>
+              ` : ``}
               <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div class="flex items-center gap-3">
                   <div class="size-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">${sectionLetter(
                     idx
                   )}</div>
                   <div>
-                    <div class="text-sm font-bold">Bagian ${idx + 1}</div>
-                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Konfigurasi terpisah per bagian</div>
+                    <div class="text-sm font-bold">Bentuk Soal ${idx + 1}</div>
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Konfigurasi terpisah per Bentuk Soal</div>
                   </div>
                 </div>
                 <div class="flex gap-2">
-                  <button
-                    class="flex items-center gap-2 rounded-lg h-9 px-3 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors"
-                    onclick="window.__sp.duplicateSection('${s.id}')"
-                  >
-                    <span class="material-symbols-outlined text-[18px]">content_copy</span>
-                    Duplikat
-                  </button>
-                  <button
-                    class="flex items-center gap-2 rounded-lg h-9 px-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 text-sm font-bold transition-colors"
-                    onclick="window.__sp.removeSection('${s.id}')"
-                  >
-                    <span class="material-symbols-outlined text-[18px]">delete</span>
-                    Hapus
-                  </button>
+                  ${idx > 0 ? `
+                    <button
+                      class="flex items-center gap-2 rounded-lg h-9 px-3 bg-white dark:bg-surface-dark border border-border-light dark:border-border-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold shadow-sm transition-colors"
+                      onclick="window.__sp.addSection()"
+                    >
+                      <span class="material-symbols-outlined text-[18px]">add</span>
+                      Tambah Bentuk Soal
+                    </button>
+                  ` : ``}
+                  ${(idx > 0 && state.sections.length > 1) ? `
+                    <button
+                      class="flex items-center gap-2 rounded-lg h-9 px-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 text-sm font-bold transition-colors"
+                      onclick="window.__sp.removeSection('${s.id}')"
+                    >
+                      <span class="material-symbols-outlined text-[18px]">delete</span>
+                      Hapus
+                    </button>
+                  ` : ``}
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div class="flex flex-col gap-2">
-                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Judul Bagian</label>
-                  <input
-                    class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
-                    value="${safeText(s.judul || "")}"
-                    oninput="window.__sp.updateSection('${s.id}','judul',this.value,false)"
-                    onblur="window.__sp.updateSection('${s.id}','judul',this.value,true)"
-                  />
-                </div>
-                <div class="flex flex-col gap-2">
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                <div class="flex flex-col gap-2 ${showOpsiPG ? "" : "md:col-span-2"}">
                   <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Bentuk Soal</label>
                   <select
                     class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
@@ -8330,16 +9336,6 @@ ${baselineModulAjar}
                     <option value="uraian" ${s.bentuk === "uraian" ? "selected" : ""}>Uraian Panjang</option>
                   </select>
                 </div>
-                <div class="flex flex-col gap-2">
-                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Ilustrasi/Gambar</label>
-                  <label class="flex items-center gap-3 h-11 px-4 rounded-lg border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 cursor-pointer">
-                    <input type="checkbox" ${s.pakaiGambar ? "checked" : ""} onchange="window.__sp.updateSection('${s.id}','pakaiGambar',this.checked)" />
-                    <span class="text-sm font-semibold">Sertakan gambar</span>
-                  </label>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-1 md:grid-cols-${showOpsiPG ? 3 : 2} gap-5">
                 ${showOpsiPG ? `
                   <div class="flex flex-col gap-2">
                     <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jumlah Opsi PG</label>
@@ -8353,37 +9349,44 @@ ${baselineModulAjar}
                     </select>
                   </div>
                 ` : ``}
-                <div class="flex flex-col gap-2">
+                <div class="flex flex-col gap-2 ${showOpsiPG ? "" : "md:col-start-3"}">
                   <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jumlah Soal</label>
-                  <input
-                    type="number"
-                    min="0"
-                    class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
-                    value="${safeText(Number(isObjective ? s.jumlahPG : s.jumlahIsian) || 0)}"
-                    oninput="window.__sp.updateSection('${s.id}','${isObjective ? 'jumlahPG' : 'jumlahIsian'}',Number(this.value),false)"
-                    onblur="window.__sp.updateSection('${s.id}','${isObjective ? 'jumlahPG' : 'jumlahIsian'}',Number(this.value),true)"
-                  />
-                </div>
-                <div class="flex flex-col gap-2">
                   <div class="flex items-center gap-2">
-                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Soal Berkonteks (Stimulus)</label>
-                    <button type="button" class="inline-flex items-center justify-center size-7 rounded-md border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark/60 transition-colors" onclick="window.__sp.openKonteksHelp(${jmlSoalKonteks})" title="Petunjuk">
-                      <span class="material-symbols-outlined text-[16px]">help</span>
+                    <button type="button"
+                      onclick="window.__sp.stepInput('${s.id}', '${isObjective ? 'jumlahPG' : 'jumlahIsian'}', -1, 0, 999)"
+                      class="h-11 w-11 rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center font-bold text-lg flex-shrink-0">
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min="0"
+                      class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm text-center font-semibold"
+                      value="${safeText(Number(isObjective ? s.jumlahPG : s.jumlahIsian) || 0)}"
+                      oninput="window.__sp.updateSection('${s.id}','${isObjective ? 'jumlahPG' : 'jumlahIsian'}',Number(this.value),false)"
+                      onblur="window.__sp.updateSection('${s.id}','${isObjective ? 'jumlahPG' : 'jumlahIsian'}',Number(this.value),true)"
+                    />
+                    <button type="button"
+                      onclick="window.__sp.stepInput('${s.id}', '${isObjective ? 'jumlahPG' : 'jumlahIsian'}', 1, 0, 999)"
+                      class="h-11 w-11 rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center font-bold text-lg flex-shrink-0">
+                      +
                     </button>
                   </div>
-                  <label class="flex items-center gap-3 h-11 px-4 rounded-lg border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 cursor-pointer">
-                    <input type="checkbox" ${s.soalKonteks ? "checked" : ""} onchange="window.__sp.updateSection('${s.id}','soalKonteks',this.checked)" />
-                    <span class="text-sm font-semibold">${s.soalKonteks ? "ON" : "OFF"} • 1 konteks untuk ${jmlSoalKonteks} soal</span>
-                  </label>
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                 <div class="p-5 rounded-xl bg-background-light dark:bg-background-dark/30 border border-border-light dark:border-border-dark">
                   <div class="flex items-center justify-between gap-3 mb-4">
                     <div>
-                      <div class="text-sm font-bold">Tingkat Kesulitan</div>
-                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-1">Pilih tingkat kesulitan soal</div>
+                      <div class="flex items-center gap-1">
+                        <div class="text-sm font-bold">Tingkat Kesulitan</div>
+                        <button type="button"
+                          class="h-5 w-5 inline-flex items-center justify-center rounded-full text-text-sub-light dark:text-text-sub-dark hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                          title="'Sedang' untuk ulangan harian. 'Campuran' gabungkan mudah-sedang-sulit untuk PTS/PAS."
+                          aria-label="Penjelasan Tingkat Kesulitan">
+                          <span class="material-symbols-outlined text-[14px]">help</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div class="grid grid-cols-1 gap-3">
@@ -8401,8 +9404,15 @@ ${baselineModulAjar}
                 <div class="p-5 rounded-xl bg-background-light dark:bg-background-dark/30 border border-border-light dark:border-border-dark">
                   <div class="flex items-center justify-between gap-3 mb-4">
                     <div>
-                      <div class="text-sm font-bold">Dimensi Kognitif (Bloom)</div>
-                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-1">Pilih cakupan dimensi kognitif</div>
+                      <div class="flex items-center gap-1">
+                        <div class="text-sm font-bold">Dimensi Kognitif (Bloom)</div>
+                        <button type="button"
+                          class="h-5 w-5 inline-flex items-center justify-center rounded-full text-text-sub-light dark:text-text-sub-dark hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                          title="Tingkat berpikir: C1 (mengingat) hingga C6 (mencipta). Pilih 'Standar' kalau ragu."
+                          aria-label="Penjelasan Dimensi Bloom">
+                          <span class="material-symbols-outlined text-[14px]">help</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div class="grid grid-cols-1 gap-3">
@@ -8417,6 +9427,341 @@ ${baselineModulAjar}
                   </div>
                 </div>
               </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                <div class="bg-gray-50 dark:bg-gray-800/40 rounded-lg p-3.5 border border-border-light dark:border-border-dark">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                      <div class="text-sm font-semibold">Ilustrasi/Gambar</div>
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5">
+                        ${s.pakaiGambar ? "Pakai gambar" : "Tidak pakai gambar"}
+                      </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" class="sr-only peer" ${s.pakaiGambar ? "checked" : ""} onchange="window.__sp.updateSection('${s.id}','pakaiGambar',this.checked)" />
+                      <div class="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800/40 rounded-lg p-3.5 border border-border-light dark:border-border-dark">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-1">
+                        <div class="text-sm font-semibold">Soal Berkonteks (Stimulus)</div>
+                        <button type="button"
+                          class="size-4 inline-flex items-center justify-center rounded-full text-text-sub-light dark:text-text-sub-dark hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                          title="Stimulus = teks/cerita pengantar sebelum soal. Cocok untuk soal HOTS atau literasi."
+                          aria-label="Apa itu Stimulus?"
+                          onclick="window.__sp.openKonteksHelp(${jmlSoalKonteks})">
+                          <span class="material-symbols-outlined text-[12px]">help</span>
+                        </button>
+                      </div>
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5">
+                        ${s.soalKonteks ? `Pakai stimulus • 1 konteks untuk ${jmlSoalKonteks} soal` : "Tidak pakai stimulus"}
+                      </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" class="sr-only peer" ${s.soalKonteks ? "checked" : ""} onchange="window.__sp.updateSection('${s.id}','soalKonteks',this.checked)" />
+                      <div class="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      };
+
+      const renderQuickPickerCard = () => {
+        const totalQuestions = Array.isArray(state.questions) ? state.questions.length : 0;
+        const paketTitle = String(state.paket?.judul || state.identity?.mataPelajaran || "Paket Aktif");
+        const paketDesc = `${totalQuestions} soal · ${String(state.identity?.jenjang || "-")} ${String(state.identity?.kelas || "")}`.trim();
+        const usingDifferentPaket = state.quizPaketId != null;
+
+        if (totalQuestions === 0) {
+          return `
+            <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-xl p-4 m-4">
+              <div class="flex items-start gap-3">
+                <span class="material-symbols-outlined text-amber-600 dark:text-amber-400 text-[24px]">info</span>
+                <div class="flex-1">
+                  <div class="font-bold text-amber-900 dark:text-amber-200 mb-1">Belum ada paket soal</div>
+                  <div class="text-sm text-amber-800 dark:text-amber-300 mb-3">Buat paket soal dulu di menu "Buat Soal", atau pilih dari paket yang sudah tersimpan.</div>
+                  <button onclick="window.__sp.openPaketBrowseModal()" class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold">
+                    <span class="material-symbols-outlined text-[16px]">folder_open</span>
+                    Pilih dari Riwayat
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="bg-white dark:bg-surface-dark border-2 border-primary rounded-xl p-4 m-4">
+            <div class="flex items-start justify-between gap-3 mb-3">
+              <div class="flex items-center gap-2">
+                <div class="w-7 h-7 bg-blue-100 dark:bg-blue-900/30 text-primary rounded-full flex items-center justify-center">
+                  <span class="material-symbols-outlined text-[16px]">folder_open</span>
+                </div>
+                <div>
+                  <div class="text-sm font-bold">Paket Soal untuk Quiz</div>
+                  <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Pilih paket yang sudah dibuat sebelumnya</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-md p-3 flex items-center gap-3 mb-2">
+              <div class="w-8 h-8 bg-white dark:bg-surface-dark text-green-700 dark:text-green-400 rounded-md flex items-center justify-center flex-shrink-0">
+                <span class="material-symbols-outlined text-[18px]">check</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-bold text-green-900 dark:text-green-200 truncate">${safeText(paketTitle)}</div>
+                <div class="text-xs text-green-700 dark:text-green-300">${safeText(paketDesc)}</div>
+              </div>
+              ${usingDifferentPaket ? `
+                <button onclick="window.__sp.resetQuizPaket()" class="text-xs text-green-700 dark:text-green-400 hover:underline font-bold">
+                  Reset
+                </button>
+              ` : ''}
+            </div>
+
+            <button onclick="window.__sp.openPaketBrowseModal()" class="w-full h-9 border border-dashed border-gray-300 dark:border-gray-600 rounded-md text-sm text-text-sub-light dark:text-text-sub-dark hover:bg-gray-50 dark:hover:bg-gray-800 flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-[16px]">search</span>
+              Pilih paket lain dari riwayat...
+            </button>
+          </div>
+        `;
+      };
+
+      const renderPaketBrowseModal = () => {
+        if (!state._showPaketBrowseModal) return '';
+
+        const list = Array.isArray(state._paketBrowseList) ? state._paketBrowseList : [];
+        const q = String(state._paketBrowseSearch || "");
+        const search = q.trim().toLowerCase();
+        const filtered = search
+          ? list.filter((it) => String(it?.title || "").toLowerCase().includes(search))
+          : list;
+
+        const now = Date.now();
+        const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+        const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+        const groups = { thisWeek: [], thisMonth: [], older: [] };
+
+        filtered.forEach((it) => {
+          const raw = String(it?.created_at || "");
+          const t = new Date(raw.includes(" ") ? raw.replace(" ", "T") : raw).getTime();
+          if (Number.isNaN(t)) {
+            groups.older.push(it);
+          } else if (t > sevenDaysAgo) {
+            groups.thisWeek.push(it);
+          } else if (t > thirtyDaysAgo) {
+            groups.thisMonth.push(it);
+          } else {
+            groups.older.push(it);
+          }
+        });
+
+        const renderPaketItem = (it) => {
+          const id = Number(it?.id);
+          const isSelected = state.quizPaketId === id;
+          const dateStr = (() => {
+            try {
+              const raw = String(it?.created_at || "");
+              const d = new Date(raw.includes(" ") ? raw.replace(" ", "T") : raw);
+              if (Number.isNaN(d.getTime())) return raw || "";
+              return d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
+            } catch {
+              return String(it?.created_at || "");
+            }
+          })();
+          const baseCls = isSelected
+            ? "border-2 border-primary bg-blue-50 dark:bg-blue-900/20"
+            : "border border-gray-200 dark:border-gray-700 bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800";
+
+          return `
+            <button onclick="window.__sp.loadPaketForQuiz(${id})" class="w-full flex items-center gap-3 p-3 ${baseCls} rounded-md text-left transition-colors">
+              <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 text-primary rounded-md flex items-center justify-center flex-shrink-0">
+                <span class="material-symbols-outlined text-[20px]">description</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-bold ${isSelected ? "text-primary" : ""} truncate">${safeText(it?.title || "Paket Tanpa Judul")}</div>
+                <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${Number(it?.question_count || 0)} soal · ${safeText(dateStr)}</div>
+              </div>
+              ${isSelected ? `<span class="material-symbols-outlined text-primary text-[20px]">check</span>` : ``}
+            </button>
+          `;
+        };
+
+        const renderGroup = (title, items) => {
+          if (!items.length) return "";
+          return `
+            <div class="px-4 pt-3 pb-1">
+              <div class="text-[10px] uppercase tracking-wide text-text-sub-light dark:text-text-sub-dark font-bold">${safeText(title)}</div>
+            </div>
+            <div class="px-4 pb-2 space-y-1.5">
+              ${items.map(renderPaketItem).join("")}
+            </div>
+          `;
+        };
+
+        const totalCount = list.length;
+        const filteredCount = filtered.length;
+
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onclick="if (event.target === this) window.__sp.closePaketBrowseModal()">
+            <div class="bg-white dark:bg-surface-dark rounded-2xl max-w-md w-full max-h-[80vh] flex flex-col overflow-hidden shadow-xl">
+
+              <div class="p-5 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <div class="text-lg font-bold">Pilih Paket Soal</div>
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5">Pilih dari riwayat paket soal Anda</div>
+                  </div>
+                  <button onclick="window.__sp.closePaketBrowseModal()" class="w-8 h-8 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md flex items-center justify-center" aria-label="Tutup">
+                    <span class="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+
+                <div class="relative">
+                  <input
+                    type="text"
+                    placeholder="Cari judul paket..."
+                    value="${safeText(state._paketBrowseSearch || "")}"
+                    oninput="window.__sp.updatePaketBrowseSearch(this.value)"
+                    class="w-full h-10 pl-10 pr-3 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-surface-dark focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" />
+                  <span class="material-symbols-outlined text-[18px] text-text-sub-light dark:text-text-sub-dark absolute left-3 top-1/2 -translate-y-1/2">search</span>
+                </div>
+              </div>
+
+              <div class="flex-1 overflow-y-auto">
+                ${state._paketBrowseLoading ? `
+                  <div class="p-8 text-center">
+                    <span class="material-symbols-outlined animate-spin text-[28px] text-primary mb-2">progress_activity</span>
+                    <div class="text-sm text-text-sub-light dark:text-text-sub-dark">Memuat daftar paket...</div>
+                  </div>
+                ` : filtered.length === 0 ? `
+                  <div class="p-8 text-center">
+                    <span class="material-symbols-outlined text-[40px] text-gray-400 dark:text-gray-600 mb-2">folder_off</span>
+                    <div class="text-sm font-bold mb-1">${search ? "Tidak ada paket yang cocok" : "Belum ada paket soal"}</div>
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${search ? `Tidak ditemukan paket dengan kata kunci "${safeText(q)}"` : 'Buat paket soal dulu di menu "Buat Soal"'}</div>
+                  </div>
+                ` : `
+                  ${renderGroup("Minggu Ini", groups.thisWeek)}
+                  ${renderGroup("Bulan Ini", groups.thisMonth)}
+                  ${renderGroup("Lebih Lama", groups.older)}
+                `}
+              </div>
+
+              <div class="p-3 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <div class="text-xs text-text-sub-light dark:text-text-sub-dark">
+                  ${filteredCount === totalCount ? `${totalCount} paket` : `${filteredCount} dari ${totalCount} paket`}
+                </div>
+                <button onclick="window.__sp.closePaketBrowseModal()" class="h-9 px-4 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold">
+                  Tutup
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      };
+
+      const renderPubBrowseModal = () => {
+        if (!state._showPubBrowseModal) return '';
+
+        const items = Array.isArray(state.quizPublications) ? state.quizPublications : [];
+        const q = String(state._pubBrowseSearch || "");
+        const search = q.trim().toLowerCase();
+        const filtered = search
+          ? items.filter((it) => {
+              const slug = String(it?.slug || '').toLowerCase();
+              const mapel = String(it?.mapel || '').toLowerCase();
+              const kelas = String(it?.kelas || '').toLowerCase();
+              const created = String(it?.created_at || '').toLowerCase();
+              return slug.includes(search) || mapel.includes(search) || kelas.includes(search) || created.includes(search);
+            })
+          : items;
+        const selected = String(state.quizSelectedSlug || '');
+
+        const renderItem = (it) => {
+          const slug = String(it?.slug || '').trim();
+          const isSelected = slug && slug === selected;
+          const mapel = String(it?.mapel || '').trim();
+          const kelas = String(it?.kelas || '').trim();
+          const createdAt = String(it?.created_at || '').trim();
+          const status = (() => {
+            const active = Number(it?.is_active ?? 1) === 1;
+            const expRaw = String(it?.expire_at || '').trim();
+            const exp = expRaw ? new Date(expRaw.replace(' ', 'T')) : null;
+            const expired = exp && !Number.isNaN(exp.getTime()) ? exp.getTime() < Date.now() : false;
+            if (!active) return { text: 'Nonaktif', cls: 'bg-red-50 text-red-700 border-red-200' };
+            if (expired) return { text: 'Kedaluwarsa', cls: 'bg-amber-50 text-amber-800 border-amber-200' };
+            return { text: 'Aktif', cls: 'bg-green-50 text-green-800 border-green-200' };
+          })();
+          const baseCls = isSelected
+            ? "border-2 border-primary bg-blue-50 dark:bg-blue-900/20"
+            : "border border-gray-200 dark:border-gray-700 bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800";
+
+          return `
+            <button type="button"
+              onclick="window.__sp.pickQuizPublication('${safeText(slug)}')"
+              class="w-full text-left p-3 rounded-lg ${baseCls}">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                  <div class="font-bold truncate">${safeText(slug || '-')}</div>
+                  <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5 truncate">
+                    ${safeText([mapel, kelas, createdAt].filter(Boolean).join(' • '))}
+                  </div>
+                </div>
+                <span class="inline-flex items-center px-2.5 h-7 rounded-full border text-xs font-semibold ${status.cls}">${status.text}</span>
+              </div>
+            </button>
+          `;
+        };
+
+        return `
+          <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onclick="if (event.target === this) window.__sp.closePubBrowseModal()">
+            <div class="bg-white dark:bg-surface-dark rounded-2xl max-w-lg w-full max-h-[80vh] flex flex-col overflow-hidden shadow-xl">
+              <div class="p-5 pb-3 border-b border-gray-200 dark:border-gray-700">
+                <div class="flex items-start justify-between gap-3 mb-3">
+                  <div>
+                    <div class="text-lg font-bold">Pilih Link Quiz</div>
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5">Pilih dari daftar link yang sudah dipublish</div>
+                  </div>
+                  <button onclick="window.__sp.closePubBrowseModal()" class="w-8 h-8 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md flex items-center justify-center" aria-label="Tutup">
+                    <span class="material-symbols-outlined text-[18px]">close</span>
+                  </button>
+                </div>
+
+                <div class="relative">
+                  <input
+                    type="text"
+                    placeholder="Cari slug / mapel / kelas..."
+                    value="${safeText(state._pubBrowseSearch || "")}"
+                    oninput="window.__sp.updatePubBrowseSearch(this.value)"
+                    class="w-full h-10 pl-10 pr-3 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-surface-dark focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" />
+                  <span class="material-symbols-outlined text-[18px] text-text-sub-light dark:text-text-sub-dark absolute left-3 top-1/2 -translate-y-1/2">search</span>
+                </div>
+              </div>
+
+              <div class="flex-1 overflow-y-auto p-4 space-y-2">
+                ${filtered.length === 0 ? `
+                  <div class="p-8 text-center">
+                    <span class="material-symbols-outlined text-[40px] text-gray-400 dark:text-gray-600 mb-2">link_off</span>
+                    <div class="text-sm font-bold mb-1">${search ? "Tidak ada link yang cocok" : "Belum ada link quiz"}</div>
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${search ? `Tidak ditemukan dengan kata kunci "${safeText(q)}"` : 'Buat link quiz dulu di tab "Buat Link Quiz".'}</div>
+                  </div>
+                ` : filtered.map(renderItem).join('')}
+              </div>
+
+              <div class="p-3 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
+                <div class="text-xs text-text-sub-light dark:text-text-sub-dark">
+                  ${filtered.length === items.length ? `${items.length} link` : `${filtered.length} dari ${items.length} link`}
+                </div>
+                <button onclick="window.__sp.closePubBrowseModal()" class="h-9 px-4 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold">
+                  Tutup
+                </button>
+              </div>
             </div>
           </div>
         `;
@@ -8430,27 +9775,24 @@ ${baselineModulAjar}
         const baseForSlug = mapel || judulPaket || 'soal';
         const slugDefault = baseForSlug.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
         if (!state.quizPublishForm.slug) state.quizPublishForm.slug = slugDefault || 'kelas';
-        const tabs = `
-          <div class="flex items-center justify-between gap-2 border-b border-border-light dark:border-border-dark px-4 pt-4 pb-3">
-            <div class="flex items-center gap-2">
-              <button onclick="window.__sp.toggleQuizPreviewPanel()" class="inline-flex items-center gap-2 h-10 px-3 rounded-lg text-sm font-bold border ${state.quizShowPreview ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-surface-dark border-border-light dark:border-border-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'}">
-                <span class="material-symbols-outlined text-[18px]">quiz</span>
-                Soal untuk Quiz
-              </button>
-              <button onclick="window.__sp.setQuizTab('live')" class="inline-flex items-center gap-2 h-10 px-3 rounded-lg text-sm font-bold border ${(!state.quizShowPreview && sub==='live')?'bg-primary text-white border-primary':'bg-white dark:bg-surface-dark border-border-light dark:border-border-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'}">
-                <span class="material-symbols-outlined text-[18px]">sports_esports</span>
-                Quiz Live
-              </button>
-              <button onclick="window.__sp.setQuizTab('share')" class="inline-flex items-center gap-2 h-10 px-3 rounded-lg text-sm font-bold border ${(!state.quizShowPreview && sub==='share')?'bg-primary text-white border-primary':'bg-white dark:bg-surface-dark border-border-light dark:border-border-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'}">
-                <span class="material-symbols-outlined text-[18px]">link</span>
-                Bagikan Link
-              </button>
+        const page = state.quizShowPreview
+          ? 'pilih'
+          : (sub === 'share' ? (shareTab === 'hasil' ? 'hasil' : 'buat_link') : 'live');
+        const topNav = !HAS_QUIZ_ACCESS ? '' : `
+          <div class="flex items-center justify-between gap-2 pt-4">
+            <div class="flex-1 min-w-0">
+              <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
+                <button class="${page==='pilih'?'bg-primary text-white':'bg-white dark:bg-surface-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap"
+                  onclick="window.__sp.setQuizPage('pilih')">1. Pilih Soal untuk Quiz</button>
+                <button class="${page==='buat_link'?'bg-primary text-white':'bg-white dark:bg-surface-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap"
+                  onclick="window.__sp.setQuizPage('buat_link')">2. Buat Link Quiz</button>
+                <button class="${page==='hasil'?'bg-primary text-white':'bg-white dark:bg-surface-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap"
+                  onclick="window.__sp.setQuizPage('hasil')">3. Lihat Hasil Quiz</button>
+                <button class="${page==='live'?'bg-primary text-white':'bg-white dark:bg-surface-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap"
+                  onclick="window.__sp.setQuizPage('live')">4. Quiz Live</button>
+              </div>
             </div>
             <div class="flex items-center gap-2">
-              <span class="hidden md:inline-flex items-center gap-2 h-10 px-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-900 text-sm font-bold">
-                <span class="material-symbols-outlined text-[18px]">info</span>
-                Quiz mendukung soal PG, PG Kompleks dan Benar/Salah
-              </span>
               <button class="inline-flex items-center gap-2 h-10 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
                 onclick="window.__sp.openQuizHelp()"><span class="material-symbols-outlined text-[18px]">help</span><span class="hidden md:inline">Petunjuk</span></button>
               <button class="inline-flex items-center gap-2 h-10 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
@@ -8476,14 +9818,14 @@ ${baselineModulAjar}
               <div class="text-xl font-bold">Quiz Live</div>
               <div class="text-sm text-text-sub-light dark:text-text-sub-dark">${haveQuestions ? 'Mode interaktif: tampilkan soal di layar guru dan jalankan kuis di kelas. Cek dulu di “Soal untuk Quiz” untuk memastikan soal yang akan dipakai.' : 'Buat naskah soal dulu di menu Buat Soal (Identitas/Konfigurasi). Setelah ada, cek “Soal untuk Quiz”, lalu mulai Quiz Live atau Bagikan Link.'}</div>
             </div>
-            <button ${haveQuestions ? '' : 'disabled'} onclick="openQuiz()" class="px-4 py-2 rounded-lg ${haveQuestions ? 'bg-primary hover:bg-blue-600 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'} font-bold">Mulai Quiz Live</button>
+            <button ${haveQuestions ? '' : 'disabled'} onclick="openQuiz()" class="px-4 py-2 rounded-lg ${haveQuestions ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'} font-bold">Mulai Quiz Live</button>
           </div>
         `;
         const pub = (() => {
           const f = state.quizPublishForm || {};
           const last = state.quizLastLink || '';
           return `
-            <div class="p-6 space-y-5">
+            <div class="px-4 py-5 md:px-6 md:py-6 space-y-4">
               <div>
                 <div class="flex items-center gap-2">
                   <div class="text-xl font-bold">Bagikan Link</div>
@@ -8495,7 +9837,7 @@ ${baselineModulAjar}
                     <span class="material-symbols-outlined text-[18px]">help</span>
                   </button>
                 </div>
-                <div class="text-sm text-text-sub-light mt-1">Buat tautan yang bisa diakses siswa tanpa login (untuk tugas/ujian mandiri).</div>
+                <div class="text-sm text-text-sub-light mt-0.5">Buat tautan yang bisa diakses siswa tanpa login (untuk tugas/ujian mandiri).</div>
               </div>
               <div id="modalBagikanLinkHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
                 <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[800px] max-height-[85vh] overflow-auto">
@@ -8540,123 +9882,343 @@ ${baselineModulAjar}
                   <div id="blfhBody" class="p-5 text-sm leading-relaxed"></div>
                 </div>
               </div>
-              <div class="rounded-xl border bg-white dark:bg-surface-dark p-4 space-y-4">
-                <div class="font-bold">A. Pengaturan Link</div>
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  <div class="space-y-1.5 md:col-span-6">
-                    <div class="flex items-center gap-2">
-                      <label class="text-sm font-semibold">Nama Link (wajib)</label>
-                      <button type="button" class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('slug')">
-                        <span class="material-symbols-outlined text-[18px]">help</span>
-                      </button>
-                    </div>
-                    <input class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(f.slug || '')}" placeholder="contoh: biologi-kls10-pts" oninput="window.__sp.setQuizPublish('slug', this.value)">
-                  </div>
+              <div class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div class="space-y-1.5 md:col-span-2">
                     <div class="flex items-center gap-2">
-                      <label class="text-sm font-semibold">Jumlah Siswa</label>
-                      <button type="button" class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('jumlah')">
-                        <span class="material-symbols-outlined text-[18px]">help</span>
+                      <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">
+                        Nama Link <span class="text-red-600">*</span>
+                      </label>
+                      <button type="button" class="flex size-7 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('slug')">
+                        <span class="material-symbols-outlined text-[15px]">help</span>
                       </button>
                     </div>
-                    <input type="number" min="1" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${Number(f.jumlah||32)}" placeholder="contoh: 32" oninput="window.__sp.setQuizPublish('jumlah', Number(this.value))">
+                    <input class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm outline-none" value="${safeText(f.slug || '')}" placeholder="contoh: ulangan-pencernaan-5a" oninput="window.__sp.setQuizPublish('slug', this.value)">
                   </div>
-                  <div class="space-y-1.5 md:col-span-4">
+
+                  <div class="space-y-1.5">
                     <div class="flex items-center gap-2">
-                      <label class="text-sm font-semibold">Batas Waktu Link (opsional)</label>
-                      <button type="button" class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('expire')">
-                        <span class="material-symbols-outlined text-[18px]">help</span>
+                      <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jumlah Siswa</label>
+                      <button type="button" class="flex size-7 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('jumlah')">
+                        <span class="material-symbols-outlined text-[15px]">help</span>
                       </button>
                     </div>
-                    ${(() => {
-                      const parts = parseExpireParts(f.expire || '');
-                      const hourOptions = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
-                        .map(h => `<option value="${h}" ${h===parts.hh?'selected':''}>${h}</option>`).join('');
-                      const minOptions = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'))
-                        .map(m => `<option value="${m}" ${m===parts.mm?'selected':''}>${m}</option>`).join('');
-                      return `
-                        <div class="flex items-center gap-2 flex-wrap">
-                          <input placeholder="31-12-2026" class="w-[12ch] h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" value="${safeText(parts.date)}" oninput="window.__sp.setQuizExpirePart('date', this.value)">
-                          <select class="w-20 h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" onchange="window.__sp.setQuizExpirePart('hh', this.value)">${hourOptions}</select>
-                          <select class="w-20 h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark" onchange="window.__sp.setQuizExpirePart('mm', this.value)">${minOptions}</select>
+                    <input type="number" min="1" max="50" class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm text-center outline-none" value="${Number(f.jumlah||32)}" placeholder="32" oninput="window.__sp.setQuizPublish('jumlah', Number(this.value))">
+                  </div>
+                </div>
+
+                <div class="space-y-1.5">
+                  <div class="flex items-center gap-2">
+                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Batas Waktu Link <span class="font-normal">(opsional)</span></label>
+                    <button type="button" class="flex size-7 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('expire')">
+                      <span class="material-symbols-outlined text-[15px]">help</span>
+                    </button>
+                  </div>
+                  ${(() => {
+                    const parts = parseExpireParts(f.expire || '');
+                    let datetimeValue = '';
+                    if (parts.date && /^\d{2}-\d{2}-\d{4}$/.test(parts.date)) {
+                      const [dd, mm, yyyy] = parts.date.split('-');
+                      datetimeValue = `${yyyy}-${mm}-${dd}T${parts.hh}:${parts.mm}`;
+                    }
+                    return `
+                      <input 
+                        type="datetime-local" 
+                        class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm outline-none" 
+                        value="${datetimeValue}"
+                        onchange="window.__sp.setQuizExpireDatetime(this.value)">
+                    `;
+                  })()}
+                  <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Link otomatis nonaktif setelah batas waktu. Kosongkan untuk tanpa batas.</div>
+                </div>
+              </div>
+
+              <details class="rounded-xl border bg-white dark:bg-surface-dark p-4 group overflow-hidden">
+                <summary class="list-none cursor-pointer flex items-center gap-2">
+                  <div class="w-7 h-7 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[16px]">tune</span>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-base font-bold">Opsi Tambahan</div>
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Opsional — pengaturan untuk siswa saat mengerjakan</div>
+                  </div>
+                  <button type="button" class="flex size-7 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="event.stopPropagation(); window.__sp.openBagikanLinkFieldHelp('opsi')">
+                    <span class="material-symbols-outlined text-[15px]">help</span>
+                  </button>
+                  <span class="material-symbols-outlined text-[18px] text-text-sub-light dark:text-text-sub-dark group-open:rotate-180 transition-transform">expand_more</span>
+                </summary>
+                <div class="pt-3 space-y-3">
+                  <label class="flex items-start gap-2.5 p-3 border ${f.showSolution ? 'border-primary bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'} rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <input type="checkbox" ${f.showSolution ? 'checked' : ''} onchange="window.__sp.setQuizPublish('showSolution', this.checked)" class="mt-0.5">
+                    <div class="flex-1">
+                      <div class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Tampilkan jawaban setelah submit</div>
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5">Siswa bisa lihat jawaban benar & pembahasan setelah selesai mengerjakan</div>
+                    </div>
+                  </label>
+
+                  <label class="flex items-start gap-2.5 p-3 border ${(f.includeImages ?? true) ? 'border-primary bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'} rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <input type="checkbox" ${(f.includeImages ?? true) ? 'checked' : ''} onchange="window.__sp.setQuizPublish('includeImages', this.checked)" class="mt-0.5">
+                    <div class="flex-1">
+                      <div class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Sertakan gambar soal</div>
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5">Maksimal 5 gambar pertama akan ditampilkan</div>
+                    </div>
+                  </label>
+
+                  <div class="pt-3 mt-1 border-t border-border-light dark:border-border-dark">
+                    <div class="flex items-center justify-between gap-2">
+                      <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span class="material-symbols-outlined text-[16px]">group</span>
                         </div>
-                      `;
-                    })()}
+                        <div>
+                          <div class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Data Siswa</div>
+                          <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Opsional — untuk link unik per siswa</div>
+                        </div>
+                      </div>
+                      <button type="button" class="flex size-7 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('roster')">
+                        <span class="material-symbols-outlined text-[15px]">help</span>
+                      </button>
+                    </div>
+
+                    <div class="flex items-center gap-2 flex-wrap mt-2">
+                      <button type="button" onclick="document.getElementById('rosterPicker').click()" class="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-semibold">
+                        <span class="material-symbols-outlined text-[15px]">upload</span>
+                        Upload CSV/TXT
+                      </button>
+                      <button type="button" onclick="window.__sp.downloadRosterTemplate()" class="inline-flex items-center gap-1.5 px-3 h-9 text-primary hover:underline text-sm font-semibold">
+                        <span class="material-symbols-outlined text-[15px]">download</span>
+                        Download template
+                      </button>
+                      ${Array.isArray(f.roster) && f.roster.length ? `
+                        <button type="button" onclick="window.__sp.clearQuizRoster()" class="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-sm font-semibold">
+                          <span class="material-symbols-outlined text-[15px]">delete</span>
+                          Hapus
+                        </button>
+                      ` : ``}
+                      <div class="flex-1 text-right text-xs text-text-sub-light dark:text-text-sub-dark">
+                        ${Array.isArray(f.roster) && f.roster.length ? `<span class="text-green-700 dark:text-green-400 font-semibold">${f.roster.length} siswa terbaca</span>` : 'Belum ada file'}
+                      </div>
+                    </div>
+
+                    ${Array.isArray(f.roster) && f.roster.length ? `
+                      <div class="rounded-lg border border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-700 p-3 flex items-center gap-2.5 mt-2">
+                        <span class="material-symbols-outlined text-green-600 dark:text-green-400 text-[20px]">check_circle</span>
+                        <div class="text-sm text-green-800 dark:text-green-200">
+                          Berhasil upload <strong>${f.roster.length} siswa</strong>. Link unik per siswa akan tampil setelah klik "Buat Link Quiz".
+                        </div>
+                      </div>
+                    ` : ``}
                   </div>
                 </div>
-              </div>
-              <div class="rounded-xl border bg-white dark:bg-surface-dark p-4 space-y-3">
-                <div class="flex items-center gap-2">
-                  <div class="font-bold">B. Opsi</div>
-                  <button type="button" class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('opsi')">
-                    <span class="material-symbols-outlined text-[18px]">help</span>
-                  </button>
-                </div>
-                <label class="inline-flex items-center gap-2 text-sm">
-                  <input type="checkbox" ${f.showSolution ? 'checked' : ''} onchange="window.__sp.setQuizPublish('showSolution', this.checked)">
-                  <span>Tampilkan jawaban & pembahasan setelah submit</span>
-                </label>
-                <label class="inline-flex items-center gap-2 text-sm">
-                  <input type="checkbox" ${(f.includeImages ?? true) ? 'checked' : ''} onchange="window.__sp.setQuizPublish('includeImages', this.checked)">
-                  <span>Sertakan gambar (maks 5)</span>
-                </label>
-              </div>
-              <div class="rounded-xl border bg-white dark:bg-surface-dark p-4 space-y-3">
-                <div class="flex items-center gap-2">
-                  <div class="font-bold">C. Data Siswa (tidak wajib)</div>
-                  <button type="button" class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('roster')">
-                    <span class="material-symbols-outlined text-[18px]">help</span>
-                  </button>
-                </div>
-                <div class="flex items-center gap-3 flex-wrap">
-                  <button type="button" onclick="document.getElementById('rosterPicker').click()" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark">Upload CSV/TXT</button>
-                  <button type="button" onclick="window.__sp.downloadRosterTemplate()" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark">Download Template TXT</button>
-                  <div class="text-xs text-text-sub-light">${Array.isArray(f.roster) && f.roster.length ? `Terbaca ${f.roster.length} siswa` : 'Belum ada file diunggah'}</div>
-                </div>
-                ${Array.isArray(f.roster) && f.roster.length ? `
-                  <div class="rounded-lg border border-green-200 bg-green-50 text-green-800 p-3 text-sm">
-                    Berhasil diupload: terbaca <b>${f.roster.length}</b> siswa.
-                  </div>
-                ` : ``}
-              </div>
-              <div class="flex items-center gap-3">
-                <button onclick="window.__sp.publishQuiz()" class="px-4 h-11 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold">Buat & Salin Link</button>
-                <div id="pubMsg" class="text-sm text-text-sub-light"></div>
+              </details>
+
+              <div class="space-y-2">
+                <button onclick="window.__sp.publishQuiz()" class="w-full h-12 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold text-base inline-flex items-center justify-center gap-2 transition-colors">
+                  <span class="material-symbols-outlined text-[20px]">link</span>
+                  Buat Link Quiz
+                </button>
+                <div id="pubMsg" class="text-sm text-text-sub-light text-center min-h-[1.25rem]"></div>
               </div>
               ${(() => {
                 const hasRoster = Array.isArray(f.roster) && f.roster.length > 0;
                 const showLast = last && (!hasRoster || !state.quizLastPubId);
-                return showLast ? `
-                <div class="space-y-2">
-                  <div class="text-xs text-text-sub-light">Link untuk siswa:</div>
-                  <code class="block px-2.5 py-1 rounded-md border bg-white dark:bg-surface-dark font-mono text-xs">${last}</code>
-                  <div>
-                    <button type="button" data-link="${last}" onclick="navigator.clipboard.writeText(this.getAttribute('data-link')); this.textContent='Disalin'; setTimeout(()=>this.textContent='Salin',1500)" class="px-3 h-9 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm">Salin</button>
-                  </div>
-                </div>
-                ` : ``;
-              })()}
-              ${Array.isArray(f.roster) && f.roster.length && state.quizLastPubId ? (() => {
-                const rows = f.roster.map(r => {
-                  const nm = decodeMaybeUrlText(String(r.nama || ''));
-                  const link = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(state.quizLastPubId))}&n=${encodeURIComponent(String(r.absen))}&name=${encodeURIComponent(nm)}`;
-                  return `<tr><td class="border px-2 py-1 text-center">${r.absen}</td><td class="border px-2 py-1">${safeText(nm || '')}</td><td class="border px-2 py-1"><a href="${link}" target="_blank" class="text-blue-600 underline">${link}</a></td></tr>`;
-                }).join('');
+                if (!showLast) return ``;
+                const paketTitle = state.paket?.judul || state.identity?.mataPelajaran || 'Quiz';
+                const expRaw = String(state.quizPublishForm?.expire || '').trim();
+                const expText = expRaw ? expRaw : 'Tanpa batas waktu';
+                const waMessage = encodeURIComponent(
+                  `Halo semua, berikut link Quiz "${paketTitle}":\n\n${last}\n\nBatas waktu: ${expText}\n\nSilakan kerjakan sebaik-baiknya.`
+                );
+                const waLink = `https://wa.me/?text=${waMessage}`;
+                const jumlahText = String(Number(state.quizPublishForm?.jumlah || 0) || '-');
                 return `
-                  <div class="mt-3">
-                    <div class="flex items-center justify-between gap-2">
-                      <div class="text-sm font-semibold">Daftar Link Siswa (${f.roster.length})</div>
-                      <div class="flex items-center gap-2">
-                        <button class="px-4 h-9 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold" onclick="window.__sp.exportRosterLinksCSV(${Number(state.quizLastPubId)}, '${safeText(state.quizLastSlug||'')}')">Download CSV</button>
-                        <button class="px-4 h-9 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold inline-flex items-center gap-2" onclick="window.__sp.exportRosterLinksPDF(${Number(state.quizLastPubId)}, '${safeText(state.quizLastSlug||'')}')">
-                          <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
-                          Download PDF
+                  <div class="rounded-xl border-2 border-green-500 bg-white dark:bg-surface-dark p-5 space-y-4">
+                    <div class="flex items-center gap-3">
+                      <div class="w-10 h-10 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full flex items-center justify-center flex-shrink-0">
+                        <span class="material-symbols-outlined text-[22px]">check_circle</span>
+                      </div>
+                      <div class="flex-1">
+                        <div class="text-base font-bold text-green-800 dark:text-green-300">Link berhasil dibuat!</div>
+                        <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5">
+                          ${expRaw ? `Berlaku sampai ${safeText(expRaw)}` : 'Tanpa batas waktu'} · Untuk ${jumlahText} siswa
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                      <div class="text-xs uppercase tracking-wide text-text-sub-light dark:text-text-sub-dark font-bold mb-1.5">Link Quiz</div>
+                      <div class="flex gap-2 items-center flex-wrap">
+                        <input 
+                          type="text" 
+                          value="${safeAttr(last)}" 
+                          readonly 
+                          class="flex-1 min-w-[220px] h-10 px-3 rounded-md border bg-white dark:bg-surface-dark font-mono text-xs cursor-text"
+                          onclick="this.select()">
+                        <button 
+                          type="button" 
+                          data-link="${safeAttr(last)}" 
+                          onclick="navigator.clipboard.writeText(this.getAttribute('data-link')); const t=this.querySelector('.btn-label'); const orig=t.textContent; t.textContent='Tersalin!'; this.classList.add('bg-green-700'); setTimeout(()=>{t.textContent=orig; this.classList.remove('bg-green-700')},1500)" 
+                          class="h-10 px-4 rounded-md bg-primary hover:bg-blue-600 text-white text-sm font-bold inline-flex items-center gap-1.5 transition-colors flex-shrink-0">
+                          <span class="material-symbols-outlined text-[16px]">content_copy</span>
+                          <span class="btn-label">Salin</span>
                         </button>
                       </div>
                     </div>
-                    <div class="overflow-auto mt-2">
-                      <table class="min-w-full text-xs border">
-                        <thead><tr><th class="border px-2 py-1">No Absen</th><th class="border px-2 py-1">Nama Siswa</th><th class="border px-2 py-1">Link</th></tr></thead>
+
+                    <div>
+                      <div class="text-xs uppercase tracking-wide text-text-sub-light dark:text-text-sub-dark font-bold mb-2">Bagikan ke siswa</div>
+                      <div class="flex gap-2 flex-wrap">
+                        <a 
+                          href="${waLink}" 
+                          target="_blank" 
+                          rel="noopener"
+                          class="inline-flex items-center gap-2 h-10 px-4 rounded-md bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition-colors">
+                          <span class="material-symbols-outlined text-[18px]">chat</span>
+                          WhatsApp
+                        </a>
+                        <button 
+                          type="button"
+                          data-link="${safeAttr(last)}"
+                          data-title="${safeAttr(paketTitle)}"
+                          onclick="(function(btn){const link=btn.getAttribute('data-link'); const title=btn.getAttribute('data-title')||'Quiz'; if(navigator.share){navigator.share({title:'Quiz: '+title,text:'Berikut link Quiz untuk dikerjakan',url:link}).catch(()=>{})}else{navigator.clipboard.writeText(link); alert('Link disalin. Tempel di aplikasi pilihan Anda.')}})(this)"
+                          class="inline-flex items-center gap-2 h-10 px-4 rounded-md border bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold">
+                          <span class="material-symbols-outlined text-[18px]">share</span>
+                          Aplikasi Lain
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="flex gap-2 pt-3 border-t border-gray-200 dark:border-gray-700">
+                      <button 
+                        type="button"
+                        onclick="window.__sp.setQuizShareTab('hasil')"
+                        class="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-semibold text-primary hover:underline">
+                        <span class="material-symbols-outlined text-[16px]">visibility</span>
+                        Lihat Hasil Quiz Siswa
+                      </button>
+                      <div class="flex-1"></div>
+                      <button 
+                        type="button"
+                        onclick="window.__sp.publishQuiz()"
+                        class="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-semibold text-text-sub-light dark:text-text-sub-dark hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md">
+                        <span class="material-symbols-outlined text-[16px]">refresh</span>
+                        Buat Link Lain
+                      </button>
+                    </div>
+                  </div>
+                `;
+              })()}
+              ${Array.isArray(f.roster) && f.roster.length && state.quizLastPubId ? (() => {
+                const paketTitle = state.paket?.judul || state.identity?.mataPelajaran || 'Quiz';
+                const kelasText = state.identity?.kelas ? ` - ${state.identity.kelas}` : '';
+                const expRaw = String(state.quizPublishForm?.expire || '').trim();
+                const expText = expRaw ? `Batas waktu: ${expRaw} WIB` : 'Tanpa batas waktu';
+
+                const linkLines = f.roster.map(r => {
+                  const nm = decodeMaybeUrlText(String(r.nama || ''));
+                  const link = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(state.quizLastPubId))}&n=${encodeURIComponent(String(r.absen))}&name=${encodeURIComponent(nm)}`;
+                  return `${r.absen}. ${nm}: ${link}`;
+                }).join('\n');
+
+                const groupMessage = `🎓 *${paketTitle}${kelasText}*\n${expText}\n\nKlik link sesuai nomor absen Anda:\n\n${linkLines}\n\nSelamat mengerjakan!`;
+                const groupShareUrl = `https://wa.me/?text=${encodeURIComponent(groupMessage)}`;
+
+                const rows = f.roster.map(r => {
+                  const nm = decodeMaybeUrlText(String(r.nama || ''));
+                  const link = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(state.quizLastPubId))}&n=${encodeURIComponent(String(r.absen))}&name=${encodeURIComponent(nm)}`;
+                  const personalMessage = `Halo ${nm},\n\nBerikut link ${paketTitle} untuk Anda:\n${link}\n\n${expText}\n\nSilakan kerjakan sebaik-baiknya.`;
+                  const personalShareUrl = `https://wa.me/?text=${encodeURIComponent(personalMessage)}`;
+                  return `<tr>
+                    <td class="border-b px-2 py-2 text-center font-semibold">${r.absen}</td>
+                    <td class="border-b px-2 py-2">${safeText(nm || '')}</td>
+                    <td class="border-b px-2 py-2">
+                      <div class="flex items-center gap-1">
+                        <a href="${link}" target="_blank" rel="noopener" class="text-primary hover:underline font-mono text-[11px] truncate max-w-[200px] inline-block" title="${safeAttr(link)}">${safeText(link.replace(location.origin, '...'))}</a>
+                      </div>
+                    </td>
+                    <td class="border-b px-2 py-1">
+                      <div class="flex items-center gap-1 justify-center">
+                        <a 
+                          href="${personalShareUrl}" 
+                          target="_blank" 
+                          rel="noopener"
+                          class="inline-flex items-center gap-1 h-8 px-2.5 rounded-md bg-green-600 hover:bg-green-700 text-white text-[11px] font-bold transition-colors"
+                          title="Kirim link ke ${safeAttr(nm || '')} via WhatsApp">
+                          <span class="material-symbols-outlined text-[14px]">chat</span>
+                          WA
+                        </a>
+                        <button 
+                          type="button"
+                          data-link="${safeAttr(link)}"
+                          onclick="navigator.clipboard.writeText(this.getAttribute('data-link')); const orig=this.querySelector('.material-symbols-outlined').textContent; this.querySelector('.material-symbols-outlined').textContent='check'; this.classList.add('text-green-600'); setTimeout(()=>{this.querySelector('.material-symbols-outlined').textContent=orig; this.classList.remove('text-green-600')},1500)"
+                          class="inline-flex items-center justify-center h-8 w-8 rounded-md border bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800 text-text-sub-light transition-colors"
+                          title="Salin link">
+                          <span class="material-symbols-outlined text-[14px]">content_copy</span>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>`;
+                }).join('');
+
+                return `
+                  <div class="mt-4 rounded-xl border bg-white dark:bg-surface-dark overflow-hidden">
+                    <div class="p-3 md:p-4 border-b border-border-light dark:border-border-dark bg-gray-50 dark:bg-gray-900">
+                      <div class="flex items-start md:items-center justify-between gap-3 flex-col md:flex-row">
+                        <div>
+                          <div class="text-sm font-bold flex items-center gap-2">
+                            <span class="material-symbols-outlined text-[18px] text-primary">link</span>
+                            Daftar Link Siswa (${f.roster.length})
+                          </div>
+                          <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5">
+                            Tiap siswa punya link unik. Kirim per siswa atau bagikan satu pesan ke grup kelas.
+                          </div>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <a 
+                            href="${groupShareUrl}" 
+                            target="_blank" 
+                            rel="noopener"
+                            class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition-colors">
+                            <span class="material-symbols-outlined text-[16px]">groups</span>
+                            Bagikan ke Grup WA
+                          </a>
+                          <button 
+                            type="button" 
+                            onclick="window.__sp.exportRosterLinksCSV(${Number(state.quizLastPubId)}, '${safeText(state.quizLastSlug||'')}')" 
+                            class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-semibold">
+                            <span class="material-symbols-outlined text-[16px]">table_chart</span>
+                            CSV
+                          </button>
+                          <button 
+                            type="button" 
+                            onclick="window.__sp.exportRosterLinksPDF(${Number(state.quizLastPubId)}, '${safeText(state.quizLastSlug||'')}')" 
+                            class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-semibold">
+                            <span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>
+                            PDF
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="px-3 md:px-4 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800">
+                      <div class="flex items-start gap-2 text-xs text-blue-800 dark:text-blue-200">
+                        <span class="material-symbols-outlined text-[16px] flex-shrink-0">tips_and_updates</span>
+                        <div class="leading-relaxed">
+                          <strong>Tips:</strong> Untuk cepat — klik "Bagikan ke Grup WA" lalu pilih grup kelas. Pesan dengan semua link siap kirim. Siswa tinggal klik link sesuai absen mereka.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="overflow-auto">
+                      <table class="min-w-full text-xs border-collapse">
+                        <thead class="bg-gray-100 dark:bg-gray-800">
+                          <tr>
+                            <th class="border-b px-2 py-2 text-center w-14 font-semibold uppercase text-[10px] tracking-wide text-text-sub-light dark:text-text-sub-dark">Absen</th>
+                            <th class="border-b px-2 py-2 text-left font-semibold uppercase text-[10px] tracking-wide text-text-sub-light dark:text-text-sub-dark">Nama Siswa</th>
+                            <th class="border-b px-2 py-2 text-left font-semibold uppercase text-[10px] tracking-wide text-text-sub-light dark:text-text-sub-dark">Link</th>
+                            <th class="border-b px-2 py-2 text-center w-32 font-semibold uppercase text-[10px] tracking-wide text-text-sub-light dark:text-text-sub-dark">Kirim</th>
+                          </tr>
+                        </thead>
                         <tbody>${rows}</tbody>
                       </table>
                     </div>
@@ -8677,7 +10239,6 @@ ${baselineModulAjar}
             return (a.absen||0) - (b.absen||0);
           });
           const pubObj = items.find(it => it.slug === sel);
-          const exampleLink = pubObj ? `${location.origin}/soal_view.php?id=${encodeURIComponent(String(pubObj.id))}&n=1` : '';
           const roster = Array.isArray(state.quizPublishForm?.roster) ? state.quizPublishForm.roster : [];
           const nameMap = new Map(roster.map(r => [Number(r.absen), String(r.nama||'')]));
           const query = String(state.quizResultsQuery || '').trim().toLowerCase();
@@ -8689,9 +10250,23 @@ ${baselineModulAjar}
                 return ab.includes(query) || nm.includes(query);
               })
             : dataRows;
+
           const scores = dataRows.map(r => r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0);
           const avg = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
           const max = scores.length ? Math.max(...scores) : 0;
+          const min = scores.length ? Math.min(...scores) : 0;
+
+          const status = (() => {
+            if (!pubObj) return { kind: 'none', text: 'Belum dipilih', cls: 'bg-gray-100 text-gray-700 border-gray-200', dotCls: 'bg-gray-400' };
+            const active = Number(pubObj?.is_active ?? 1) === 1;
+            const expRaw = String(pubObj?.expire_at || '').trim();
+            const exp = expRaw ? new Date(expRaw.replace(' ', 'T')) : null;
+            const expired = exp && !Number.isNaN(exp.getTime()) ? exp.getTime() < Date.now() : false;
+            if (!active) return { kind: 'inactive', text: 'Nonaktif', cls: 'bg-red-50 text-red-700 border-red-200', dotCls: 'bg-red-500' };
+            if (expired) return { kind: 'expired', text: 'Kedaluwarsa', cls: 'bg-amber-50 text-amber-800 border-amber-200', dotCls: 'bg-amber-500' };
+            return { kind: 'active', text: 'Aktif', cls: 'bg-green-50 text-green-800 border-green-200', dotCls: 'bg-green-500' };
+          })();
+
           const loadedAtText = (() => {
             const raw = String(state.quizResultsLoadedAt || '').trim();
             if (!raw) return '';
@@ -8699,49 +10274,102 @@ ${baselineModulAjar}
             if (Number.isNaN(d.getTime())) return '';
             return d.toLocaleString('id-ID');
           })();
-          const status = (() => {
-            if (!pubObj) return { text: 'Belum dipilih', cls: 'bg-gray-100 text-gray-700 border-gray-200' };
-            const active = Number(pubObj?.is_active ?? 1) === 1;
-            const expRaw = String(pubObj?.expire_at || '').trim();
-            const exp = expRaw ? new Date(expRaw.replace(' ', 'T')) : null;
-            const expired = exp && !Number.isNaN(exp.getTime()) ? exp.getTime() < Date.now() : false;
-            if (!active) return { text: 'Nonaktif', cls: 'bg-red-50 text-red-700 border-red-200' };
-            if (expired) return { text: 'Kedaluwarsa', cls: 'bg-amber-50 text-amber-800 border-amber-200' };
-            return { text: 'Aktif', cls: 'bg-green-50 text-green-800 border-green-200' };
-          })();
+
+          const submitterAbsens = new Set(dataRows.map(r => Number(r.absen)).filter(Number.isFinite));
+          const belumKerjakan = roster.filter(r => !submitterAbsens.has(Number(r.absen)));
+
           const top3 = dataRows.slice(0,3).map((r,i) => {
             const ab = Number(r.absen);
             const nmRaw = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
             const nm = decodeMaybeUrlText(nmRaw);
             return { rank: i+1, absen: ab, name: nm, nilai: r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0 };
           });
-          const rows = filteredRows.map((r, idx) => {
+
+          const getNilaiLabel = (pct) => {
+            if (pct >= 85) return { text: 'Sangat Baik', color: 'text-green-700 dark:text-green-300', bg: 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700' };
+            if (pct >= 70) return { text: 'Baik', color: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-700' };
+            if (pct >= 60) return { text: 'Cukup', color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-700' };
+            return { text: 'Perlu Remedial', color: 'text-red-700 dark:text-red-300', bg: 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700' };
+          };
+
+          const categoryCount = { sangatBaik: 0, baik: 0, cukup: 0, remedial: 0 };
+          scores.forEach(pct => {
+            if (pct >= 85) categoryCount.sangatBaik++;
+            else if (pct >= 70) categoryCount.baik++;
+            else if (pct >= 60) categoryCount.cukup++;
+            else categoryCount.remedial++;
+          });
+
+          const catFilter = String(state.quizResultsCategoryFilter || 'semua');
+          const filteredByCategory = catFilter === 'semua' ? filteredRows : filteredRows.filter(r => {
+            const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
+            if (catFilter === 'sangatBaik') return pct >= 85;
+            if (catFilter === 'baik') return pct >= 70 && pct < 85;
+            if (catFilter === 'cukup') return pct >= 60 && pct < 70;
+            if (catFilter === 'remedial') return pct < 60;
+            return true;
+          });
+
+          const rows = filteredByCategory.map((r, idx) => {
             const pct = r && r.total ? Math.round((Number(r.score||0)/Number(r.total||1))*100) : 0;
             const ab = Number(r.absen);
             const nmRaw = String(r?.nama || r?.name || '') || (nameMap.get(ab) || '');
             const nm = decodeMaybeUrlText(nmRaw);
-            const trophy = idx < 3 ? `<span class="material-symbols-outlined text-amber-500 text-[18px] align-middle">trophy</span>` : '';
-            const rowCls = idx % 2 ? 'bg-background-light/40 dark:bg-background-dark/30' : '';
-            return `<tr>
-              <td class="border px-3 py-2 text-center ${rowCls}">${idx+1} ${trophy}</td>
-              <td class="border px-3 py-2 text-center ${rowCls}">${ab}</td>
-              <td class="border px-3 py-2 ${rowCls}">${safeText(nm || '-')}</td>
-              <td class="border px-3 py-2 text-center ${rowCls}">${pct}</td>
+            const label = getNilaiLabel(pct);
+            const trophyIcon = idx === 0 && dataRows.length >= 2 ? '🥇' : idx === 1 && dataRows.length >= 3 ? '🥈' : idx === 2 && dataRows.length >= 3 ? '🥉' : '';
+            let rowCls = '';
+            if (pct < 60) {
+              rowCls = 'bg-red-50/40 dark:bg-red-900/10';
+            } else if (idx % 2) {
+              rowCls = 'bg-gray-50 dark:bg-gray-800/30';
+            }
+            return `<tr class="${rowCls} hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+              <td class="px-3 py-1.5 text-center font-semibold border-b border-gray-100 dark:border-gray-800">${idx+1} ${trophyIcon}</td>
+              <td class="px-3 py-1.5 text-center border-b border-gray-100 dark:border-gray-800">${ab}</td>
+              <td class="px-3 py-1.5 font-medium border-b border-gray-100 dark:border-gray-800">${safeText(nm || '-')}</td>
+              <td class="px-3 py-1.5 text-center border-b border-gray-100 dark:border-gray-800">
+                <span class="inline-flex items-center justify-center min-w-[44px] px-2.5 py-0.5 rounded-full ${label.bg} ${label.color} font-bold text-xs border">${pct}</span>
+              </td>
+              <td class="px-3 py-1.5 text-center text-xs ${label.color} font-semibold border-b border-gray-100 dark:border-gray-800">${label.text}</td>
             </tr>`;
           }).join('');
+
+          const paketTitle = state.paket?.judul || pubObj?.mapel || 'Quiz';
+          const reminderMessage = belumKerjakan.length > 0
+            ? encodeURIComponent(`Halo, mengingatkan untuk mengerjakan Quiz "${paketTitle}".\n\nSilakan cek link yang sudah dibagikan sebelumnya. Terima kasih.`)
+            : '';
+          const reminderWaUrl = `https://wa.me/?text=${reminderMessage}`;
+
+          const totalSiswa = roster.length > 0 ? roster.length : dataRows.length;
+          const submittedCount = dataRows.length;
+          const submitPct = totalSiswa > 0 ? Math.round((submittedCount / totalSiswa) * 100) : 0;
+
           return `
-            <div class="p-6 space-y-4">
-              <div class="flex items-center gap-2">
-                <div class="text-xl font-bold">Hasil Quiz</div>
+            <div class="p-4 md:p-6 space-y-4">
+              <div class="flex items-center gap-2 flex-wrap">
+                <div class="text-xl font-bold">Hasil Quiz Siswa</div>
                 <button type="button"
                   class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors"
                   title="Petunjuk Hasil Quiz"
-                  onclick="window.__sp.openHasilQuizHelp()"
-                >
+                  onclick="window.__sp.openHasilQuizHelp()">
                   <span class="material-symbols-outlined text-[18px]">help</span>
                 </button>
-                <span class="ml-1 inline-flex items-center px-2.5 h-7 rounded-full border text-xs font-semibold ${status.cls}">${status.text}</span>
+                <span class="inline-flex items-center gap-1.5 px-2.5 h-7 rounded-full border text-xs font-semibold ${status.cls}">
+                  <span class="size-2 rounded-full ${status.dotCls}"></span>
+                  ${status.text}
+                </span>
               </div>
+
+              ${status.kind === 'expired' ? `
+                <div class="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 p-3 flex items-center gap-2.5">
+                  <span class="material-symbols-outlined text-amber-600 dark:text-amber-400">schedule</span>
+                  <div class="flex-1 text-sm">
+                    <span class="font-bold text-amber-900 dark:text-amber-200">Link Quiz Kedaluwarsa</span>
+                    <span class="text-amber-800 dark:text-amber-300"> — Siswa tidak bisa lagi mengerjakan, tapi nilai yang sudah masuk tetap bisa dilihat.</span>
+                  </div>
+                </div>
+              ` : ''}
+
               <div id="modalHasilQuizHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
                 <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[800px] max-height-[85vh] overflow-auto">
                   <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
@@ -8759,95 +10387,201 @@ ${baselineModulAjar}
                     <div>
                       <div class="font-bold mb-1">Cara cek hasil</div>
                       <ol class="list-decimal pl-5 space-y-1">
-                        <li>Pilih Nama Link pada dropdown.</li>
-                        <li>Klik Muat untuk mengambil data nilai terbaru.</li>
+                        <li>Pilih Link Quiz dari tombol Pilih.</li>
+                        <li>Hasil akan dimuat otomatis.</li>
                         <li>Daftar Nama Link akan muncul otomatis setelah Anda membuat link.</li>
                       </ol>
                     </div>
-                    <div>
-                      <div class="font-bold mb-1">Fungsi tombol</div>
-                      <ul class="list-disc pl-5 space-y-1">
-                        <li>Muat: mengambil hasil dari link yang dipilih.</li>
-                        <li>Ikon PDF: unduh laporan PDF.</li>
-                        <li>Ikon Tabel: unduh laporan CSV (untuk Excel).</li>
-                      </ul>
-                    </div>
                     <div class="rounded-md border border-amber-200 bg-amber-50 text-amber-900 p-3 text-xs">
-                      Catatan: Data hasil dan gambar di server akan dihapus otomatis 14 hari setelah publish. Segera unduh laporan untuk arsip.
+                      Catatan: Data hasil dan gambar di server akan dihapus otomatis 14 hari setelah publish.
                     </div>
                   </div>
                 </div>
               </div>
-              <div class="rounded-xl border bg-white dark:bg-surface-dark p-4 space-y-3">
-                <div class="flex flex-col md:flex-row md:items-center gap-2">
+
+              <div class="rounded-xl border bg-white dark:bg-surface-dark p-4 md:p-5">
+                <div class="flex flex-col md:flex-row md:items-end gap-3">
                   <div class="flex-1 min-w-0">
-                    <div class="text-xs text-text-sub-light mb-1">Pilih Link Quiz</div>
-                    <select id="selPub" class="w-full h-11 px-3 rounded-lg border bg-white dark:bg-surface-dark">${options}</select>
+                    <label class="text-xs uppercase tracking-wide text-text-sub-light dark:text-text-sub-dark font-bold block mb-1.5">Pilih Link Quiz</label>
+                    <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 px-3 py-2">
+                      <div class="flex items-start gap-2">
+                        <span class="material-symbols-outlined text-[18px] text-primary mt-[1px]">link</span>
+                        <div class="min-w-0 flex-1">
+                          <div class="text-sm font-bold truncate">${pubObj ? safeText(pubObj.slug || '-') : 'Belum dipilih'}</div>
+                          <div class="text-[11px] text-text-sub-light dark:text-text-sub-dark truncate">
+                            ${pubObj ? safeText([pubObj.mapel, pubObj.kelas, pubObj.created_at].filter(Boolean).join(' • ')) : 'Klik Pilih untuk memilih link quiz'}
+                          </div>
+                        </div>
+                        ${pubObj ? `<span class="inline-flex items-center h-6 px-2 rounded-full text-[10px] font-bold bg-white dark:bg-surface-dark border border-gray-200 dark:border-gray-700 text-text-sub-light dark:text-text-sub-dark">Terpilih</span>` : ''}
+                      </div>
+                    </div>
                   </div>
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <button onclick="window.__sp.loadResults()" class="px-4 h-11 rounded-lg border bg-white dark:bg-surface-dark">Tampilkan Hasil Quiz</button>
+
+                  <div class="flex items-end gap-2">
+                    <button type="button"
+                      onclick="window.__sp.openPubBrowseModal()"
+                      class="h-10 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold inline-flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[16px]">search</span>
+                      Pilih
+                    </button>
                     <button ${pubObj ? `onclick="window.__sp.exportResultsPDF('${safeText(pubObj.slug)}')"` : 'disabled'} title="Unduh PDF"
-                      class="flex items-center justify-center h-11 w-11 rounded-lg ${pubObj ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}">
-                      <span class="material-symbols-outlined">picture_as_pdf</span>
+                      class="h-10 w-10 flex items-center justify-center rounded-lg ${pubObj ? 'bg-white dark:bg-surface-dark border hover:bg-gray-50 dark:hover:bg-gray-800' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}">
+                      <span class="material-symbols-outlined text-[18px]">picture_as_pdf</span>
                     </button>
                     <button ${pubObj ? `onclick="window.__sp.exportResultsCSV('${safeText(pubObj.slug)}')"` : 'disabled'} title="Unduh CSV (Excel)"
-                      class="flex items-center justify-center h-11 w-11 rounded-lg ${pubObj ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}">
-                      <span class="material-symbols-outlined">table</span>
+                      class="h-10 w-10 flex items-center justify-center rounded-lg ${pubObj ? 'bg-white dark:bg-surface-dark border hover:bg-gray-50 dark:hover:bg-gray-800' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}">
+                      <span class="material-symbols-outlined text-[18px]">table_chart</span>
                     </button>
                   </div>
                 </div>
-                <div class="flex flex-col md:flex-row md:items-center gap-2">
-                  <div class="flex-1 min-w-0">
-                    <input class="w-full h-10 px-3 rounded-lg border bg-white dark:bg-surface-dark text-sm" placeholder="Cari No Absen atau Nama Siswa..." value="${safeText(state.quizResultsQuery || '')}" oninput="window.__sp.setQuizResultsQuery(this.value)">
+                ${loadedAtText ? `<div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-2.5"><span class="material-symbols-outlined text-[14px] align-text-bottom">schedule</span> Terakhir diperbarui: ${safeText(loadedAtText)}</div>` : ''}
+              </div>
+
+              ${dataRows.length === 0 ? `
+                <div class="rounded-xl border bg-white dark:bg-surface-dark p-8 text-center">
+                  <span class="material-symbols-outlined text-[40px] text-gray-300 dark:text-gray-600">analytics</span>
+                  <div class="text-base font-semibold mt-2">Belum ada hasil</div>
+                  <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">
+                    Pilih link quiz untuk melihat hasil siswa.
                   </div>
                 </div>
-                <div class="text-xs rounded-md border border-amber-200 bg-amber-50 text-amber-800 p-3">
-                  Data hasil dan gambar di server akan dihapus otomatis 14 hari setelah publish. Segera unduh laporan untuk arsip.
+              ` : `
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div class="rounded-xl border bg-white dark:bg-surface-dark p-4">
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark uppercase tracking-wide font-bold">Sudah Mengerjakan</div>
+                    <div class="flex items-baseline gap-1.5 mt-1">
+                      <div class="text-2xl font-bold">${submittedCount}</div>
+                      ${roster.length > 0 ? `<div class="text-sm text-text-sub-light">/ ${totalSiswa}</div>` : ''}
+                    </div>
+                    ${roster.length > 0 ? `<div class="text-xs text-green-700 dark:text-green-400 font-semibold mt-1">${submitPct}% kelas</div>` : '<div class="text-xs text-text-sub-light mt-1">siswa</div>'}
+                  </div>
+
+                  <div class="rounded-xl border bg-white dark:bg-surface-dark p-4">
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark uppercase tracking-wide font-bold">Rata-rata</div>
+                    <div class="text-2xl font-bold text-primary mt-1">${avg}<span class="text-sm text-text-sub-light font-normal">/100</span></div>
+                    <div class="text-xs text-text-sub-light mt-1">${avg >= 75 ? 'Memuaskan' : avg >= 60 ? 'Cukup baik' : 'Perlu perhatian'}</div>
+                  </div>
+
+                  <div class="rounded-xl border bg-white dark:bg-surface-dark p-4">
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark uppercase tracking-wide font-bold">Tertinggi</div>
+                    <div class="text-2xl font-bold text-green-700 dark:text-green-400 mt-1">${max}<span class="text-sm text-text-sub-light font-normal">/100</span></div>
+                    <div class="text-xs text-text-sub-light mt-1 truncate">${top3[0] ? safeText(top3[0].name || `Absen ${top3[0].absen}`) : '-'}</div>
+                  </div>
+
+                  <div class="rounded-xl border bg-white dark:bg-surface-dark p-4">
+                    <div class="text-xs text-text-sub-light dark:text-text-sub-dark uppercase tracking-wide font-bold">Terendah</div>
+                    <div class="text-2xl font-bold text-amber-700 dark:text-amber-400 mt-1">${min}<span class="text-sm text-text-sub-light font-normal">/100</span></div>
+                    <div class="text-xs text-text-sub-light mt-1">${min < 60 ? 'Perlu remedial' : min < 75 ? 'Bisa ditingkatkan' : 'Baik'}</div>
+                  </div>
                 </div>
-              </div>
-              <div class="grid grid-cols-1 md:grid-cols-4 gap-3 text-sm">
-                <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
-                  <div class="text-xs text-text-sub-light">Mata Pelajaran</div>
-                  <div class="font-bold">${safeText(state.quizResultsMapel || '-')}</div>
+
+                ${top3.length > 0 ? `
+                  <div class="rounded-xl border bg-white dark:bg-surface-dark p-4">
+                    <div class="flex items-center gap-2 mb-3">
+                      <span class="material-symbols-outlined text-amber-500">workspace_premium</span>
+                      <div class="text-sm font-bold">Peringkat Teratas</div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      ${top3.map((t, idx) => {
+                        const colors = [
+                          { bg: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700', text: 'text-amber-800 dark:text-amber-200' },
+                          { bg: 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600', text: 'text-gray-700 dark:text-gray-300' },
+                          { bg: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700', text: 'text-orange-800 dark:text-orange-200' },
+                        ];
+                        const c = colors[idx];
+                        return `
+                          <div class="${c.bg} rounded-lg p-3 flex items-center gap-3 border">
+                            <span class="material-symbols-outlined text-[26px] ${c.text}">workspace_premium</span>
+                            <div class="min-w-0 flex-1">
+                              <div class="text-sm font-bold ${c.text} truncate">${safeText(t.name || `Absen ${t.absen}`)}</div>
+                              <div class="text-xs text-text-sub-light dark:text-text-sub-dark">Absen ${t.absen} · Nilai ${t.nilai}</div>
+                            </div>
+                          </div>
+                        `;
+                      }).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+
+                <div class="rounded-xl border bg-white dark:bg-surface-dark overflow-hidden">
+                  <div class="p-3 md:p-4 border-b border-border-light dark:border-border-dark bg-gray-50 dark:bg-gray-900 space-y-3">
+                    <div class="flex items-center justify-between gap-3 flex-wrap">
+                      <div class="text-sm font-bold">Semua Hasil (${filteredByCategory.length}${(query || catFilter !== 'semua') && filteredByCategory.length !== dataRows.length ? ` dari ${dataRows.length}` : ''} siswa)</div>
+                      ${dataRows.length > 3 ? `
+                        <div class="relative flex-1 max-w-xs">
+                          <input class="w-full h-9 pl-9 pr-3 rounded-lg border bg-white dark:bg-surface-dark text-sm" placeholder="Cari absen atau nama..." value="${safeText(state.quizResultsQuery || '')}" oninput="window.__sp.setQuizResultsQuery(this.value)">
+                          <span class="material-symbols-outlined text-[16px] absolute left-2.5 top-1/2 -translate-y-1/2 text-text-sub-light">search</span>
+                        </div>
+                      ` : ''}
+                    </div>
+
+                    ${dataRows.length >= 4 ? `
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <button onclick="window.__sp.setQuizResultsCategoryFilter('semua')" class="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-xs font-semibold transition-colors ${catFilter === 'semua' ? 'bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-900' : 'bg-white dark:bg-surface-dark border hover:bg-gray-100 dark:hover:bg-gray-800'}">
+                          Semua <span class="opacity-70">${dataRows.length}</span>
+                        </button>
+                        <button onclick="window.__sp.setQuizResultsCategoryFilter('sangatBaik')" class="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-xs font-semibold transition-colors ${catFilter === 'sangatBaik' ? 'bg-green-600 text-white' : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700 hover:bg-green-100'}">
+                          Sangat Baik <span class="opacity-70">${categoryCount.sangatBaik}</span>
+                        </button>
+                        <button onclick="window.__sp.setQuizResultsCategoryFilter('baik')" class="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-xs font-semibold transition-colors ${catFilter === 'baik' ? 'bg-blue-600 text-white' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 hover:bg-blue-100'}">
+                          Baik <span class="opacity-70">${categoryCount.baik}</span>
+                        </button>
+                        <button onclick="window.__sp.setQuizResultsCategoryFilter('cukup')" class="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-xs font-semibold transition-colors ${catFilter === 'cukup' ? 'bg-amber-600 text-white' : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700 hover:bg-amber-100'}">
+                          Cukup <span class="opacity-70">${categoryCount.cukup}</span>
+                        </button>
+                        <button onclick="window.__sp.setQuizResultsCategoryFilter('remedial')" class="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full text-xs font-semibold transition-colors ${catFilter === 'remedial' ? 'bg-red-600 text-white' : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700 hover:bg-red-100'}">
+                          Perlu Remedial <span class="opacity-70">${categoryCount.remedial}</span>
+                        </button>
+                      </div>
+                    ` : ''}
+                  </div>
+
+                  <div class="overflow-auto" style="max-height: 600px;">
+                    <table class="min-w-full text-sm">
+                      <thead class="bg-gray-100 dark:bg-gray-800 sticky top-0 z-10">
+                        <tr>
+                          <th class="px-3 py-2 text-center font-semibold uppercase text-[10px] tracking-wide text-text-sub-light dark:text-text-sub-dark border-b">Peringkat</th>
+                          <th class="px-3 py-2 text-center font-semibold uppercase text-[10px] tracking-wide text-text-sub-light dark:text-text-sub-dark border-b">Absen</th>
+                          <th class="px-3 py-2 text-left font-semibold uppercase text-[10px] tracking-wide text-text-sub-light dark:text-text-sub-dark border-b">Nama Siswa</th>
+                          <th class="px-3 py-2 text-center font-semibold uppercase text-[10px] tracking-wide text-text-sub-light dark:text-text-sub-dark border-b">Nilai</th>
+                          <th class="px-3 py-2 text-center font-semibold uppercase text-[10px] tracking-wide text-text-sub-light dark:text-text-sub-dark border-b">Kategori</th>
+                        </tr>
+                      </thead>
+                      <tbody>${rows || `<tr><td colspan="5" class="px-3 py-6 text-center text-text-sub-light dark:text-text-sub-dark">${(query || catFilter !== 'semua') ? 'Tidak ada siswa yang cocok dengan filter.' : 'Belum ada hasil.'}</td></tr>`}</tbody>
+                    </table>
+                  </div>
+
+                  ${belumKerjakan.length > 0 ? `
+                    <div class="p-3 md:p-4 border-t border-border-light dark:border-border-dark bg-amber-50 dark:bg-amber-900/20 flex items-start md:items-center justify-between gap-3 flex-col md:flex-row">
+                      <div class="flex items-start gap-2">
+                        <span class="material-symbols-outlined text-amber-600 dark:text-amber-400 text-[20px] flex-shrink-0">notifications_active</span>
+                        <div>
+                          <div class="text-sm font-bold text-amber-900 dark:text-amber-200">${belumKerjakan.length} siswa belum mengerjakan</div>
+                          <div class="text-xs text-amber-800 dark:text-amber-300 mt-0.5">
+                            Absen: ${belumKerjakan.slice(0, 8).map(r => `<strong>${r.absen}</strong>`).join(', ')}${belumKerjakan.length > 8 ? ` dan ${belumKerjakan.length - 8} lainnya` : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <a 
+                        href="${reminderWaUrl}" 
+                        target="_blank" 
+                        rel="noopener"
+                        class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold flex-shrink-0">
+                        <span class="material-symbols-outlined text-[16px]">chat</span>
+                        Ingatkan via WA
+                      </a>
+                    </div>
+                  ` : ''}
                 </div>
-                <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
-                  <div class="text-xs text-text-sub-light">Nilai Rata-rata</div>
-                  <div class="font-bold">${avg}</div>
+
+                <div class="text-xs rounded-md border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 text-amber-800 dark:text-amber-200 p-3 flex gap-2 items-start">
+                  <span class="material-symbols-outlined text-[16px] flex-shrink-0">info</span>
+                  <div>Data hasil dan gambar di server akan dihapus otomatis 14 hari setelah publish. Segera unduh laporan untuk arsip.</div>
                 </div>
-                <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
-                  <div class="text-xs text-text-sub-light">Nilai Tertinggi</div>
-                  <div class="font-bold">${max}</div>
-                </div>
-                <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
-                  <div class="text-xs text-text-sub-light">Respon Masuk</div>
-                  <div class="font-bold">${dataRows.length}</div>
-                </div>
-              </div>
-              <div class="rounded-lg border bg-white dark:bg-surface-dark p-4">
-                <div class="font-bold mb-2">3 Besar</div>
-                <div class="space-y-1">
-                  ${top3.map(t => `<div class="flex items-center gap-2"><span class="material-symbols-outlined text-amber-500">trophy</span><span>#${t.rank}</span><span>• No ${t.absen}</span><span>• ${safeText(t.name||'-')}</span><span class="ml-auto font-bold">${t.nilai}</span></div>`).join('')}
-                </div>
-              </div>
-              <div class="overflow-auto">
-                <table class="min-w-full text-sm border">
-                  <thead class="bg-background-light dark:bg-background-dark sticky top-0 z-10">
-                    <tr><th class="border px-3 py-2 text-center">Peringkat</th><th class="border px-3 py-2 text-center">No Absen</th><th class="border px-3 py-2 text-left">Nama Siswa</th><th class="border px-3 py-2 text-center">Nilai</th></tr>
-                  </thead>
-                  <tbody>${rows || `<tr><td colspan="4" class="border px-3 py-6 text-center text-text-sub-light">${query ? 'Tidak ada data yang cocok.' : 'Belum ada hasil.'}</td></tr>`}</tbody>
-                </table>
-              </div>
+              `}
             </div>
           `;
         })();
-        const shareNav = `
-          <div class="px-4 pt-4">
-            <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
-              <button class="${shareTab==='buat_link'?'bg-primary text-white':'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setQuizShareTab('buat_link')">1. Buat Link</button>
-              <button class="${shareTab==='hasil'?'bg-primary text-white':'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setQuizShareTab('hasil')">2. Hasil Quiz</button>
-            </div>
-          </div>
-        `;
         const quizHelpModal = `
           <div id="modalQuizHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
             <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[760px] max-h-[85vh] overflow-auto">
@@ -8945,17 +10679,84 @@ ${baselineModulAjar}
         ` : ``;
         const body = !HAS_QUIZ_ACCESS
           ? noAccess
-          : (sub === 'share'
-              ? `${shareNav}${shareTab==='hasil' ? res : pub}`
-              : (state.quizShowPreview ? previewInline : live));
-        return `
-          <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
-            ${tabs}
-            ${body}
-            ${quizHelpModal}
+          : (page === 'pilih' ? previewInline : page === 'live' ? live : page === 'hasil' ? res : pub);
+        const quickPickerCard = (HAS_QUIZ_ACCESS && page === 'pilih') ? renderQuickPickerCard() : '';
+        const supportNote = (HAS_QUIZ_ACCESS && page === 'pilih') ? `
+          <div class="rounded-lg border border-amber-200 bg-amber-50 text-amber-900 text-sm font-bold px-4 h-10 inline-flex items-center gap-2">
+            <span class="material-symbols-outlined text-[18px]">info</span>
+            Quiz mendukung soal PG, PG Kompleks dan Benar/Salah
+          </div>
+        ` : '';
+        const pilihHeader = (HAS_QUIZ_ACCESS && page === 'pilih') ? `
+          <div class="px-4 pt-5 md:px-6 md:pt-6">
+            <div class="flex items-start gap-3">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <div class="text-xl font-bold">Soal Untuk Quiz</div>
+                  <button type="button"
+                    class="flex size-8 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light dark:text-text-sub-dark hover:bg-primary/10 hover:text-primary transition-colors"
+                    title="Petunjuk Soal Untuk Quiz"
+                    onclick="window.__sp.openSoalUntukQuizHelp()">
+                    <span class="material-symbols-outlined text-[18px]">help</span>
+                  </button>
+                </div>
+                <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">
+                  Pilih paket soal yang akan dipakai untuk Quiz.
+                </div>
+              </div>
+              <div class="flex-shrink-0 self-start">${supportNote}</div>
+            </div>
+          </div>
+        ` : '';
+        const supportNoteWrap = '';
+        const soalUntukQuizHelpModal = `
+          <div id="modalSoalUntukQuizHelp" class="fixed inset-0 hidden items-center justify-center" style="display:none; background: rgba(0,0,0,0.5); z-index:50;">
+            <div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-xl w-[92vw] max-w-[800px] max-h-[85vh] overflow-auto">
+              <div class="p-5 border-b border-border-light dark:border-border-dark flex items-center justify-between">
+                <div class="font-bold text-lg flex items-center gap-2"><span class="material-symbols-outlined">help</span> Petunjuk Soal Untuk Quiz</div>
+                <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeSoalUntukQuizHelp()">&times;</button>
+              </div>
+              <div class="p-5 space-y-4 text-sm leading-relaxed">
+                <div>
+                  <div class="font-bold mb-1">Fungsi</div>
+                  <ul class="list-disc pl-5 space-y-1">
+                    <li>Memilih paket soal yang dipakai untuk Quiz Live dan Bagikan Link.</li>
+                    <li>Menampilkan pratinjau soal sehingga Anda bisa cek isi sebelum dibagikan.</li>
+                  </ul>
+                </div>
+                <div>
+                  <div class="font-bold mb-1">Cara pakai</div>
+                  <ol class="list-decimal pl-5 space-y-1">
+                    <li>Klik tombol Pilih paket dari riwayat.</li>
+                    <li>Pilih paket soal yang akan dipakai.</li>
+                    <li>Cek pratinjau soal di bawah.</li>
+                  </ol>
+                </div>
+                <div class="rounded-md border border-amber-200 bg-amber-50 text-amber-900 p-3 text-xs">
+                  Catatan: Quiz hanya mendukung soal PG, PG Kompleks, dan Benar/Salah.
+                </div>
+              </div>
+            </div>
           </div>
         `;
+        return `
+          <div class="space-y-3">
+            ${topNav}
+            <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
+              ${pilihHeader}
+              ${supportNoteWrap}
+              ${quickPickerCard}
+              ${body}
+              ${quizHelpModal}
+              ${soalUntukQuizHelpModal}
+            </div>
+          </div>
+          ${renderPaketBrowseModal()}
+          ${renderPubBrowseModal()}
+        `;
       };
+      function openSoalUntukQuizHelp(){ const m = el('modalSoalUntukQuizHelp'); if (m) m.style.display='flex'; }
+      function closeSoalUntukQuizHelp(){ const m = el('modalSoalUntukQuizHelp'); if (m) m.style.display='none'; }
       function openQuizHelp(){ const m = el('modalQuizHelp'); if (m) m.style.display='flex'; }
       function closeQuizHelp(){ const m = el('modalQuizHelp'); if (m) m.style.display='none'; }
       const QUIZ_TUTORIALS = [
@@ -9045,7 +10846,7 @@ ${baselineModulAjar}
           body.innerHTML = `
             <div class="p-6">
               ${ctxHtml}
-              <div class="font-bold mb-4">${safeMathHtml(q.question)}</div>
+              <div class="font-bold mb-4">${safeMathHtml(formatQuestionText(q.type, q.question))}</div>
               <div class="space-y-2">
                 ${optsHtml}
               </div>
@@ -9057,7 +10858,7 @@ ${baselineModulAjar}
           body.innerHTML = `
             <div class="p-6">
               ${ctxHtml}
-              <div class="font-bold mb-4">${safeMathHtml(q.question)}</div>
+              <div class="font-bold mb-4">${safeMathHtml(formatQuestionText(q.type, q.question))}</div>
               <div class="text-sm text-text-sub-light">Jawaban ditampilkan setelah diungkap</div>
               ${state.quiz.reveal ? `<div class="mt-4 font-bold text-green-600">Kunci: ${safeText(String(q.answer || ''))}</div>` : ``}
             </div>
@@ -9103,6 +10904,25 @@ ${baselineModulAjar}
         saveDebounced(true);
         render();
       };
+      const setQuizPage = async (p) => {
+        const v = String(p || '').trim();
+        if (v === 'pilih') {
+          state.quizShowPreview = true;
+          state.quizSubtab = 'live';
+          saveDebounced(true);
+          render();
+          return;
+        }
+        if (v === 'buat_link') {
+          await setQuizShareTab('buat_link');
+          return;
+        }
+        if (v === 'hasil') {
+          await setQuizShareTab('hasil');
+          return;
+        }
+        setQuizTab('live');
+      };
       const setQuizShareTab = async (t) => {
         state.quizSubtab = 'share';
         state.quizShowPreview = false;
@@ -9116,7 +10936,12 @@ ${baselineModulAjar}
       };
       const setQuizPublish = (k, v) => {
         state.quizPublishForm = state.quizPublishForm || {};
-        state.quizPublishForm[k] = v;
+        if (k === 'jumlah') {
+          const n = Math.floor(Number(v || 0));
+          state.quizPublishForm.jumlah = Math.min(50, Math.max(1, Number.isFinite(n) ? n : 1));
+        } else {
+          state.quizPublishForm[k] = v;
+        }
         saveDebounced(false);
       };
       const parseExpireParts = (s) => {
@@ -9156,8 +10981,30 @@ ${baselineModulAjar}
         }
         saveDebounced(false);
       };
+      const setQuizExpireDatetime = (val) => {
+        state.quizPublishForm = state.quizPublishForm || {};
+        const raw = String(val || '').trim();
+        if (!raw) {
+          state.quizPublishForm.expire = '';
+          saveDebounced(false);
+          return;
+        }
+        const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+        if (match) {
+          const [, yyyy, mm, dd, hh, mins] = match;
+          state.quizPublishForm.expire = `${dd}-${mm}-${yyyy} ${hh}:${mins}`;
+        } else {
+          state.quizPublishForm.expire = raw;
+        }
+        saveDebounced(false);
+      };
       const setQuizResultsQuery = (q) => {
         state.quizResultsQuery = String(q || "");
+        saveDebounced(false);
+        render();
+      };
+      const setQuizResultsCategoryFilter = (cat) => {
+        state.quizResultsCategoryFilter = String(cat || "semua");
         saveDebounced(false);
         render();
       };
@@ -9194,15 +11041,25 @@ ${baselineModulAjar}
         const reader = new FileReader();
         reader.onload = (e) => {
           const txt = String(e.target?.result || '');
-          const rows = parseRosterText(txt);
+          const rows0 = parseRosterText(txt);
+          const rows = rows0.length > 50 ? rows0.slice(0, 50) : rows0;
           state.quizPublishForm = state.quizPublishForm || {};
           state.quizPublishForm.roster = rows;
           if (rows.length > 0) state.quizPublishForm.jumlah = rows.length;
           saveDebounced(false);
           render();
+          if (rows0.length > 50) alert('Maksimal 50 siswa. Hanya 50 baris pertama yang dipakai.');
           if (!rows.length) alert('Tidak ada data valid pada file.');
         };
         reader.readAsText(f);
+      };
+      const clearQuizRoster = () => {
+        state.quizPublishForm = state.quizPublishForm || {};
+        state.quizPublishForm.roster = [];
+        const inp = document.getElementById('rosterPicker');
+        if (inp) inp.value = '';
+        saveDebounced(false);
+        render();
       };
       const exportRosterLinksCSV = (pubId, slug) => {
         const roster = Array.isArray(state.quizPublishForm?.roster) ? state.quizPublishForm.roster : [];
@@ -9316,6 +11173,7 @@ ${baselineModulAjar}
             return false;
           });
         if (quizItems.length === 0) { alert("Hanya mendukung PG, Benar/Salah, dan PG Kompleks. Tidak ada soal yang bisa dipublish pada paket ini."); return; }
+        if (quizItems.length > 50) { alert(`Maksimal 50 soal untuk Quiz. Saat ini terdeteksi ${quizItems.length} soal.`); return; }
         const includeImages = state.quizPublishForm?.includeImages ?? true;
         const imageCount = includeImages ? quizItems.reduce((acc, q) => acc + (String(q.image || '').trim() ? 1 : 0), 0) : 0;
         if (includeImages && imageCount > 5) {
@@ -9426,7 +11284,15 @@ ${baselineModulAjar}
         const btn = document.getElementById('pubMsg');
         if (btn) btn.textContent = "Memproses...";
         try {
-          const roster = Array.isArray(state.quizPublishForm?.roster) ? state.quizPublishForm.roster : [];
+          const roster0 = Array.isArray(state.quizPublishForm?.roster) ? state.quizPublishForm.roster : [];
+          const roster = roster0.length > 50 ? roster0.slice(0, 50) : roster0;
+          if (roster0.length > 50) {
+            state.quizPublishForm = state.quizPublishForm || {};
+            state.quizPublishForm.roster = roster;
+            state.quizPublishForm.jumlah = roster.length;
+            saveDebounced(false);
+            alert('Maksimal 50 siswa. Roster otomatis dipangkas menjadi 50.');
+          }
           const compressImageDataUrl = async (dataUrl, opts = {}) => {
             const maxSide = Number(opts.maxSide || 1280);
             const maxBytes = Number(opts.maxBytes || (350 * 1024));
@@ -9504,7 +11370,9 @@ ${baselineModulAjar}
           }));
           params.set('payload_public', JSON.stringify(payloadWithExplain));
           params.set('answer_key', JSON.stringify(answer_key));
-          const maxAbsen = roster.length > 0 ? roster.length : (Number(state.quizPublishForm?.jumlah || 0) || 0);
+          const jumlah = Math.floor(Number(state.quizPublishForm?.jumlah || 0));
+          const maxAbsenRaw = roster.length > 0 ? roster.length : (Number.isFinite(jumlah) ? jumlah : 0);
+          const maxAbsen = Math.min(50, Math.max(1, Math.floor(Number(maxAbsenRaw || 0))));
           params.set('max_absen', String(maxAbsen));
           params.set('show_solution', String(state.quizPublishForm?.showSolution ? 1 : 0));
           if (expire) params.set('expire_at', expire);
@@ -9781,6 +11649,8 @@ ${baselineModulAjar}
         }
         state.soalError = null;
         state._isGenerating = true;
+        state.questions = [];
+        state.previewTab = "naskah";
         saveDebounced(true);
         setView("preview");
         autoFillPaket();
@@ -9798,10 +11668,7 @@ ${baselineModulAjar}
             }
           }
         } catch {}
-        state.questions = [];
         saveDebounced(true);
-
-        // loading UI will be rendered by computeView() based on _isGenerating flag
 
         let cp046SoalBlock = "";
         let cp046SoalPagesText = "";
@@ -9838,10 +11705,91 @@ ${baselineModulAjar}
           const isEssay = ["isian", "uraian"].includes(s.bentuk);
           return acc + (isObjective ? Number(s.jumlahPG || 0) : isEssay ? Number(s.jumlahIsian || 0) : 0);
         }, 0);
+        const jenisLabel = (bentuk) => {
+          const b = String(bentuk || '').trim();
+          if (b === 'pg') return 'Pilihan Ganda';
+          if (b === 'benar_salah') return 'Benar / Salah';
+          if (b === 'pg_kompleks') return 'PG Kompleks';
+          if (b === 'menjodohkan') return 'Menjodohkan';
+          if (b === 'isian') return 'Isian';
+          if (b === 'uraian') return 'Essay (Uraian)';
+          return 'Soal';
+        };
+        const totalBySection = new Map();
+        const doneBySection = new Map();
+        const sectionStartAt = new Map();
+        const sectionDoneAt = new Map();
+        for (const s of state.sections) {
+          const isObjective = ["pg", "benar_salah", "pg_kompleks", "menjodohkan"].includes(s.bentuk);
+          const isEssay = ["isian", "uraian"].includes(s.bentuk);
+          const t = isObjective ? Number(s.jumlahPG || 0) : isEssay ? Number(s.jumlahIsian || 0) : 0;
+          totalBySection.set(s.id, Number.isFinite(t) ? t : 0);
+          doneBySection.set(s.id, 0);
+        }
+        const genStartAt = Date.now();
+        let currentSectionId = "";
         const updateGenProgress = () => {
           const done = state.questions.length;
-          const elp = document.getElementById("genProgress");
-          if (elp) elp.textContent = `Membuat soal: ${done}/${total}`;
+          const percent = total > 0 ? Math.min(100, Math.max(0, Math.round((done / total) * 100))) : 0;
+          const elPct = document.getElementById("genPercent");
+          if (elPct) elPct.textContent = `${percent}%`;
+          const elBar = document.getElementById("genBar");
+          if (elBar) elBar.style.width = `${percent}%`;
+          const elapsed = (Date.now() - genStartAt) / 1000;
+          const remain = Math.max(0, total - done);
+          const etaSec = (done > 0 && remain > 0) ? Math.max(0, Math.round((elapsed / done) * remain)) : 0;
+          const elSum = document.getElementById("genSummary");
+          if (elSum) {
+            elSum.textContent = `${done} dari ${total} soal selesai${etaSec > 0 ? ` • sekitar ${etaSec} detik lagi` : ''}`;
+          }
+          const elDetail = document.getElementById("genDetail");
+          if (elDetail) {
+            const now = Date.now();
+            const html = state.sections.map((s, idx) => {
+              const sid = s.id;
+              const t = totalBySection.get(sid) || 0;
+              const d = doneBySection.get(sid) || 0;
+              const isDone = t > 0 && d >= t;
+              const isActive = !isDone && sid === currentSectionId;
+              const pct = t > 0 ? Math.min(100, Math.max(0, Math.round((d / t) * 100))) : 0;
+              const startAt = sectionStartAt.get(sid) || 0;
+              const doneAt = sectionDoneAt.get(sid) || 0;
+              const durSec = (isDone && startAt) ? Math.max(1, Math.round(((doneAt || now) - startAt) / 1000)) : 0;
+              const icon = isDone
+                ? `<span class="material-symbols-outlined text-green-600 text-[20px]">check_circle</span>`
+                : isActive
+                  ? `<span class="material-symbols-outlined text-primary text-[20px] animate-spin">progress_activity</span>`
+                  : `<span class="material-symbols-outlined text-gray-400 text-[20px]">radio_button_unchecked</span>`;
+              const title = jenisLabel(s.bentuk);
+              const leftLine = isDone
+                ? `<div class="text-xs text-text-sub-light dark:text-text-sub-dark">${d}/${t} soal • selesai dalam ${durSec} detik</div>`
+                : isActive
+                  ? `<div class="text-xs text-text-sub-light dark:text-text-sub-dark">Sedang membuat soal nomor ${Math.min(t, d + 1)} dari ${t}...</div>`
+                  : `<div class="text-xs text-text-sub-light dark:text-text-sub-dark">${d}/${t} soal</div>`;
+              const right = isDone
+                ? `<div class="text-xs font-bold text-green-700">Selesai</div>`
+                : `<div class="text-xs font-bold text-text-sub-light dark:text-text-sub-dark">${d}/${t}</div>`;
+              return `
+                <div class="${isDone ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-900/30' : isActive ? 'bg-primary/5 border-primary/20' : 'bg-white dark:bg-surface-dark border-border-light dark:border-border-dark'} rounded-lg border p-4">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-start gap-3 min-w-0">
+                      <div class="mt-0.5">${icon}</div>
+                      <div class="min-w-0">
+                        <div class="text-sm font-extrabold truncate">${safeText(title)}</div>
+                        ${leftLine}
+                      </div>
+                    </div>
+                    <div class="shrink-0">${right}</div>
+                  </div>
+                  ${!isDone ? `
+                    <div class="mt-3 w-full h-1.5 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
+                      <div class="h-1.5 ${isActive ? 'bg-primary' : 'bg-gray-400'}" style="width:${pct}%"></div>
+                    </div>` : ``}
+                </div>
+              `;
+            }).join("");
+            elDetail.innerHTML = html;
+          }
         };
         updateGenProgress();
 
@@ -9854,6 +11802,9 @@ ${baselineModulAjar}
           const jumlahIsian = Number(sec.jumlahIsian || 0);
           const totalSec = isObjective ? jumlahPG : isEssay ? jumlahIsian : 0;
           if (totalSec === 0) continue;
+          currentSectionId = sec.id;
+          if (!sectionStartAt.get(sec.id)) sectionStartAt.set(sec.id, Date.now());
+          updateGenProgress();
           const konteksOn = !!sec.soalKonteks;
           const konteksSoalCount = konteksOn ? Math.min(3, totalSec) : 0;
           const trimContextComplete = (text, maxLen) => {
@@ -10448,6 +12399,10 @@ OUTPUT JSON:
             q = { ...q, context: forceContext ? forceContext : '' };
             q = applyContextPolicy(q);
             state.questions.push(q);
+            doneBySection.set(q.sectionId, (doneBySection.get(q.sectionId) || 0) + 1);
+            if ((doneBySection.get(q.sectionId) || 0) >= (totalBySection.get(q.sectionId) || 0)) {
+              if (!sectionDoneAt.get(q.sectionId)) sectionDoneAt.set(q.sectionId, Date.now());
+            }
             updateGenProgress();
             return true;
           };
@@ -10528,6 +12483,8 @@ OUTPUT JSON:
             if (stimCount > 0) await generateQuestions(promptStimulusQuestions, stimCount, stimulusText);
             if (nonStimCount > 0) await generateQuestions(promptNoStimulus, nonStimCount, '');
           }
+          if (!sectionDoneAt.get(sec.id)) sectionDoneAt.set(sec.id, Date.now());
+          updateGenProgress();
         }
 
         state._isGenerating = false;
@@ -10568,6 +12525,130 @@ OUTPUT JSON:
         } else {
           alert(`Paket tersusun ${actual} dari ${total}. Kuota tidak berkurang.`);
         }
+      };
+
+      const editQuestionInline = (qId) => {
+        const q = state.questions.find(x => x && x.id === qId);
+        if (!q) return;
+        updateQuestionData(qId, { _editMode: true });
+        render();
+        setTimeout(() => {
+          const ta = document.getElementById(`editQuestion-${qId}`);
+          if (ta) {
+            ta.focus();
+            const len = ta.value.length;
+            try { ta.setSelectionRange(len, len); } catch {}
+          }
+        }, 50);
+      };
+
+      const saveQuestionInline = (qId) => {
+        const q = state.questions.find(x => x && x.id === qId);
+        if (!q) return;
+
+        const qText = document.getElementById(`editQuestion-${qId}`)?.value?.trim() || '';
+        if (!qText) {
+          alert('Soal tidak boleh kosong');
+          return;
+        }
+
+        const explainText = document.getElementById(`editExplain-${qId}`)?.value ?? '';
+        const updates = { question: qText, explanation: String(explainText).trim(), _editMode: false };
+
+        if ((q.type === 'pg' || q.type === 'pg_kompleks') && Array.isArray(q.options)) {
+          const newOptions = [];
+          for (let i = 0; i < q.options.length; i++) {
+            const optInput = document.getElementById(`editOpt-${qId}-${i}`);
+            newOptions.push((optInput?.value ?? '').trim());
+          }
+          updates.options = newOptions;
+
+          if (q.type === 'pg') {
+            let correctIdx = 0;
+            for (let i = 0; i < q.options.length; i++) {
+              const radio = document.getElementById(`editAns-${qId}-${i}`);
+              if (radio && radio.checked) correctIdx = i;
+            }
+            updates.answer = correctIdx;
+          } else {
+            const checked = [];
+            for (let i = 0; i < q.options.length; i++) {
+              const cb = document.getElementById(`editAns-${qId}-${i}`);
+              if (cb && cb.checked) checked.push(i);
+            }
+            if (checked.length < 2) {
+              alert('PG Kompleks: pilih minimal 2 jawaban benar');
+              return;
+            }
+            updates.answer = checked;
+          }
+        }
+
+        if (q.type === 'benar_salah') {
+          const radioBenar = document.getElementById(`editBS-${qId}-0`);
+          updates.answer = (radioBenar && radioBenar.checked) ? 0 : 1;
+          updates.options = ['Benar', 'Salah'];
+        }
+
+        if (q.type === 'isian' || q.type === 'uraian') {
+          const ansInput = document.getElementById(`editAns-${qId}`)?.value ?? '';
+          updates.answer = String(ansInput).trim();
+        }
+
+        updateQuestionData(qId, updates);
+        saveDebounced(true);
+        render();
+      };
+
+      const cancelQuestionInline = (qId) => {
+        updateQuestionData(qId, { _editMode: false });
+        render();
+      };
+
+      const openChangeTaksonomi = (qId) => {
+        const q = state.questions.find(x => x && x.id === qId);
+        if (!q) return;
+        state._taksonomiModal = { qId, currentBloom: q.bloom || 'C2', selectedBloom: q.bloom || 'C2' };
+        render();
+      };
+
+      const closeChangeTaksonomi = () => {
+        state._taksonomiModal = null;
+        render();
+      };
+
+      const selectBloomLevel = (bloom) => {
+        if (!state._taksonomiModal) return;
+        state._taksonomiModal.selectedBloom = String(bloom || 'C2');
+        render();
+      };
+
+      const confirmChangeTaksonomi = async () => {
+        if (!state._taksonomiModal) return;
+        const { qId, selectedBloom, currentBloom } = state._taksonomiModal;
+        if (String(selectedBloom) === String(currentBloom)) {
+          closeChangeTaksonomi();
+          return;
+        }
+        state._taksonomiModal = null;
+        const q = state.questions.find(x => x && x.id === qId);
+        if (!q) { render(); return; }
+        updateQuestionData(qId, { bloom: String(selectedBloom || 'C2') });
+        await regenSingle(qId);
+      };
+
+      const toggleSoalMenu = (qId, event) => {
+        try { if (event) event.stopPropagation(); } catch {}
+        document.querySelectorAll('[id^="soalMenu-"]').forEach(elm => {
+          if (elm && elm.id !== `soalMenu-${qId}`) elm.classList.add('hidden');
+        });
+        const menu = document.getElementById(`soalMenu-${qId}`);
+        if (menu) menu.classList.toggle('hidden');
+      };
+
+      const closeSoalMenu = (qId) => {
+        const menu = document.getElementById(`soalMenu-${qId}`);
+        if (menu) menu.classList.add('hidden');
       };
 
       const regenSingle = async (qId) => {
@@ -10865,6 +12946,50 @@ ${out}`;
                   if (opt) L.fase = opt;
                 }
               }
+              if (path === 'bahanAjar.jenjang' || path === 'bahanAjar.kesetaraanPaket' || path === 'bahanAjar.kelas') {
+                const B = state.bahanAjar || {};
+                const je = resolveJenjang(B.jenjang, B.kesetaraanPaket);
+                const faseOpts = MA_FASE_MAP[je] || [];
+                const kelasOpts = CLASS_OPTIONS[je] || [];
+                const mapelOpts = SUBJECT_OPTIONS[je] || [];
+                if (faseOpts.length === 1) B.fase = faseOpts[0];
+                else if (B.fase && !faseOpts.includes(B.fase)) {
+                  const fl = faseLetterFromLabel(B.fase);
+                  const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+                  B.fase = opt || '';
+                }
+                if (kelasOpts.length === 1) B.kelas = kelasOpts[0];
+                else if (B.kelas && !kelasOpts.includes(B.kelas)) B.kelas = '';
+                if (B.mataPelajaran && !mapelOpts.includes(B.mataPelajaran)) B.mataPelajaran = '';
+                if (path === 'bahanAjar.kelas') {
+                  const kn = parseKelasNumber(B.kelas);
+                  const fl = expectedFaseLetter(je, kn);
+                  const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+                  if (opt) B.fase = opt;
+                }
+              }
+              if (path === 'lkpdInteraktif.jenjang' || path === 'lkpdInteraktif.kesetaraanPaket' || path === 'lkpdInteraktif.kelas') {
+                const X = state.lkpdInteraktif || {};
+                const je = resolveJenjang(X.jenjang, X.kesetaraanPaket);
+                const faseOpts = MA_FASE_MAP[je] || [];
+                const kelasOpts = CLASS_OPTIONS[je] || [];
+                const mapelOpts = SUBJECT_OPTIONS[je] || [];
+                if (faseOpts.length === 1) X.fase = faseOpts[0];
+                else if (X.fase && !faseOpts.includes(X.fase)) {
+                  const fl = faseLetterFromLabel(X.fase);
+                  const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+                  X.fase = opt || '';
+                }
+                if (kelasOpts.length === 1) X.kelas = kelasOpts[0];
+                else if (X.kelas && !kelasOpts.includes(X.kelas)) X.kelas = '';
+                if (X.mataPelajaran && !mapelOpts.includes(X.mataPelajaran)) X.mataPelajaran = '';
+                if (path === 'lkpdInteraktif.kelas') {
+                  const kn = parseKelasNumber(X.kelas);
+                  const fl = expectedFaseLetter(je, kn);
+                  const opt = fl ? faseOpts.find(x => new RegExp(`\\bFase\\s+${fl}\\b`, 'i').test(String(x))) : null;
+                  if (opt) X.fase = opt;
+                }
+              }
             } catch {}
           };
 
@@ -10892,6 +13017,157 @@ ${out}`;
         state.lkpd.sumber = v;
         saveDebounced(true);
         render();
+      };
+      const setBahanAjarTab = (tab) => {
+        const t = String(tab || "").trim();
+        state.bahanAjarTab = (t === "info" || t === "gabung") ? t : "info";
+        saveDebounced(true);
+        render();
+      };
+      const setLkpdInteraktifTab = (tab) => {
+        const t = String(tab || "").trim();
+        state.lkpdInteraktifTab = (t === "info" || t === "gabung") ? t : "info";
+        saveDebounced(true);
+        render();
+      };
+      const setBahanAjarSource = (v) => {
+        state.bahanAjar = state.bahanAjar || {};
+        state.bahanAjar.sumber = v;
+        saveDebounced(true);
+        render();
+      };
+      const setLkpdInteraktifSource = (v) => {
+        state.lkpdInteraktif = state.lkpdInteraktif || {};
+        state.lkpdInteraktif.sumber = v;
+        saveDebounced(true);
+        render();
+      };
+      const copyFromModulAjarToBahanAjar = () => {
+        const M = state.modulAjar || {};
+        state.bahanAjar = state.bahanAjar || {};
+        const B = state.bahanAjar;
+        if (String(M.jenjang || "").trim()) B.jenjang = String(M.jenjang || "");
+        if (String(M.kesetaraanPaket || "").trim()) B.kesetaraanPaket = String(M.kesetaraanPaket || "");
+        if (String(M.fase || "").trim()) B.fase = String(M.fase || "");
+        if (String(M.kelas || "").trim()) B.kelas = String(M.kelas || "");
+        if (String(M.mapel || "").trim()) B.mataPelajaran = String(M.mapel || "");
+        if (!String(B.namaSekolah || "").trim() && String(M.institusi || "").trim()) B.namaSekolah = String(M.institusi || "");
+        if (!String(B.topikUtama || "").trim() && String(M.judulModul || "").trim()) B.topikUtama = String(M.judulModul || "");
+        saveDebounced(true);
+        render();
+      };
+      const getBahanAjarPromptPairs = (B) => {
+        const jenjang = String(B?.jenjang || "").trim();
+        const kelasNum = parseKelasNumber(B?.kelas);
+        const kelas = String(kelasNum || B?.kelas || "").replace(/^Kelas\s+/i, "").trim();
+        const mapel = String(B?.mataPelajaran || "").trim();
+        const topik = String(B?.topikUtama || "").trim();
+        const subtopik = String(B?.subtopikSpesifik || "").trim();
+        const mode = String(B?.modePembuatan || "").trim() || "cepat";
+        const modeLabel = mode === "lengkap" ? "Lengkap (10 slide)" : "Cepat (5 slide)";
+        const carousel = String(B?.jenisCarousel || "").trim() || "literasi";
+        const carouselLabel = carousel === "numerasi" ? "Numerasi (ada angka, rumus, contoh soal)" : "Literasi (fokus konsep & cerita)";
+        const rasio = String(B?.formatRasio || "").trim() || "story_9_16";
+        const rasioLabel = rasio === "portrait_4_5" ? "Portrait 4:5" : "Story 9:16";
+        const watermark = String(B?.usernameWatermark || "").trim();
+        const sekolah = String(B?.namaSekolah || "").trim();
+        return [
+          { label: "Jenjang", value: jenjang || "-" },
+          { label: "Kelas", value: kelas || "-" },
+          { label: "Mata pelajaran", value: mapel || "-" },
+          { label: "Topik utama", value: topik || "-" },
+          { label: "Subtopik spesifik", value: subtopik || "-" },
+          { label: "Mode pembuatan", value: modeLabel },
+          { label: "Jenis carousel", value: carouselLabel },
+          { label: "Format rasio", value: rasioLabel },
+          { label: "Username Instagram/TikTok untuk watermark", value: watermark || "-" },
+          { label: "Nama sekolah", value: sekolah || "-" },
+        ];
+      };
+      const getBahanAjarPromptText = (B) => {
+        const pairs = getBahanAjarPromptPairs(B) || [];
+        return ["Sesuai inputan, berikut hasilnya:"]
+          .concat(pairs.map(it => `${it.label}: ${it.value}`))
+          .join("\n");
+      };
+      const buildBahanAjarPrompt = () => {
+        state.bahanAjar = state.bahanAjar || {};
+        const B = state.bahanAjar;
+        B.generatedPrompt = getBahanAjarPromptText(B);
+        saveDebounced(true);
+        render();
+      };
+      const copyBahanAjarPrompt = async (el) => {
+        try {
+          const p = String(getBahanAjarPromptText(state.bahanAjar) || "").trim();
+          if (!p) return;
+          await navigator.clipboard.writeText(p);
+          if (el) {
+            const prev = el.innerHTML;
+            el.innerHTML = '<span class="material-symbols-outlined text-[18px]">done</span>';
+            setTimeout(() => { el.innerHTML = prev; }, 1200);
+          }
+        } catch {}
+      };
+      const copyFromModulAjarToLkpdInteraktif = () => {
+        const M = state.modulAjar || {};
+        state.lkpdInteraktif = state.lkpdInteraktif || {};
+        const X = state.lkpdInteraktif;
+        if (String(M.jenjang || "").trim()) X.jenjang = String(M.jenjang || "");
+        if (String(M.kesetaraanPaket || "").trim()) X.kesetaraanPaket = String(M.kesetaraanPaket || "");
+        if (String(M.fase || "").trim()) X.fase = String(M.fase || "");
+        if (String(M.kelas || "").trim()) X.kelas = String(M.kelas || "");
+        if (String(M.mapel || "").trim()) X.mataPelajaran = String(M.mapel || "");
+        if (!String(X.namaSekolah || "").trim() && String(M.institusi || "").trim()) X.namaSekolah = String(M.institusi || "");
+        if (!String(X.topikUtama || "").trim() && String(M.judulModul || "").trim()) X.topikUtama = String(M.judulModul || "");
+        saveDebounced(true);
+        render();
+      };
+      const getLkpdInteraktifPromptPairs = (X) => {
+        const jenjang = String(X?.jenjang || "").trim();
+        const kelasNum = parseKelasNumber(X?.kelas);
+        const kelas = String(kelasNum || X?.kelas || "").replace(/^Kelas\s+/i, "").trim();
+        const mapel = String(X?.mataPelajaran || "").trim();
+        const topik = String(X?.topikUtama || "").trim();
+        const subtopik = String(X?.subtopikSpesifik || "").trim();
+        const mode = String(X?.modePembuatan || "").trim() || "cepat";
+        const modeLabel = mode === "lengkap" ? "Lengkap (10 slide)" : "Cepat (5 slide)";
+        const carousel = String(X?.jenisCarousel || "").trim() || "literasi";
+        const carouselLabel = carousel === "numerasi" ? "Numerasi (ada angka, rumus, contoh soal)" : "Literasi (fokus konsep & cerita)";
+        const rasio = String(X?.formatRasio || "").trim() || "story_9_16";
+        const rasioLabel = rasio === "portrait_4_5" ? "Portrait 4:5" : "Story 9:16";
+        const watermark = String(X?.usernameWatermark || "").trim();
+        const sekolah = String(X?.namaSekolah || "").trim();
+        return [
+          { label: "Jenjang", value: jenjang || "-" },
+          { label: "Kelas", value: kelas || "-" },
+          { label: "Mata pelajaran", value: mapel || "-" },
+          { label: "Topik utama", value: topik || "-" },
+          { label: "Subtopik spesifik", value: subtopik || "-" },
+          { label: "Mode pembuatan", value: modeLabel },
+          { label: "Jenis carousel", value: carouselLabel },
+          { label: "Format rasio", value: rasioLabel },
+          { label: "Username Instagram/TikTok untuk watermark", value: watermark || "-" },
+          { label: "Nama sekolah", value: sekolah || "-" },
+        ];
+      };
+      const getLkpdInteraktifPromptText = (X) => {
+        const pairs = getLkpdInteraktifPromptPairs(X) || [];
+        return ["Sesuai inputan, berikut hasilnya:"]
+          .concat(pairs.map(it => `${it.label}: ${it.value}`))
+          .join("\n");
+      };
+      const copyLkpdInteraktifPrompt = async (el) => {
+        try {
+          const p = String(getLkpdInteraktifPromptText(state.lkpdInteraktif) || "").trim();
+          if (!p) return;
+          await navigator.clipboard.writeText(p);
+          if (el) {
+            const prev = el.innerHTML;
+            el.innerHTML = '<span class="material-symbols-outlined text-[18px]">done</span>';
+            setTimeout(() => { el.innerHTML = prev; }, 1200);
+          }
+        } catch {}
       };
       const pickLkpdImage = () => {
         const elp = el("lkpdImgUpload");
@@ -10922,6 +13198,50 @@ ${out}`;
         if (!elp) return;
         elp.value = "";
         elp.click();
+      };
+      const pickBahanAjarModulPdf = () => {
+        const elp = el("bahanAjarModulPdfUpload");
+        if (!elp) return;
+        elp.value = "";
+        elp.click();
+      };
+      const pickBahanAjarImages = () => {
+        const elp = el("bahanAjarImagesUpload");
+        if (!elp) return;
+        elp.value = "";
+        elp.click();
+      };
+      const pickLkpdInteraktifModulPdf = () => {
+        const elp = el("lkpdInteraktifModulPdfUpload");
+        if (!elp) return;
+        elp.value = "";
+        elp.click();
+      };
+      const pickLkpdInteraktifImages = () => {
+        const elp = el("lkpdInteraktifImagesUpload");
+        if (!elp) return;
+        elp.value = "";
+        elp.click();
+      };
+      const ensurePdfLib = async () => {
+        if (window.PDFLib && window.PDFLib.PDFDocument) return;
+        const src = "https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js";
+        await new Promise((resolve, reject) => {
+          const existing = document.querySelector(`script[data-pdflib-src="${src}"]`);
+          if (existing) {
+            existing.addEventListener("load", resolve, { once: true });
+            existing.addEventListener("error", () => reject(new Error("Gagal memuat PDF editor.")), { once: true });
+            return;
+          }
+          const s = document.createElement("script");
+          s.src = src;
+          s.async = true;
+          s.setAttribute("data-pdflib-src", src);
+          s.onload = resolve;
+          s.onerror = () => reject(new Error("Gagal memuat PDF editor."));
+          document.head.appendChild(s);
+        });
+        if (!(window.PDFLib && window.PDFLib.PDFDocument)) throw new Error("PDF editor tidak tersedia.");
       };
       const ensurePdfJs = async () => {
         if (window.pdfjsLib && window.pdfjsLib.getDocument) return;
@@ -11008,6 +13328,412 @@ ${out}`;
           const msg = String(e?.message || '').trim();
           const extra = msg ? `\n\nDetail: ${msg}` : '';
           alert('Gagal membaca PDF. Jika PDF berupa scan gambar, gunakan Upload Gambar agar dibaca OCR.' + extra);
+        } finally {
+          if (btn) { btn.disabled = false; if (original) btn.innerHTML = original; }
+        }
+      };
+      const handleBahanAjarModulPdfSelected = (evt) => {
+        const file = evt.target?.files?.[0];
+        if (!file) return;
+        const isPdf = String(file.type || "").toLowerCase() === "application/pdf" || /\.pdf$/i.test(String(file.name || ""));
+        if (!isPdf) { alert("File harus berupa PDF."); return; }
+        state.bahanAjarGabung = state.bahanAjarGabung || { modulPdfName: "", imageNames: [], mergedOk: false, mergedUrl: "", mergedFileName: "" };
+        try {
+          const prevUrl = String(state.bahanAjarGabung.mergedUrl || "").trim();
+          if (prevUrl) URL.revokeObjectURL(prevUrl);
+        } catch {}
+        state.bahanAjarGabung.modulPdfName = String(file.name || "modul_ajar.pdf");
+        state.bahanAjarGabung.mergedOk = false;
+        state.bahanAjarGabung.mergedUrl = "";
+        state.bahanAjarGabung.mergedFileName = "";
+        window.__sp = window.__sp || {};
+        window.__sp.__bahanAjarGabungFiles = window.__sp.__bahanAjarGabungFiles || {};
+        window.__sp.__bahanAjarGabungFiles.modulPdf = file;
+        saveDebounced(true);
+        render();
+      };
+      const handleBahanAjarImagesSelected = (evt) => {
+        const files = Array.from(evt.target?.files || []).filter(Boolean).slice(0, 50);
+        if (!files.length) return;
+        const invalid = files.find(f => !String(f.type || "").toLowerCase().startsWith("image/"));
+        if (invalid) { alert("Semua file Bahan Ajar harus berupa gambar."); return; }
+        state.bahanAjarGabung = state.bahanAjarGabung || { modulPdfName: "", imageNames: [], mergedOk: false, mergedUrl: "", mergedFileName: "" };
+        try {
+          const prevUrl = String(state.bahanAjarGabung.mergedUrl || "").trim();
+          if (prevUrl) URL.revokeObjectURL(prevUrl);
+        } catch {}
+        state.bahanAjarGabung.mergedOk = false;
+        state.bahanAjarGabung.mergedUrl = "";
+        state.bahanAjarGabung.mergedFileName = "";
+        window.__sp = window.__sp || {};
+        window.__sp.__bahanAjarGabungFiles = window.__sp.__bahanAjarGabungFiles || {};
+        window.__sp.__bahanAjarGabungFiles.images = files;
+        syncBahanAjarImageNames();
+        saveDebounced(true);
+        render();
+      };
+      const syncBahanAjarImageNames = () => {
+        const files = window.__sp?.__bahanAjarGabungFiles?.images;
+        const arr = Array.isArray(files) ? files : [];
+        state.bahanAjarGabung = state.bahanAjarGabung || { modulPdfName: "", imageNames: [], mergedOk: false, mergedUrl: "", mergedFileName: "" };
+        state.bahanAjarGabung.imageNames = arr.map(f => String(f?.name || "image")).slice(0, 50);
+      };
+      const moveBahanAjarImage = (idx, delta) => {
+        const files = window.__sp?.__bahanAjarGabungFiles?.images;
+        if (!Array.isArray(files) || !files.length) return;
+        const i = Number(idx);
+        const d = Number(delta);
+        if (!Number.isFinite(i) || !Number.isFinite(d)) return;
+        const j = i + d;
+        if (i < 0 || j < 0 || i >= files.length || j >= files.length) return;
+        const next = files.slice();
+        const tmp = next[i];
+        next[i] = next[j];
+        next[j] = tmp;
+        window.__sp.__bahanAjarGabungFiles.images = next;
+        syncBahanAjarImageNames();
+        try {
+          const prevUrl = String(state.bahanAjarGabung.mergedUrl || "").trim();
+          if (prevUrl) URL.revokeObjectURL(prevUrl);
+        } catch {}
+        state.bahanAjarGabung.mergedOk = false;
+        state.bahanAjarGabung.mergedUrl = "";
+        state.bahanAjarGabung.mergedFileName = "";
+        saveDebounced(true);
+        render();
+      };
+      const sortBahanAjarImages = (mode) => {
+        const files = window.__sp?.__bahanAjarGabungFiles?.images;
+        if (!Array.isArray(files) || !files.length) return;
+        const m = String(mode || "").trim();
+        const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+        const next = files.slice().sort((a, b) => collator.compare(String(a?.name || ""), String(b?.name || "")));
+        if (m === "name_desc") next.reverse();
+        window.__sp.__bahanAjarGabungFiles.images = next;
+        syncBahanAjarImageNames();
+        try {
+          const prevUrl = String(state.bahanAjarGabung.mergedUrl || "").trim();
+          if (prevUrl) URL.revokeObjectURL(prevUrl);
+        } catch {}
+        state.bahanAjarGabung.mergedOk = false;
+        state.bahanAjarGabung.mergedUrl = "";
+        state.bahanAjarGabung.mergedFileName = "";
+        saveDebounced(true);
+        render();
+      };
+      const handleLkpdInteraktifModulPdfSelected = (evt) => {
+        const file = evt.target?.files?.[0];
+        if (!file) return;
+        const isPdf = String(file.type || "").toLowerCase() === "application/pdf" || /\.pdf$/i.test(String(file.name || ""));
+        if (!isPdf) { alert("File harus berupa PDF."); return; }
+        state.lkpdInteraktifGabung = state.lkpdInteraktifGabung || { modulPdfName: "", imageNames: [], mergedOk: false, mergedUrl: "", mergedFileName: "" };
+        try {
+          const prevUrl = String(state.lkpdInteraktifGabung.mergedUrl || "").trim();
+          if (prevUrl) URL.revokeObjectURL(prevUrl);
+        } catch {}
+        state.lkpdInteraktifGabung.modulPdfName = String(file.name || "modul_ajar.pdf");
+        state.lkpdInteraktifGabung.mergedOk = false;
+        state.lkpdInteraktifGabung.mergedUrl = "";
+        state.lkpdInteraktifGabung.mergedFileName = "";
+        window.__sp = window.__sp || {};
+        window.__sp.__lkpdInteraktifGabungFiles = window.__sp.__lkpdInteraktifGabungFiles || {};
+        window.__sp.__lkpdInteraktifGabungFiles.modulPdf = file;
+        saveDebounced(true);
+        render();
+      };
+      const handleLkpdInteraktifImagesSelected = (evt) => {
+        const files = Array.from(evt.target?.files || []).filter(Boolean).slice(0, 50);
+        if (!files.length) return;
+        const invalid = files.find(f => !String(f.type || "").toLowerCase().startsWith("image/"));
+        if (invalid) { alert("Semua file LKPD Interaktif harus berupa gambar."); return; }
+        state.lkpdInteraktifGabung = state.lkpdInteraktifGabung || { modulPdfName: "", imageNames: [], mergedOk: false, mergedUrl: "", mergedFileName: "" };
+        try {
+          const prevUrl = String(state.lkpdInteraktifGabung.mergedUrl || "").trim();
+          if (prevUrl) URL.revokeObjectURL(prevUrl);
+        } catch {}
+        state.lkpdInteraktifGabung.mergedOk = false;
+        state.lkpdInteraktifGabung.mergedUrl = "";
+        state.lkpdInteraktifGabung.mergedFileName = "";
+        window.__sp = window.__sp || {};
+        window.__sp.__lkpdInteraktifGabungFiles = window.__sp.__lkpdInteraktifGabungFiles || {};
+        window.__sp.__lkpdInteraktifGabungFiles.images = files;
+        syncLkpdInteraktifImageNames();
+        saveDebounced(true);
+        render();
+      };
+      const syncLkpdInteraktifImageNames = () => {
+        const files = window.__sp?.__lkpdInteraktifGabungFiles?.images;
+        const arr = Array.isArray(files) ? files : [];
+        state.lkpdInteraktifGabung = state.lkpdInteraktifGabung || { modulPdfName: "", imageNames: [], mergedOk: false, mergedUrl: "", mergedFileName: "" };
+        state.lkpdInteraktifGabung.imageNames = arr.map(f => String(f?.name || "image")).slice(0, 50);
+      };
+      const moveLkpdInteraktifImage = (idx, delta) => {
+        const files = window.__sp?.__lkpdInteraktifGabungFiles?.images;
+        if (!Array.isArray(files) || !files.length) return;
+        const i = Number(idx);
+        const d = Number(delta);
+        if (!Number.isFinite(i) || !Number.isFinite(d)) return;
+        const j = i + d;
+        if (i < 0 || j < 0 || i >= files.length || j >= files.length) return;
+        const next = files.slice();
+        const tmp = next[i];
+        next[i] = next[j];
+        next[j] = tmp;
+        window.__sp.__lkpdInteraktifGabungFiles.images = next;
+        syncLkpdInteraktifImageNames();
+        try {
+          const prevUrl = String(state.lkpdInteraktifGabung.mergedUrl || "").trim();
+          if (prevUrl) URL.revokeObjectURL(prevUrl);
+        } catch {}
+        state.lkpdInteraktifGabung.mergedOk = false;
+        state.lkpdInteraktifGabung.mergedUrl = "";
+        state.lkpdInteraktifGabung.mergedFileName = "";
+        saveDebounced(true);
+        render();
+      };
+      const sortLkpdInteraktifImages = (mode) => {
+        const files = window.__sp?.__lkpdInteraktifGabungFiles?.images;
+        if (!Array.isArray(files) || !files.length) return;
+        const m = String(mode || "").trim();
+        const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+        const next = files.slice().sort((a, b) => collator.compare(String(a?.name || ""), String(b?.name || "")));
+        if (m === "name_desc") next.reverse();
+        window.__sp.__lkpdInteraktifGabungFiles.images = next;
+        syncLkpdInteraktifImageNames();
+        try {
+          const prevUrl = String(state.lkpdInteraktifGabung.mergedUrl || "").trim();
+          if (prevUrl) URL.revokeObjectURL(prevUrl);
+        } catch {}
+        state.lkpdInteraktifGabung.mergedOk = false;
+        state.lkpdInteraktifGabung.mergedUrl = "";
+        state.lkpdInteraktifGabung.mergedFileName = "";
+        saveDebounced(true);
+        render();
+      };
+      const toArrayBuffer = async (blob) => {
+        if (blob && typeof blob.arrayBuffer === "function") return blob.arrayBuffer();
+        return new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result);
+          r.onerror = () => reject(new Error("Gagal membaca file."));
+          r.readAsArrayBuffer(blob);
+        });
+      };
+      const fileToPngBytes = async (file) => {
+        const url = URL.createObjectURL(file);
+        try {
+          const img = await new Promise((resolve, reject) => {
+            const im = new Image();
+            im.onload = () => resolve(im);
+            im.onerror = () => reject(new Error("Gagal memuat gambar."));
+            im.src = url;
+          });
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas tidak tersedia.");
+          ctx.drawImage(img, 0, 0);
+          const pngBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+          if (!pngBlob) throw new Error("Gagal konversi gambar.");
+          const ab = await toArrayBuffer(pngBlob);
+          return new Uint8Array(ab);
+        } finally {
+          try { URL.revokeObjectURL(url); } catch {}
+        }
+      };
+      const mergePdfWithImages = async (pdfFile, imageFiles) => {
+        await ensurePdfLib();
+        const { PDFDocument } = window.PDFLib;
+        const pdfBytes = new Uint8Array(await pdfFile.arrayBuffer());
+        const doc = await PDFDocument.load(pdfBytes, { ignoreEncryption: false });
+
+        for (const f of (Array.isArray(imageFiles) ? imageFiles.slice(0, 50) : [])) {
+          const type = String(f.type || "").toLowerCase();
+          const ext = String(f.name || "").toLowerCase();
+          const isJpg = type === "image/jpeg" || type === "image/jpg" || ext.endsWith(".jpg") || ext.endsWith(".jpeg");
+          const isPng = type === "image/png" || ext.endsWith(".png");
+
+          let imgBytes;
+          if (isJpg || isPng) imgBytes = new Uint8Array(await f.arrayBuffer());
+          else imgBytes = await fileToPngBytes(f);
+
+          const embedded = isJpg ? await doc.embedJpg(imgBytes) : await doc.embedPng(imgBytes);
+          const iw = embedded.width;
+          const ih = embedded.height;
+          const landscape = iw > ih;
+          const pageW = landscape ? 841.89 : 595.28;
+          const pageH = landscape ? 595.28 : 841.89;
+          const page = doc.addPage([pageW, pageH]);
+          const scale = Math.min(pageW / iw, pageH / ih);
+          const w = iw * scale;
+          const h = ih * scale;
+          const x = (pageW - w) / 2;
+          const y = (pageH - h) / 2;
+          page.drawImage(embedded, { x, y, width: w, height: h });
+        }
+
+        const out = await doc.save();
+        return new Uint8Array(out);
+      };
+      const buildBahanAjarPdfFromImages = async (imageFiles) => {
+        await ensurePdfLib();
+        const { PDFDocument } = window.PDFLib;
+        const doc = await PDFDocument.create();
+        for (const f of (Array.isArray(imageFiles) ? imageFiles.slice(0, 50) : [])) {
+          const type = String(f.type || "").toLowerCase();
+          const ext = String(f.name || "").toLowerCase();
+          const isJpg = type === "image/jpeg" || type === "image/jpg" || ext.endsWith(".jpg") || ext.endsWith(".jpeg");
+          const isPng = type === "image/png" || ext.endsWith(".png");
+
+          let imgBytes;
+          if (isJpg || isPng) imgBytes = new Uint8Array(await f.arrayBuffer());
+          else imgBytes = await fileToPngBytes(f);
+
+          const embedded = isJpg ? await doc.embedJpg(imgBytes) : await doc.embedPng(imgBytes);
+          const iw = embedded.width;
+          const ih = embedded.height;
+          const landscape = iw > ih;
+          const pageW = landscape ? 841.89 : 595.28;
+          const pageH = landscape ? 595.28 : 841.89;
+          const page = doc.addPage([pageW, pageH]);
+          const scale = Math.min(pageW / iw, pageH / ih);
+          const w = iw * scale;
+          const h = ih * scale;
+          const x = (pageW - w) / 2;
+          const y = (pageH - h) / 2;
+          page.drawImage(embedded, { x, y, width: w, height: h });
+        }
+        const out = await doc.save();
+        return new Uint8Array(out);
+      };
+      const gabungkanBahanAjarKeModulAjar = async () => {
+        const files = window.__sp?.__bahanAjarGabungFiles || {};
+        const pdf = files.modulPdf || null;
+        const imgs = Array.isArray(files.images) ? files.images : [];
+        if (!pdf) { alert("Upload Modul Ajar (PDF) dulu."); return; }
+        if (!imgs.length) { alert("Upload Bahan Ajar (Image) dulu."); return; }
+        const btn = el("btnBahanAjarMerge");
+        const original = btn ? btn.innerHTML : "";
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Menggabungkan...'; }
+        try {
+          const mergedBytes = await mergePdfWithImages(pdf, imgs);
+          const base = String(pdf.name || "modul_ajar.pdf").replace(/\.pdf$/i, "");
+          const outName = `${base}_ModulAjar+BahanAjar.pdf`;
+          const blob = new Blob([mergedBytes], { type: "application/pdf" });
+          const url = URL.createObjectURL(blob);
+          state.bahanAjarGabung = state.bahanAjarGabung || { modulPdfName: "", imageNames: [], mergedOk: false, mergedUrl: "", mergedFileName: "" };
+          try {
+            const prevUrl = String(state.bahanAjarGabung.mergedUrl || "").trim();
+            if (prevUrl) URL.revokeObjectURL(prevUrl);
+          } catch {}
+          state.bahanAjarGabung.mergedOk = true;
+          state.bahanAjarGabung.mergedUrl = url;
+          state.bahanAjarGabung.mergedFileName = outName;
+          saveDebounced(true);
+          render();
+          try { downloadMergedBahanAjarPdf(); } catch {}
+          alert("Berhasil menggabungkan Modul Ajar + Bahan Ajar. File otomatis terunduh.");
+        } catch (e) {
+          alert("Gagal menggabungkan: " + (e?.message || "Terjadi kesalahan."));
+        } finally {
+          if (btn) { btn.disabled = false; if (original) btn.innerHTML = original; }
+        }
+      };
+      const downloadMergedBahanAjarPdf = () => {
+        const g = state.bahanAjarGabung || {};
+        const url = String(g.mergedUrl || "").trim();
+        if (!g.mergedOk || !url) return;
+        const name = String(g.mergedFileName || "ModulAjar_BahanAjar.pdf").trim() || "ModulAjar_BahanAjar.pdf";
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = name;
+        a.click();
+      };
+      const downloadBahanAjarPdfOnly = async () => {
+        const imgs = window.__sp?.__bahanAjarGabungFiles?.images;
+        const imageFiles = Array.isArray(imgs) ? imgs : [];
+        if (!imageFiles.length) { alert("Upload Bahan Ajar (Image) dulu."); return; }
+        const btn = el("btnBahanAjarDownloadOnly");
+        const original = btn ? btn.innerHTML : "";
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Menyiapkan PDF...'; }
+        try {
+          const pdfBytes = await buildBahanAjarPdfFromImages(imageFiles);
+          const pdf = window.__sp?.__bahanAjarGabungFiles?.modulPdf || null;
+          const base = pdf ? String(pdf.name || "modul_ajar.pdf").replace(/\.pdf$/i, "") : "BahanAjar";
+          const name = `${base}_BahanAjar.pdf`;
+          const blob = new Blob([pdfBytes], { type: "application/pdf" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = name;
+          a.click();
+          setTimeout(() => { try { URL.revokeObjectURL(url); } catch {} }, 15000);
+        } catch (e) {
+          alert("Gagal membuat PDF Bahan Ajar: " + (e?.message || "Terjadi kesalahan."));
+        } finally {
+          if (btn) { btn.disabled = false; if (original) btn.innerHTML = original; }
+        }
+      };
+      const gabungkanLkpdInteraktifKeModulAjar = async () => {
+        const files = window.__sp?.__lkpdInteraktifGabungFiles || {};
+        const pdf = files.modulPdf || null;
+        const imgs = Array.isArray(files.images) ? files.images : [];
+        if (!pdf) { alert("Upload Modul Ajar (PDF) dulu."); return; }
+        if (!imgs.length) { alert("Upload LKPD Interaktif (Image) dulu."); return; }
+        const btn = el("btnLkpdInteraktifMerge");
+        const original = btn ? btn.innerHTML : "";
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Menggabungkan...'; }
+        try {
+          const mergedBytes = await mergePdfWithImages(pdf, imgs);
+          const base = String(pdf.name || "modul_ajar.pdf").replace(/\.pdf$/i, "");
+          const outName = `${base}_ModulAjar+LKPDInteraktif.pdf`;
+          const blob = new Blob([mergedBytes], { type: "application/pdf" });
+          const url = URL.createObjectURL(blob);
+          state.lkpdInteraktifGabung = state.lkpdInteraktifGabung || { modulPdfName: "", imageNames: [], mergedOk: false, mergedUrl: "", mergedFileName: "" };
+          try {
+            const prevUrl = String(state.lkpdInteraktifGabung.mergedUrl || "").trim();
+            if (prevUrl) URL.revokeObjectURL(prevUrl);
+          } catch {}
+          state.lkpdInteraktifGabung.mergedOk = true;
+          state.lkpdInteraktifGabung.mergedUrl = url;
+          state.lkpdInteraktifGabung.mergedFileName = outName;
+          saveDebounced(true);
+          render();
+          try {
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = outName;
+            a.click();
+          } catch {}
+          alert("Berhasil menggabungkan Modul Ajar + LKPD Interaktif. File otomatis terunduh.");
+        } catch (e) {
+          alert("Gagal menggabungkan: " + (e?.message || "Terjadi kesalahan."));
+        } finally {
+          if (btn) { btn.disabled = false; if (original) btn.innerHTML = original; }
+        }
+      };
+      const downloadLkpdInteraktifPdfOnly = async () => {
+        const imgs = window.__sp?.__lkpdInteraktifGabungFiles?.images;
+        const imageFiles = Array.isArray(imgs) ? imgs : [];
+        if (!imageFiles.length) { alert("Upload LKPD Interaktif (Image) dulu."); return; }
+        const btn = el("btnLkpdInteraktifDownloadOnly");
+        const original = btn ? btn.innerHTML : "";
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Menyiapkan PDF...'; }
+        try {
+          const pdfBytes = await buildBahanAjarPdfFromImages(imageFiles);
+          const pdf = window.__sp?.__lkpdInteraktifGabungFiles?.modulPdf || null;
+          const base = pdf ? String(pdf.name || "modul_ajar.pdf").replace(/\.pdf$/i, "") : "LKPDInteraktif";
+          const name = `${base}_LKPDInteraktif.pdf`;
+          const blob = new Blob([pdfBytes], { type: "application/pdf" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = name;
+          a.click();
+          setTimeout(() => { try { URL.revokeObjectURL(url); } catch {} }, 15000);
+        } catch (e) {
+          alert("Gagal membuat PDF LKPD Interaktif: " + (e?.message || "Terjadi kesalahan."));
         } finally {
           if (btn) { btn.disabled = false; if (original) btn.innerHTML = original; }
         }
@@ -11412,6 +14138,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       };
       const clearLogo = () => {
         state.identity.logo = "";
+        state.identity.logoName = "";
         saveDebounced(true);
         render();
       };
@@ -11426,6 +14153,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         const reader = new FileReader();
         reader.onload = () => {
           state.identity.logo = reader.result;
+          state.identity.logoName = String(file.name || "");
           saveDebounced(true);
           render();
         };
@@ -11632,7 +14360,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               const pushOne = (q, num) => {
                 questionParagraphs.push(
                   new Paragraph({
-                    children: [new TextRun({ text: `${num}.\t${q.question}`, bold: false })],
+                    children: [new TextRun({ text: `${num}.\t${String(formatQuestionText(q.type, q.question) || "")}`, bold: false })],
                     tabStops: [{ type: "left", position: 400 }],
                     indent: { left: 0, hanging: 0 },
                     spacing: { before: 200, after: 100 },
@@ -11655,16 +14383,109 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
                   );
                 }
                 if (sec.type === 'pg' || sec.type === 'benar_salah' || sec.type === 'pg_kompleks') {
-                  q.options.forEach((opt, idx) => {
-                    questionParagraphs.push(
-                      new Paragraph({
-                        children: [new TextRun({ text: `${String.fromCharCode(65 + idx)}.\t${opt}` })],
-                        tabStops: [{ type: "left", position: 300 }],
-                        indent: { left: 400, hanging: 0 },
-                        spacing: { after: 50 },
-                      })
-                    );
-                  });
+                  const opts = Array.isArray(q.options) ? q.options : [];
+                  const twoCols = (sec.type === 'pg' || sec.type === 'pg_kompleks') && opts.length >= 4;
+                  if (sec.type === 'benar_salah' && opts.length >= 2) {
+                    const leftText = String(opts[0] || "Benar");
+                    const rightText = String(opts[1] || "Salah");
+                    questionParagraphs.push(new Table({
+                      width: { size: 100, type: WidthType.PERCENTAGE },
+                      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
+                      rows: [
+                        new TableRow({
+                          children: [
+                            new TableCell({
+                              width: { size: 8, type: WidthType.PERCENTAGE },
+                              margins: { top: 0, bottom: 0, left: 0, right: 0 },
+                              children: [new Paragraph({ text: "" })],
+                              borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+                            }),
+                            new TableCell({
+                              width: { size: 46, type: WidthType.PERCENTAGE },
+                              margins: { top: 0, bottom: 0, left: 0, right: 0 },
+                              children: [new Paragraph({ children: [new TextRun({ text: leftText, bold: true })], spacing: { after: 50 } })],
+                              borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+                            }),
+                            new TableCell({
+                              width: { size: 46, type: WidthType.PERCENTAGE },
+                              margins: { top: 0, bottom: 0, left: 0, right: 0 },
+                              children: [new Paragraph({ children: [new TextRun({ text: rightText, bold: true })], spacing: { after: 50 } })],
+                              borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+                            }),
+                          ]
+                        })
+                      ],
+                    }));
+                  } else
+                  if (twoCols) {
+                    const n = opts.length;
+                    const leftCount = Math.ceil(n / 2);
+                    const rows = [];
+                    for (let r = 0; r < leftCount; r++) {
+                      const li = r;
+                      const ri = r + leftCount;
+                      const leftText = li < n ? String(opts[li] ?? "") : "";
+                      const rightText = ri < n ? String(opts[ri] ?? "") : "";
+                      rows.push(new TableRow({
+                        children: [
+                          new TableCell({
+                            width: { size: 8, type: WidthType.PERCENTAGE },
+                            margins: { top: 0, bottom: 0, left: 0, right: 0 },
+                            children: [new Paragraph({ text: "" })],
+                            borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+                          }),
+                          new TableCell({
+                            width: { size: 46, type: WidthType.PERCENTAGE },
+                            margins: { top: 0, bottom: 0, left: 0, right: 0 },
+                            children: [
+                              new Paragraph({
+                                children: [
+                                  new TextRun({ text: `${String.fromCharCode(65 + li)}. `, bold: true }),
+                                  new TextRun({ text: leftText }),
+                                ],
+                                spacing: { after: 50 },
+                              })
+                            ],
+                            borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+                          }),
+                          new TableCell({
+                            width: { size: 46, type: WidthType.PERCENTAGE },
+                            margins: { top: 0, bottom: 0, left: 0, right: 0 },
+                            children: [
+                              new Paragraph({
+                                children: rightText
+                                  ? [
+                                      new TextRun({ text: `${String.fromCharCode(65 + ri)}. `, bold: true }),
+                                      new TextRun({ text: rightText }),
+                                    ]
+                                  : [new TextRun({ text: "" })],
+                                spacing: { after: 50 },
+                              })
+                            ],
+                            borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE } },
+                          }),
+                        ]
+                      }));
+                    }
+                    questionParagraphs.push(new Table({
+                      width: { size: 100, type: WidthType.PERCENTAGE },
+                      borders: { top: { style: BorderStyle.NONE }, bottom: { style: BorderStyle.NONE }, left: { style: BorderStyle.NONE }, right: { style: BorderStyle.NONE }, insideHorizontal: { style: BorderStyle.NONE }, insideVertical: { style: BorderStyle.NONE } },
+                      rows,
+                    }));
+                  } else {
+                    opts.forEach((opt, idx) => {
+                      questionParagraphs.push(
+                        new Paragraph({
+                          children: [
+                            new TextRun({ text: `${String.fromCharCode(65 + idx)}. `, bold: true }),
+                            new TextRun({ text: String(opt ?? "") }),
+                          ],
+                          indent: { left: 400, hanging: 0 },
+                          spacing: { after: 50 },
+                        })
+                      );
+                    });
+                  }
                 } else if (sec.type === 'menjodohkan') {
                   const leftList = Array.isArray(q.options) ? q.options : [];
                   const rightList = Array.isArray(q.answer) ? q.answer : [];
@@ -12403,7 +15224,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               const pushOne = (q, num) => {
                 questionParagraphs.push(
                   new Paragraph({
-                    children: [new TextRun({ text: `${num}.\t${q.question}`, bold: false })],
+                    children: [new TextRun({ text: `${num}.\t${String(formatQuestionText(q.type, q.question) || "")}`, bold: false })],
                     tabStops: [{ type: "left", position: 400 }],
                     indent: { left: 0, hanging: 0 },
                     spacing: { before: 200, after: 100 },
@@ -12755,6 +15576,15 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       window.regenSingle = regenSingle;
       window.regenImage = regenImage;
       window.deleteImage = deleteImage;
+      window.editQuestionInline = editQuestionInline;
+      window.saveQuestionInline = saveQuestionInline;
+      window.cancelQuestionInline = cancelQuestionInline;
+      window.openChangeTaksonomi = openChangeTaksonomi;
+      window.closeChangeTaksonomi = closeChangeTaksonomi;
+      window.selectBloomLevel = selectBloomLevel;
+      window.confirmChangeTaksonomi = confirmChangeTaksonomi;
+      window.toggleSoalMenu = toggleSoalMenu;
+      window.closeSoalMenu = closeSoalMenu;
 
       window.__sp = {
         setView,
@@ -12766,14 +15596,20 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         downloadSoalPDF,
         setModulAjarTab,
         setQuizTab,
+        setQuizPage,
         setQuizShareTab,
         setQuizPublish,
         setQuizExpirePart,
+        setQuizExpireDatetime,
         publishQuiz,
+        openSoalUntukQuizHelp,
+        closeSoalUntukQuizHelp,
         downloadRosterTemplate,
+        clearQuizRoster,
         loadPublications,
         loadResults,
         setQuizResultsQuery,
+        setQuizResultsCategoryFilter,
         exportJSON,
         exportZIP,
         exportRosterLinksCSV,
@@ -12809,6 +15645,16 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         closeHasilQuizHelp,
         moreQuizPreview,
         toggleQuizPreviewPanel,
+        loadPaketForQuiz,
+        openPaketBrowseModal,
+        closePaketBrowseModal,
+        updatePaketBrowseSearch,
+        openPubBrowseModal,
+        closePubBrowseModal,
+        updatePubBrowseSearch,
+        pickQuizPublication,
+        resetQuizPaket,
+        fetchPaketListForQuiz,
         openSumberMateriHelp,
         closeSumberMateriHelp,
         openKonfigurasiHelp,
@@ -12841,12 +15687,34 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         exportRPPDocx,
         exportRPPPdf,
         setLkpdSource,
+        setBahanAjarTab,
+        setLkpdInteraktifTab,
+        setBahanAjarSource,
+        setLkpdInteraktifSource,
+        copyFromModulAjarToBahanAjar,
+        buildBahanAjarPrompt,
+        copyBahanAjarPrompt,
+        copyLkpdInteraktifPrompt,
+        copyFromModulAjarToLkpdInteraktif,
         buildLKPD,
         pickLkpdImage,
         pickLkpdText,
         pickTopikImage,
         pickTopikText,
         pickTopikPdf,
+        pickBahanAjarModulPdf,
+        pickBahanAjarImages,
+        pickLkpdInteraktifModulPdf,
+        pickLkpdInteraktifImages,
+        gabungkanBahanAjarKeModulAjar,
+        downloadMergedBahanAjarPdf,
+        downloadBahanAjarPdfOnly,
+        gabungkanLkpdInteraktifKeModulAjar,
+        downloadLkpdInteraktifPdfOnly,
+        moveBahanAjarImage,
+        sortBahanAjarImages,
+        moveLkpdInteraktifImage,
+        sortLkpdInteraktifImages,
         buildPackage,
         uploadQuestionImage,
         exportDocx,
@@ -12859,6 +15727,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         removeSection,
         duplicateSection,
         updateSection,
+        stepInput,
         pickLogo,
         clearLogo,
         setAdminGeneratePrompt: (val) => {
@@ -12906,6 +15775,17 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         cp046MapelPick,
         cp046MapelPickFromEl,
       };
+
+      document.addEventListener('click', (e) => {
+        const tgt = e?.target;
+        const inMenu = tgt && tgt.closest ? tgt.closest('[id^="soalMenu-"]') : null;
+        const inBtn = tgt && tgt.closest ? tgt.closest('[onclick*="toggleSoalMenu"]') : null;
+        if (!inMenu && !inBtn) {
+          document.querySelectorAll('[id^="soalMenu-"]').forEach(elm => {
+            try { elm.classList.add('hidden'); } catch {}
+          });
+        }
+      });
 
       const btnThemeEl = el("btnTheme");
       if (btnThemeEl) btnThemeEl.addEventListener("click", toggleTheme);
@@ -12978,6 +15858,14 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       if (topikTxt) topikTxt.addEventListener("change", handleTopikTextSelected);
       const topikPdf = el("topikPdfUpload");
       if (topikPdf) topikPdf.addEventListener("change", handleTopikPdfSelected);
+      const baPdf = el("bahanAjarModulPdfUpload");
+      if (baPdf) baPdf.addEventListener("change", handleBahanAjarModulPdfSelected);
+      const baImgs = el("bahanAjarImagesUpload");
+      if (baImgs) baImgs.addEventListener("change", handleBahanAjarImagesSelected);
+      const liPdf = el("lkpdInteraktifModulPdfUpload");
+      if (liPdf) liPdf.addEventListener("change", handleLkpdInteraktifModulPdfSelected);
+      const liImgs = el("lkpdInteraktifImagesUpload");
+      if (liImgs) liImgs.addEventListener("change", handleLkpdInteraktifImagesSelected);
       const rosterPicker = el("rosterPicker");
       if (rosterPicker) rosterPicker.addEventListener("change", handleRosterSelected);
       const rekapPicker = el("rekapExcelPicker");
@@ -13123,10 +16011,20 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
             <td class="border px-3 py-2">${it.question_count || 0}</td>
             <td class="border px-3 py-2">${it.created_at || ''}</td>
             <td class="border px-3 py-2">
-              <button data-id="${it.id}" class="btnHistoryEdit inline-flex items-center justify-center rounded border h-9 px-3 bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark">
-                <span class="material-symbols-outlined text-[18px]">edit</span>
-                <span class="ml-1 text-sm font-bold">Edit</span>
-              </button>
+              <div class="flex items-center gap-1 justify-end">
+                <button data-id="${it.id}" class="btnHistoryQuiz inline-flex items-center justify-center rounded border h-9 px-3 bg-primary hover:bg-blue-600 text-white text-sm font-bold gap-1" title="Buat Quiz dari paket ini">
+                  <span class="material-symbols-outlined text-[16px]">link</span>
+                  <span>Quiz</span>
+                </button>
+                <button data-id="${it.id}" class="btnHistoryEdit inline-flex items-center justify-center rounded border h-9 px-3 bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark" title="Edit paket">
+                  <span class="material-symbols-outlined text-[16px]">edit</span>
+                  <span class="ml-1 text-sm font-bold">Edit</span>
+                </button>
+                <button data-id="${it.id}" data-title="${safeAttr(it.title || 'Paket')}" class="btnHistoryDelete inline-flex items-center justify-center rounded border h-9 px-3 bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 text-sm font-bold" title="Hapus permanen">
+                  <span class="material-symbols-outlined text-[16px]">delete</span>
+                  <span class="ml-1">Hapus</span>
+                </button>
+              </div>
             </td>
           </tr>
         `).join('');
@@ -13152,13 +16050,68 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
               const d = await r.json();
               if (d && d.ok && d.state) {
                 state = { ...DEFAULT_STATE(), ...d.state };
+                state.soalError = null;
+                state.previewTab = "identitas";
                 saveDebounced(true);
-                setView("identitas");
+                setView("preview");
               } else {
                 alert("Gagal memuat paket.");
               }
             } catch {
               alert("Gagal memuat paket.");
+            }
+          });
+        });
+
+        tbody.querySelectorAll(".btnHistoryQuiz").forEach(btn => {
+          btn.addEventListener("click", async (e) => {
+            const id = e.currentTarget.getAttribute("data-id");
+            try {
+              const ok = await loadPaketForQuiz(Number(id));
+              if (!ok) {
+                alert("Gagal memuat paket untuk Quiz.");
+                return;
+              }
+              state.quizShowPreview = false;
+              state.quizSubtab = "share";
+              state.quizShareTab = "buat_link";
+              saveDebounced(true);
+              render();
+            } catch (err) {
+              console.error("Buat Quiz error:", err);
+              alert("Gagal memuat paket untuk Quiz.");
+            }
+          });
+        });
+
+        tbody.querySelectorAll(".btnHistoryDelete").forEach(btn => {
+          btn.addEventListener("click", async (e) => {
+            const id = Number(e.currentTarget.getAttribute("data-id") || 0);
+            const title = String(e.currentTarget.getAttribute("data-title") || "Paket");
+            if (!id) return;
+            const okConfirm = confirm(`Hapus permanen paket ini?\n\n${title}\n\nTindakan ini tidak bisa dibatalkan.`);
+            if (!okConfirm) return;
+            try {
+              const r = await fetch("api/soal_user.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ type: "delete", id }),
+              });
+              const d = await r.json().catch(() => ({}));
+              if (!r.ok || !d?.ok) {
+                alert("Gagal menghapus paket. Coba lagi.");
+                return;
+              }
+              historyItems = Array.isArray(historyItems) ? historyItems.filter((it) => Number(it?.id) !== id) : [];
+              if (state.quizPaketId === id) {
+                state.quizPaketId = null;
+                state.quizPaketSnapshot = null;
+              }
+              saveDebounced(true);
+              renderHistoryTable();
+            } catch (err) {
+              console.error("Hapus paket error:", err);
+              alert("Gagal menghapus paket. Coba lagi.");
             }
           });
         });
@@ -13349,6 +16302,39 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       applyUserProfileDefaults();
       render();
       if (ensureProfileComplete()) ensureUsagePolicyAck();
+    </script>
+    <div id="toastContainer" class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+    <script>
+      window.showToast = function(message, type = 'info', duration = 3000) {
+        const container = document.getElementById('toastContainer');
+        if (!container) return;
+        const colors = {
+          success: 'bg-green-50 border-green-300 text-green-900 dark:bg-green-900/30 dark:border-green-700 dark:text-green-200',
+          error: 'bg-red-50 border-red-300 text-red-900 dark:bg-red-900/30 dark:border-red-700 dark:text-red-200',
+          warning: 'bg-yellow-50 border-yellow-300 text-yellow-900 dark:bg-yellow-900/30 dark:border-yellow-700 dark:text-yellow-200',
+          info: 'bg-blue-50 border-blue-300 text-blue-900 dark:bg-blue-900/30 dark:border-blue-700 dark:text-blue-200'
+        };
+        const icons = { success: 'check_circle', error: 'error', warning: 'warning', info: 'info' };
+        const toast = document.createElement('div');
+        toast.className = `${colors[type] || colors.info} border-2 rounded-lg shadow-lg p-4 pr-6 min-w-[280px] max-w-[420px] flex items-start gap-3 pointer-events-auto transition-all duration-300 opacity-0 translate-x-4`;
+        const msg = String(message || '');
+        toast.innerHTML = `
+          <span class="material-symbols-outlined text-[24px] flex-shrink-0">${icons[type] || icons.info}</span>
+          <div class="flex-1 text-sm font-medium leading-relaxed">${msg.replace(/[&<>]/g, (ch) => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[ch]))}</div>
+          <button class="text-current opacity-60 hover:opacity-100 text-xl leading-none" type="button" onclick="this.parentElement.remove()">&times;</button>
+        `;
+        container.appendChild(toast);
+        setTimeout(() => {
+          toast.classList.remove('opacity-0', 'translate-x-4');
+          toast.classList.add('opacity-100', 'translate-x-0');
+        }, 10);
+        if (duration > 0) {
+          setTimeout(() => {
+            toast.classList.add('opacity-0', 'translate-x-4');
+            setTimeout(() => toast.remove(), 300);
+          }, duration);
+        }
+      };
     </script>
   </body>
 </html>
