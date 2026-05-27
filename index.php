@@ -1023,6 +1023,42 @@ session_write_close();
         safeText(s)
           .replaceAll('"', "&quot;")
           .replaceAll("'", "&#39;");
+      const cleanInlineHtml = (input) => {
+        let t = String(input ?? "");
+        t = t
+          .replace(/<\s*sup\s*>([\s\S]*?)<\s*\/\s*sup\s*>/gi, (_m, g1) => `^${String(g1 ?? "").trim()}`)
+          .replace(/<\s*sub\s*>([\s\S]*?)<\s*\/\s*sub\s*>/gi, (_m, g1) => `_${String(g1 ?? "").trim()}`)
+          .replace(/<\s*\/\s*sup\s*>/gi, "")
+          .replace(/<\s*\/\s*sub\s*>/gi, "")
+          .replace(/<\s*sup\s*>/gi, "^")
+          .replace(/<\s*sub\s*>/gi, "_")
+          .replace(/<\/?[^>]+>/g, "");
+        t = t.replace(/&nbsp;/gi, " ").replace(/\s+/g, " ").trim();
+        return t;
+      };
+      // #region debug-point A:init-debug
+      const __DBG_URL = "http://127.0.0.1:7777/event";
+      const __DBG_SESSION = "regen-question-fails";
+      const dbgEvent = (hypothesisId, msg, data, traceId) => {
+        try {
+          fetch(__DBG_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            keepalive: true,
+            body: JSON.stringify({
+              sessionId: __DBG_SESSION,
+              runId: "pre-fix",
+              hypothesisId: String(hypothesisId || "A"),
+              location: "index.php",
+              msg: `[DEBUG] ${String(msg || "")}`,
+              data: data && typeof data === "object" ? data : {},
+              traceId: traceId ? String(traceId) : undefined,
+              ts: Date.now(),
+            }),
+          }).catch(() => {});
+        } catch {}
+      };
+      // #endregion
       const decodeMaybeUrlText = (s) => {
         let out = String(s ?? "");
         for (let i = 0; i < 2; i++) {
@@ -3836,9 +3872,14 @@ session_write_close();
       }
 
       async function callOpenAI(prompt, timeoutMs = OPENAI_TIMEOUT_MS) {
+        // #region debug-point B:callOpenAI-entry
+        const traceId = `ai-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        dbgEvent("B", "callOpenAI entry", { timeoutMs: Number(timeoutMs || 0), promptLen: String(prompt || "").length, model: String(OPENAI_MODEL || "") }, traceId);
+        // #endregion
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(new Error("timeout")), timeoutMs);
         try {
+          const t0 = Date.now();
           const response = await fetch("api/openai_proxy.php", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -3848,14 +3889,39 @@ session_write_close();
           });
           if (!response.ok) {
             const errText = await response.text();
+            // #region debug-point B:callOpenAI-http-error
+            dbgEvent("B", "callOpenAI http error", { status: response.status, ms: Date.now() - t0, errText: String(errText || "").slice(0, 500) }, traceId);
+            // #endregion
             if (response.status === 401) {
               try { alert("Sesi login berakhir. Silakan login ulang."); } catch {}
               try { window.location.href = "login.php"; } catch {}
             }
             throw new Error(`Proxy Error ${response.status}: ${errText}`);
           }
-          const data = await response.json();
+          const ct = String(response.headers.get("content-type") || "");
+          if (!/application\/json/i.test(ct)) {
+            const raw = await response.text();
+            throw new Error(`Non-JSON response: ${String(raw || "").slice(0, 220)}`);
+          }
+          let data = null;
+          try {
+            data = await response.json();
+          } catch (je) {
+            throw new Error(`JSON parse error: ${String(je?.message || je || "")}`);
+          }
+          // #region debug-point B:callOpenAI-ok
+          dbgEvent("B", "callOpenAI ok", { status: response.status, ms: Date.now() - t0, keys: data && typeof data === "object" ? Object.keys(data).slice(0, 20) : [], hasItems: Array.isArray(data?.items), itemsLen: Array.isArray(data?.items) ? data.items.length : 0 }, traceId);
+          // #endregion
           return data;
+        } catch (e) {
+          // #region debug-point B:callOpenAI-exception
+          dbgEvent("B", "callOpenAI exception", { message: String(e?.message || e || "") }, traceId);
+          // #endregion
+          const name = String(e?.name || "");
+          const msg = String(e?.message || e || "");
+          const isAbort = name === "AbortError" || /aborted/i.test(msg) || /AbortError/i.test(msg);
+          if (isAbort) throw new Error("timeout");
+          throw e;
         } finally {
           clearTimeout(timer);
         }
@@ -4268,9 +4334,8 @@ session_write_close();
             <div class="relative group break-inside-avoid">
               <div class="flex gap-4">
                 <span class="font-bold text-lg min-w-[1.5rem]">${i + 1}.</span>
-                <div class="flex-1 relative group/soal max-h-[60vh] overflow-y-auto pr-2 print:max-h-none print:overflow-visible custom-scrollbar">
-                  <div class="relative">
-                    <div class="no-print absolute right-2 top-2 flex items-center gap-1 bg-white dark:bg-surface-dark border border-gray-200 dark:border-gray-700 rounded-lg p-1 shadow-sm">
+                <div class="flex-1 relative group/soal">
+                  <div class="no-print absolute right-2 top-2 flex items-center gap-1 bg-white dark:bg-surface-dark border border-gray-200 dark:border-gray-700 rounded-lg p-1 shadow-sm z-30">
                       <button
                         ${q._loadingText ? "disabled" : ""}
                         onclick="editQuestionInline('${q.id}')"
@@ -4287,7 +4352,7 @@ session_write_close();
                           title="Pilihan lain">
                           <span class="material-symbols-outlined text-[16px]">more_vert</span>
                         </button>
-                        <div id="soalMenu-${q.id}" class="hidden absolute right-0 top-full mt-1 w-64 bg-white dark:bg-surface-dark border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 overflow-hidden">
+                        <div id="soalMenu-${q.id}" class="hidden absolute right-0 top-full mt-1 w-64 bg-white dark:bg-surface-dark border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 overflow-hidden">
                           <div class="px-3 py-2">
                             <div class="text-[10px] uppercase tracking-wide text-text-sub-light font-bold">Edit Soal Ini</div>
                           </div>
@@ -4347,54 +4412,58 @@ session_write_close();
                         ` : ``}
                       ` : ``}
                     </div>
-                    <p class="mb-4 pr-44 text-justify leading-relaxed text-lg">${safeMathHtml(formatQuestionText(q.type, q.question))}</p>
-                  </div>
-                  ${q.image ? `<img src="${q.image}" class="w-64 h-64 object-contain rounded-lg mb-2 border shadow-sm">` : ""}
-                  ${q._showImagePrompt && !q.image && q.imagePrompt ? `
-                    <div class="mb-3 italic text-xs text-text-sub-light flex items-center gap-2">
-                      <span>Prompt Gambar: ${safeText(q.imagePrompt)}</span>
-                      <button class="inline-flex items-center justify-center size-6 rounded hover:bg-background-light border border-border-light" title="Salin prompt" onclick="copyImagePrompt('${q.id}', this)">
-                        <span class="material-symbols-outlined text-[16px]">content_copy</span>
-                      </button>
-                      <button class="inline-flex items-center justify-center size-6 rounded hover:bg-background-light border border-border-light" title="Buka ChatGPT (prompt disalin)" onclick="openChatGPTWithPrompt('${q.id}', this)">
-                        <span class="material-symbols-outlined text-[16px]">smart_toy</span>
-                      </button>
-                      <a href="https://gemini.google.com/share/03bfbeff5d94" target="_blank" rel="noopener" class="inline-flex items-center justify-center size-6 rounded hover:bg-background-light border border-border-light" title="Buka pembuat prompt">
-                        <span class="material-symbols-outlined text-[16px]">open_in_new</span>
-                      </a>
-                      <button class="inline-flex items-center justify-center size-6 rounded hover:bg-background-light border border-border-light" title="Upload gambar" onclick="document.getElementById('qImgFile-${q.id}').click()">
-                        <span class="material-symbols-outlined text-[16px]">file_upload</span>
-                      </button>
-                      <input id="qImgFile-${q.id}" type="file" accept="image/*" class="hidden" onchange="uploadQuestionImage('${q.id}', this)">
+
+                  <div class="max-h-[60vh] overflow-y-auto pr-2 pt-2 print:max-h-none print:overflow-visible custom-scrollbar">
+                    <div class="relative">
+                      <p class="mb-4 pr-44 text-justify leading-relaxed text-lg">${safeMathHtml(formatQuestionText(q.type, q.question))}</p>
                     </div>
-                  ` : ``}
-                  ${!q.image && !q.asciiDiagram && !q.svgSource && q._imageError ? `<div class="mb-4 text-xs px-2 py-1 rounded bg-red-100 text-red-700 inline-flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">error</span><span>${safeText(q._imageError)}</span></div>` : ""}
-                  ${
-                    (q.type === "pg" || q.type === "benar_salah" || q.type === "pg_kompleks")
-                      ? renderPilihanObjektif(q.options, q.type)
-                      : q.type === "menjodohkan"
-                      ? `
-                        <div class="grid grid-cols-2 gap-8 text-sm">
-                           <div class="space-y-3">
-                              ${q.options.map((opt, oi) => `
-                                 <div class="flex items-center gap-2">
-                                    <span class="font-bold text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">${oi + 1}</span>
-                                    <div class="p-2 border rounded bg-white dark:bg-gray-800 w-full">${safeMathHtml(opt)}</div>
-                                 </div>
-                              `).join("")}
-                           </div>
-                           <div class="space-y-3">
-                              ${(Array.isArray(q.answer) ? q.answer : []).map((ans, ai) => `
-                                 <div class="flex items-center gap-2">
-                                    <span class="font-bold text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">${String.fromCharCode(65 + ai)}</span>
-                                    <div class="p-2 border rounded bg-white dark:bg-gray-800 w-full">${safeMathHtml(ans)}</div>
-                                 </div>
-                              `).join("")}
-                           </div>
-                        </div>
-                      `
-                      : `<div class="${q.type === 'uraian' ? 'h-48' : 'h-24'} border-b border-dotted border-black w-full mt-2"></div>`
-                  }
+                    ${q.image ? `<img src="${q.image}" class="w-64 h-64 object-contain rounded-lg mb-2 border shadow-sm">` : ""}
+                    ${q._showImagePrompt && !q.image && q.imagePrompt ? `
+                      <div class="mb-3 italic text-xs text-text-sub-light flex items-center gap-2">
+                        <span>Prompt Gambar: ${safeText(q.imagePrompt)}</span>
+                        <button class="inline-flex items-center justify-center size-6 rounded hover:bg-background-light border border-border-light" title="Salin prompt" onclick="copyImagePrompt('${q.id}', this)">
+                          <span class="material-symbols-outlined text-[16px]">content_copy</span>
+                        </button>
+                        <button class="inline-flex items-center justify-center size-6 rounded hover:bg-background-light border border-border-light" title="Buka ChatGPT (prompt disalin)" onclick="openChatGPTWithPrompt('${q.id}', this)">
+                          <span class="material-symbols-outlined text-[16px]">smart_toy</span>
+                        </button>
+                        <a href="https://gemini.google.com/share/03bfbeff5d94" target="_blank" rel="noopener" class="inline-flex items-center justify-center size-6 rounded hover:bg-background-light border border-border-light" title="Buka pembuat prompt">
+                          <span class="material-symbols-outlined text-[16px]">open_in_new</span>
+                        </a>
+                        <button class="inline-flex items-center justify-center size-6 rounded hover:bg-background-light border border-border-light" title="Upload gambar" onclick="document.getElementById('qImgFile-${q.id}').click()">
+                          <span class="material-symbols-outlined text-[16px]">file_upload</span>
+                        </button>
+                        <input id="qImgFile-${q.id}" type="file" accept="image/*" class="hidden" onchange="uploadQuestionImage('${q.id}', this)">
+                      </div>
+                    ` : ``}
+                    ${!q.image && !q.asciiDiagram && !q.svgSource && q._imageError ? `<div class="mb-4 text-xs px-2 py-1 rounded bg-red-100 text-red-700 inline-flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">error</span><span>${safeText(q._imageError)}</span></div>` : ""}
+                    ${
+                      (q.type === "pg" || q.type === "benar_salah" || q.type === "pg_kompleks")
+                        ? renderPilihanObjektif(q.options, q.type)
+                        : q.type === "menjodohkan"
+                        ? `
+                          <div class="grid grid-cols-2 gap-8 text-sm">
+                             <div class="space-y-3">
+                                ${q.options.map((opt, oi) => `
+                                   <div class="flex items-center gap-2">
+                                      <span class="font-bold text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">${oi + 1}</span>
+                                      <div class="p-2 border rounded bg-white dark:bg-gray-800 w-full">${safeMathHtml(opt)}</div>
+                                   </div>
+                                `).join("")}
+                             </div>
+                             <div class="space-y-3">
+                                ${(Array.isArray(q.answer) ? q.answer : []).map((ans, ai) => `
+                                   <div class="flex items-center gap-2">
+                                      <span class="font-bold text-xs bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">${String.fromCharCode(65 + ai)}</span>
+                                      <div class="p-2 border rounded bg-white dark:bg-gray-800 w-full">${safeMathHtml(ans)}</div>
+                                   </div>
+                                `).join("")}
+                             </div>
+                          </div>
+                        `
+                        : `<div class="${q.type === 'uraian' ? 'h-48' : 'h-24'} border-b border-dotted border-black w-full mt-2"></div>`
+                    }
+                  </div>
                 </div>
               </div>
             </div>
@@ -12656,11 +12725,37 @@ OUTPUT JSON:
         if (!q) return;
         updateQuestionData(qId, { _loadingText: true });
         try {
+          const clip = (val, max) => {
+            const s = String(val ?? "");
+            if (!max || s.length <= max) return s;
+            return s.slice(0, Math.max(0, max - 3)).trimEnd() + "...";
+          };
+          const callOpenAIWithRetry = async (p) => {
+            let lastErr = null;
+            for (let i = 0; i < 2; i++) {
+              try {
+                return await callOpenAI(p);
+              } catch (e) {
+                lastErr = e;
+                const msg = String(e?.message || e || "");
+                const retryable =
+                  /Proxy Error 429/i.test(msg) ||
+                  /Proxy Error 5\d\d/i.test(msg) ||
+                  /OpenAI error/i.test(msg) ||
+                  /timeout/i.test(msg) ||
+                  /failed to fetch|networkerror|fetch failed/i.test(msg);
+                if (!retryable || i === 1) break;
+                await new Promise((r) => setTimeout(r, 900 * (i + 1)));
+              }
+            }
+            throw lastErr || new Error("Retry failed");
+          };
+
           const secCfg = state.sections.find((s) => s.id === q.sectionId) || {};
           const konteksOn = !!secCfg.soalKonteks;
           const totalInSection = state.questions.filter(x => x && x.sectionId === q.sectionId).length;
           const konteksSoalCount = konteksOn ? Math.min(3, totalInSection) : 0;
-          const existingContext = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+          const existingContext = clip(String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim(), 1200);
           const tieToContext = konteksOn && !!existingContext;
 
           const out = q.type === 'menjodohkan'
@@ -12727,33 +12822,114 @@ ${adminPromptRaw}
 >>>
 - Jika prompt admin bertentangan dengan instruksi lain, prioritaskan prompt admin.\n`
             : ``;
+          const bloomCode = String(q.bloom || 'C2').trim() || 'C2';
+          const targetDifficulty = (() => {
+            const b = String(bloomCode || '').toUpperCase().trim();
+            if (b === 'C5' || b === 'C6') return 'sulit';
+            if (b === 'C3' || b === 'C4') return 'sedang';
+            return 'mudah';
+          })();
+          const bloomGuide = (() => {
+            const map = {
+              C1: 'C1 (Mengingat): fokus pada fakta/istilah/definisi.',
+              C2: 'C2 (Memahami): jelaskan konsep, sebab-akibat, klasifikasi.',
+              C3: 'C3 (Menerapkan): gunakan konsep pada situasi/contoh baru.',
+              C4: 'C4 (Menganalisis): bedakan, bandingkan, cari hubungan, analisis sebab-akibat.',
+              C5: 'C5 (Mengevaluasi): menilai keputusan/argumen, pilih yang paling tepat dengan alasan.',
+              C6: 'C6 (Mencipta): merancang solusi/prosedur/rencana, membuat keputusan desain yang tepat.',
+            };
+            return map[bloomCode] || `${bloomCode}: sesuaikan level berpikir.`;
+          })();
+          const bloomDepthRules = (() => {
+            const b = String(bloomCode || '').toUpperCase().trim();
+            if (b === 'C6') {
+              return `\nKETENTUAN KHUSUS C6 (WAJIB):\n- Soal harus menuntut siswa MERANCANG / MENYUSUN / MEMBUAT rancangan solusi (bukan sekadar memilih definisi).\n- Beri minimal 2 batasan/constraint (mis. waktu, biaya, aturan, sumber daya, tujuan, atau kondisi).\n- Jawaban benar harus dapat dibenarkan dengan alasan (tulis di "explanation").\n`;
+            }
+            if (b === 'C5') {
+              return `\nKETENTUAN KHUSUS C5 (WAJIB):\n- Soal harus menuntut siswa MENILAI pilihan/argumen/strategi dan memilih yang paling tepat disertai alasan.\n`;
+            }
+            if (b === 'C4') {
+              return `\nKETENTUAN KHUSUS C4 (WAJIB):\n- Soal harus menuntut ANALISIS (membandingkan, mencari sebab-akibat, mengelompokkan, menarik hubungan), bukan hafalan.\n`;
+            }
+            return '';
+          })();
+
+          const prevStem = clip(cleanInlineHtml(q.question || '').replace(/\s+/g, ' ').trim(), 520);
+          const prevOptions = Array.isArray(q.options)
+            ? q.options.map(x => clip(cleanInlineHtml(x || '').replace(/\s+/g, ' ').trim(), 220)).filter(Boolean)
+            : [];
+          const avoidDupList = state.questions
+            .filter(x => x && x.sectionId === q.sectionId && x.id !== qId)
+            .slice(0, 6)
+            .map(x => clip(cleanInlineHtml(x.question || '').replace(/\s+/g, ' ').trim(), 240))
+            .filter(Boolean);
+          const avoidDupBlock = avoidDupList.length
+            ? `\nHINDARI DUPLIKASI dengan soal-soal berikut (jangan buat yang sama/serupa):\n- ${avoidDupList.join('\n- ')}\n`
+            : '';
+
           const prompt = `Buat ulang 1 butir soal sesuai detail berikut:
 Jenis: ${q.type}
-Tingkat Kesulitan: sedang
-Bloom: ${q.bloom || 'C2'}
+Tingkat Kesulitan: ${targetDifficulty} (WAJIB)
+Bloom Target: ${bloomCode} (WAJIB)
 Materi: ${q.materi || '-'}
 ${contextBlock}
 ${adminPromptRules}
 Instruksi:
 1. ${wantsArabicHarakat ? 'Gunakan Bahasa Arab dengan harakat/tasykīl lengkap.' : 'Gunakan Bahasa Indonesia.'}
-2. Jika tipe "pg" atau "pg_kompleks", buat ${clamp(Number(state.sections.find(s=>s.id===q.sectionId)?.opsiPG || 4), 3, 5)} opsi.
-3. Pastikan jawaban benar dan disertai penjelasan singkat.
+2. Target kognitif: ${bloomGuide}
+3. Tingkat kesulitan target: ${targetDifficulty}. Buat benar-benar sesuai (${bloomCode}).
+4. Gunakan ide/topik yang sama, tapi buat soal BARU yang tidak identik dengan soal sebelumnya.
+4. Jika tipe "pg" atau "pg_kompleks", buat ${clamp(Number(state.sections.find(s=>s.id===q.sectionId)?.opsiPG || 4), 3, 5)} opsi.
+5. Pastikan jawaban benar dan disertai penjelasan singkat.
 4. Jika butuh gambar: Prioritas 1: "asciiDiagram", Prioritas 2: "svgSource", Prioritas 3: "imagePrompt" (tulis "imagePrompt" dalam Bahasa Inggris; jika soal berbahasa lain pahami artinya lalu tulis deskripsi gambar dalam Bahasa Inggris; hindari teks/label di gambar).
 5. Jika tipe "pg_kompleks", field "answer" HARUS array minimal 2 jawaban benar (contoh: [0,2]).
 6. Jika tipe "menjodohkan", field "pairs" HARUS ada: [{"left":"...","right":"..."}, ...] (teks, bukan angka). Jangan output "0,3" atau "1-4".
+6b. Field "difficulty" WAJIB "${targetDifficulty}". Field "bloom" WAJIB "${bloomCode}".
 7. Aturan konteks:
 - Jika bagian ini mode konteks OFF, field "context" wajib kosong.
 - Jika bagian ini mode konteks ON dan soal ini terkait konteks: field "context" wajib kosong (konteks sudah diberikan di atas dan harus tetap sama). Buat pertanyaan yang merujuk konteks tersebut.
 - Jika bagian ini mode konteks ON tapi soal ini tidak terkait konteks: field "context" tetap kosong.
 8. Jangan membuat stimulus baru. Dalam 1 bagian hanya ada 1 konteks (dipakai untuk ${konteksSoalCount} soal).
+9. Variasi ID: ${qId}
+\n${bloomDepthRules}
+\nSOAL SEBELUMNYA (UNTUK DIBUAT LEBIH MENANTANG/BERBEDA, JANGAN DISALIN):
+Pertanyaan: ${prevStem || '-'}
+Opsi: ${prevOptions.length ? prevOptions.map((t,i)=>`${String.fromCharCode(65+i)}. ${t}`).join(' | ') : '-'}
+${avoidDupBlock}
 ${specialRules}
 ${arabicHarakatRules}
 ${out}`;
-        const res = await callOpenAI(prompt);
-        const item = Array.isArray(res?.items) ? res.items[0] : null;
-        if (!item) return updateQuestionData(qId, { _loadingText: false });
-        const sec = state.sections.find((s) => s.id === q.sectionId) || {};
-        const next = normalizeQuestion(item, sec);
+        const prevStemKey = cleanInlineHtml(q.question || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const prevOptKey = (Array.isArray(q.options) ? q.options : []).map(x => cleanInlineHtml(x || '').replace(/\s+/g, ' ').trim().toLowerCase()).filter(Boolean).join('|');
+
+        let item = null;
+        let next = null;
+        let unchangedFinal = false;
+        const nonce = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          const promptTry = attempt === 1
+            ? prompt
+            : `${prompt}\n\nRETRY ${attempt} (WAJIB BERBEDA, JANGAN SAMA):\n- Variasikan sudut pandang, konteks, dan opsi.\n- Jangan gunakan stem pertanyaan yang sama.\n- Nonce: ${nonce}\n`;
+          const res = await callOpenAIWithRetry(promptTry);
+          item = Array.isArray(res?.items) ? res.items[0] : null;
+          if (!item) continue;
+          const sec = state.sections.find((s) => s.id === q.sectionId) || {};
+          next = normalizeQuestion(item, sec);
+
+          const nextStemKey = cleanInlineHtml(next?.question || '').replace(/\s+/g, ' ').trim().toLowerCase();
+          const nextOptKey = (Array.isArray(next?.options) ? next.options : []).map(x => cleanInlineHtml(x || '').replace(/\s+/g, ' ').trim().toLowerCase()).filter(Boolean).join('|');
+          const unchanged = !!prevStemKey && prevStemKey === nextStemKey && prevOptKey === nextOptKey;
+          unchangedFinal = unchanged;
+          if (!unchanged) break;
+        }
+        if (!item || !next) {
+          alert('Gagal membuat versi soal baru. Coba klik lagi, atau ubah Materi/Perintah Khusus untuk variasi.');
+          return updateQuestionData(qId, { _loadingText: false });
+        }
+        if (unchangedFinal) {
+          alert('AI masih menghasilkan soal yang sama. Coba klik lagi beberapa saat, atau ubah Materi/Perintah Khusus agar variasi lebih besar.');
+          return updateQuestionData(qId, { _loadingText: false });
+        }
         updateQuestionData(qId, {
           type: next.type,
           context: q.context || "",
@@ -12761,8 +12937,8 @@ ${out}`;
           options: next.options,
           answer: next.answer,
           explanation: next.explanation,
-          difficulty: next.difficulty,
-          bloom: next.bloom,
+          difficulty: next.difficulty || targetDifficulty,
+          bloom: bloomCode,
           imagePrompt: next.imagePrompt,
           asciiDiagram: next.asciiDiagram,
           svgSource: next.svgSource,
@@ -12772,6 +12948,20 @@ ${out}`;
         });
         } catch (e) {
           console.error(e);
+          const msg = String(e?.message || e || '');
+          if (/Proxy Error 403/i.test(msg)) {
+            alert('Akses Buat Soal tidak aktif untuk akun ini (403). Hubungi admin untuk mengaktifkan.');
+          } else if (/Proxy Error 401/i.test(msg) || /unauthorized/i.test(msg)) {
+            alert('Sesi login berakhir. Silakan login ulang.');
+          } else if (/timeout/i.test(msg)) {
+            alert('Timeout saat menghubungi server AI. Coba lagi.');
+          } else if (/non-json response/i.test(msg) || /json parse error/i.test(msg)) {
+            alert('Respons server AI tidak valid (bukan JSON). Biasanya karena server error/timeout. Coba lagi atau cek server.');
+          } else if (/Proxy Error 5\d\d/i.test(msg) || /OpenAI error/i.test(msg)) {
+            alert('Server AI sedang bermasalah. Coba lagi beberapa saat.');
+          } else {
+            alert('Gagal memproses AI. Coba lagi.');
+          }
         } finally {
           updateQuestionData(qId, { _loadingText: false });
         }

@@ -1,7 +1,45 @@
 <?php
 declare(strict_types=1);
 session_start();
+// #region debug-point S:dbg-send
+$__DBG_URL = 'http://127.0.0.1:7777/event';
+$__DBG_LOG_FILE = __DIR__ . '/../.dbg/trae-debug-log-regen-question-fails.ndjson';
+function dbg_send(array $payload): void {
+  try {
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE);
+    if (!$json) return;
+    $ch = curl_init('http://127.0.0.1:7777/event');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT_MS, 200);
+    curl_setopt($ch, CURLOPT_TIMEOUT_MS, 300);
+    @curl_exec($ch);
+    @curl_close($ch);
+  } catch (Throwable $e) {}
+  try {
+    $dir = dirname(__DIR__ . '/../.dbg/.keep');
+    if (!is_dir($dir)) @mkdir($dir, 0777, true);
+    @file_put_contents(__DIR__ . '/../.dbg/trae-debug-log-regen-question-fails.ndjson', json_encode($payload, JSON_UNESCAPED_UNICODE) . "\n", FILE_APPEND);
+  } catch (Throwable $e) {}
+}
+// #endregion
 if (!isset($_SESSION['user_id'])) {
+  // #region debug-point S:openai-proxy-unauth
+  try {
+    dbg_send([
+      'sessionId' => 'regen-question-fails',
+      'runId' => 'pre-fix',
+      'hypothesisId' => 'S',
+      'location' => 'api/openai_proxy.php',
+      'msg' => '[DEBUG] openai_proxy unauthorized (no session user_id)',
+      'data' => ['status' => 401, 'has_session_user_id' => false],
+      'traceId' => 'proxy-unauth-' . (string)round(microtime(true) * 1000),
+      'ts' => (int)round(microtime(true) * 1000),
+    ]);
+  } catch (Throwable $e) {}
+  // #endregion
   http_response_code(401);
   header('Content-Type: application/json');
   echo json_encode(['error' => 'Unauthorized']);
@@ -19,6 +57,20 @@ if ($user_id > 0 && $sid && $role !== 'admin' && !$isLockExempt) {
   $did = auth_lock_get_device_id();
   $fp = auth_lock_fingerprint();
   if (!auth_lock_touch($user_id, $sid, $did, $fp)) {
+    // #region debug-point S:openai-proxy-device-lock
+    try {
+      dbg_send([
+        'sessionId' => 'regen-question-fails',
+        'runId' => 'pre-fix',
+        'hypothesisId' => 'S',
+        'location' => 'api/openai_proxy.php',
+        'msg' => '[DEBUG] openai_proxy unauthorized (auth_lock_touch failed)',
+        'data' => ['status' => 401, 'user_id' => $user_id, 'role' => $role, 'lock_exempt' => $isLockExempt ? 1 : 0],
+        'traceId' => 'proxy-lock-' . (string)round(microtime(true) * 1000),
+        'ts' => (int)round(microtime(true) * 1000),
+      ]);
+    } catch (Throwable $e) {}
+    // #endregion
     http_response_code(401);
     echo json_encode(['error' => 'Unauthorized']);
     exit;
@@ -34,6 +86,24 @@ if (isset($_GET['ping'])) {
 
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../db.php';
+
+// #region debug-point S:openai-proxy-instrument
+function dbg_event(string $hypothesisId, string $msg, array $data = [], ?string $traceId = null): void {
+  try {
+    $payload = [
+      'sessionId' => 'regen-question-fails',
+      'runId' => 'pre-fix',
+      'hypothesisId' => $hypothesisId,
+      'location' => 'api/openai_proxy.php',
+      'msg' => '[DEBUG] ' . $msg,
+      'data' => $data,
+      'traceId' => $traceId ?: ('proxy-' . (string)round(microtime(true) * 1000)),
+      'ts' => (int)round(microtime(true) * 1000),
+    ];
+    dbg_send($payload);
+  } catch (Throwable $e) {}
+}
+// #endregion
 
 function read_json_input(): array {
   $raw = file_get_contents('php://input') ?: '';
@@ -208,12 +278,21 @@ function clip_messages_to_char_limit(array $messages, int $maxChars): array {
 }
 
 function proxy_chat(mysqli $db, array $payload, int $user_id) {
+  $traceId = 'chat-' . (string)round(microtime(true) * 1000) . '-' . bin2hex(random_bytes(3));
+  $t0 = microtime(true);
   $prompt = trim((string)($payload['prompt'] ?? ''));
   $model  = (string)($payload['model'] ?? 'gpt-4o-mini');
+  dbg_event('S', 'proxy_chat entry', [
+    'user_id' => $user_id,
+    'model' => $model,
+    'prompt_len' => strlen($prompt),
+    'has_prompt' => $prompt !== '' ? 1 : 0,
+  ], $traceId);
   if ($prompt === '') {
     http_response_code(400);
     echo json_encode(['error' => 'Prompt kosong']);
     log_audit($db, $user_id, 'error', 'openai_chat', 'Prompt kosong', 400, []);
+    dbg_event('S', 'proxy_chat reject: empty prompt', ['status' => 400], $traceId);
     return;
   }
   $cfg = get_model_config($db, $model, 'chat');
@@ -232,6 +311,7 @@ function proxy_chat(mysqli $db, array $payload, int $user_id) {
     http_response_code(500);
     echo json_encode(['error' => 'API key tidak tersedia. Tambahkan ke tabel api_keys.']);
     log_audit($db, $user_id, 'error', 'openai_chat', 'API key tidak tersedia', 500, ['provider'=>$provider]);
+    dbg_event('S', 'proxy_chat error: api_key missing', ['status' => 500, 'provider' => $provider], $traceId);
     return;
   }
 
@@ -265,6 +345,12 @@ function proxy_chat(mysqli $db, array $payload, int $user_id) {
     http_response_code(502);
     echo json_encode(['error' => 'OpenAI error', 'status' => $status, 'detail' => $err ?: $result]);
     log_audit($db, $user_id, 'error', 'openai_chat', 'HTTP error dari OpenAI', $status ?: 502, ['error'=>$err, 'result'=>$result]);
+    dbg_event('S', 'proxy_chat upstream error', [
+      'status' => 502,
+      'upstream_status' => $status,
+      'curl_error' => $err ? 1 : 0,
+      'ms' => (int)round((microtime(true) - $t0) * 1000),
+    ], $traceId);
     return;
   }
   $decoded = json_decode($result, true);
@@ -274,6 +360,11 @@ function proxy_chat(mysqli $db, array $payload, int $user_id) {
     http_response_code(500);
     echo json_encode(['error' => 'Respons tidak valid dari OpenAI']);
     log_audit($db, $user_id, 'error', 'openai_chat', 'Respons tidak valid dari OpenAI', 500, ['decoded'=>$decoded]);
+    dbg_event('S', 'proxy_chat parse error (content not json)', [
+      'status' => 500,
+      'ms' => (int)round((microtime(true) - $t0) * 1000),
+      'content_head' => substr((string)$content, 0, 180),
+    ], $traceId);
     return;
   }
   $usage = $decoded['usage'] ?? [];
@@ -300,6 +391,12 @@ function proxy_chat(mysqli $db, array $payload, int $user_id) {
     ];
   }
   echo json_encode($parsed, JSON_UNESCAPED_UNICODE);
+  dbg_event('S', 'proxy_chat ok', [
+    'status' => 200,
+    'ms' => (int)round((microtime(true) - $t0) * 1000),
+    'keys' => array_slice(array_keys($parsed), 0, 12),
+    'items_len' => isset($parsed['items']) && is_array($parsed['items']) ? count($parsed['items']) : 0,
+  ], $traceId);
 }
 
 function proxy_image(mysqli $db, array $payload, int $user_id) {
@@ -378,21 +475,33 @@ function proxy_image(mysqli $db, array $payload, int $user_id) {
 
 $data = read_json_input();
 $type = (string)($data['type'] ?? 'chat');
+$traceIdMain = 'req-' . (string)round(microtime(true) * 1000) . '-' . bin2hex(random_bytes(3));
+dbg_event('S', 'request entry', [
+  'user_id' => $user_id,
+  'role' => $role,
+  'type' => $type,
+  'has_prompt' => isset($data['prompt']) ? 1 : 0,
+  'prompt_len' => isset($data['prompt']) ? strlen((string)$data['prompt']) : 0,
+  'model' => isset($data['model']) ? (string)$data['model'] : '',
+], $traceIdMain);
 
 if ($role !== 'admin') {
   if ($type === 'chat' && $access_buat_soal === 0) {
     http_response_code(403);
     echo json_encode(['error' => 'Forbidden']);
+    dbg_event('S', 'forbidden: access_buat_soal=0', ['status' => 403, 'type' => $type, 'user_id' => $user_id], $traceIdMain);
     exit;
   }
   if ($type === 'modul_ajar' && $access_modul_ajar === 0) {
     http_response_code(403);
     echo json_encode(['error' => 'Forbidden']);
+    dbg_event('S', 'forbidden: access_modul_ajar=0', ['status' => 403, 'type' => $type, 'user_id' => $user_id], $traceIdMain);
     exit;
   }
   if ($type === 'rpp' && $access_rpp === 0) {
     http_response_code(403);
     echo json_encode(['error' => 'Forbidden']);
+    dbg_event('S', 'forbidden: access_rpp=0', ['status' => 403, 'type' => $type, 'user_id' => $user_id], $traceIdMain);
     exit;
   }
 }
