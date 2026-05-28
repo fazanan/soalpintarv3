@@ -196,27 +196,6 @@ if ($ownerId <= 0 || $mapel === '') {
   echo json_encode(['ok'=>false,'error'=>'quiz_corrupt']);
   exit;
 }
-$stmtG = @$mysqli->prepare("SELECT spreadsheet_id, is_active FROM gsheet_settings WHERE user_id=? AND mapel=? LIMIT 1");
-if (!$stmtG) {
-  http_response_code(503);
-  echo json_encode(['ok'=>false,'error'=>'gsheet_unavailable']);
-  exit;
-}
-$stmtG->bind_param('is', $ownerId, $mapel);
-$stmtG->execute();
-$stmtG->bind_result($gsheetId, $gsheetActive);
-if (!$stmtG->fetch()) {
-  $stmtG->close();
-  http_response_code(503);
-  echo json_encode(['ok'=>false,'error'=>'gsheet_not_configured']);
-  exit;
-}
-$stmtG->close();
-if ((int)$gsheetActive !== 1 || trim((string)$gsheetId) === '') {
-  http_response_code(503);
-  echo json_encode(['ok'=>false,'error'=>'gsheet_not_active']);
-  exit;
-}
 $decoded = json_decode($payloadJson, true);
 $maxAbsen = 0;
 if (is_array($decoded) && isset($decoded['settings']['max_absen'])) $maxAbsen = (int)$decoded['settings']['max_absen'];
@@ -352,6 +331,16 @@ for ($i = 0; $i < $len; $i++) {
     else $answersOrdered[] = '';
   }
 }
+$createdAt = date('Y-m-d H:i:s');
+try {
+  $stmtR = @$mysqli->prepare("INSERT INTO published_quiz_results (published_id, absen, nama, score, total, created_at) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE nama=VALUES(nama), score=VALUES(score), total=VALUES(total), created_at=VALUES(created_at)");
+  if ($stmtR) {
+    $stmtR->bind_param('iisiss', $pubId, $absen, $nama, $score, $totalFinal, $createdAt);
+    @$stmtR->execute();
+    $stmtR->close();
+  }
+} catch (Throwable $e) {
+}
 $resp = ['ok'=>true,'status'=>'saved','score'=>$score,'total'=>$totalFinal];
 $outJson = json_encode($resp, JSON_UNESCAPED_UNICODE);
 if (!is_string($outJson)) $outJson = '{"ok":true}';
@@ -366,5 +355,4 @@ if (function_exists('fastcgi_finish_request')) {
 }
 @ignore_user_abort(true);
 @set_time_limit(15);
-$createdAt = date('Y-m-d H:i:s');
 __sp_try_gsheet_autosync($mysqli, $pubId, $absen, $nama, $score, $totalFinal, $createdAt, $answersOrdered);
