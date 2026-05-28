@@ -1,4 +1,13 @@
 <?php
+$isReview = isset($_GET['review']) && (string)$_GET['review'] !== '' && (string)$_GET['review'] !== '0';
+if ($isReview) {
+  session_start();
+  if (!isset($_SESSION['user_id'])) {
+    http_response_code(403);
+    echo 'Forbidden';
+    exit;
+  }
+}
 require __DIR__ . '/db.php';
 $slug = isset($_GET['slug']) ? trim((string)$_GET['slug']) : '';
 $pubIdParam = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -9,8 +18,8 @@ if ($slug === '' && $pubIdParam <= 0) {
   exit;
 }
 $sql = $pubIdParam > 0
-  ? "SELECT id, slug, mapel, kelas, payload_public, is_active, expire_at FROM published_quizzes WHERE id=? LIMIT 1"
-  : "SELECT id, slug, mapel, kelas, payload_public, is_active, expire_at FROM published_quizzes WHERE slug=? LIMIT 1";
+  ? "SELECT id, slug, mapel, kelas, payload_public, is_active, expire_at, user_id FROM published_quizzes WHERE id=? LIMIT 1"
+  : "SELECT id, slug, mapel, kelas, payload_public, is_active, expire_at, user_id FROM published_quizzes WHERE slug=? LIMIT 1";
 $stmt = $mysqli->prepare($sql);
 if ($pubIdParam > 0) $stmt->bind_param('i', $pubIdParam);
 else $stmt->bind_param('s', $slug);
@@ -22,7 +31,8 @@ $kelas = '';
 $payloadJson = '';
 $active = 0;
 $expireAt = null;
-$stmt->bind_result($pubId, $slugDb, $mapel, $kelas, $payloadJson, $active, $expireAt);
+$ownerId = 0;
+$stmt->bind_result($pubId, $slugDb, $mapel, $kelas, $payloadJson, $active, $expireAt, $ownerId);
 if (!$stmt->fetch()) {
   $stmt->close();
   http_response_code(404);
@@ -31,6 +41,13 @@ if (!$stmt->fetch()) {
 }
 $stmt->close();
 if ($slug === '') $slug = (string)$slugDb;
+if ($isReview) {
+  if ((int)$ownerId !== (int)($_SESSION['user_id'] ?? 0)) {
+    http_response_code(403);
+    echo 'Forbidden';
+    exit;
+  }
+}
 if ((int)$active !== 1) {
   http_response_code(403);
   echo 'Link nonaktif';
@@ -46,6 +63,17 @@ $items = [];
 $maxAbsen = 0;
 $showSolution = 0;
 $answerKeySettings = [];
+$logoSekolah = '';
+$__sp_is_safe_img_src = function (string $src): bool {
+  $s = trim($src);
+  if ($s === '') return false;
+  $low = strtolower($s);
+  if (strpos($low, 'data:image/') === 0) return true;
+  if (preg_match('/^https?:\/\//i', $s)) return true;
+  if (strpos($s, '/') === 0) return true;
+  if (preg_match('/^(uploads|assets)\//i', $s)) return true;
+  return false;
+};
 $__sp_normalize_student_name = function ($s) {
   $s = trim((string)$s);
   if ($s === '') return '';
@@ -67,6 +95,21 @@ $__sp_normalize_student_name = function ($s) {
 $studentName = isset($_GET['name']) ? trim((string)$_GET['name']) : (isset($_GET['nama']) ? trim((string)$_GET['nama']) : '');
 $studentName = $__sp_normalize_student_name($studentName);
 if (is_array($decoded)) {
+  $logoCandidate = '';
+  if (isset($decoded['settings']) && is_array($decoded['settings'])) {
+    if (isset($decoded['settings']['meta']) && is_array($decoded['settings']['meta'])) {
+      $logoCandidate = (string)($decoded['settings']['meta']['logo']
+        ?? $decoded['settings']['meta']['logo_url']
+        ?? $decoded['settings']['meta']['logo_sekolah']
+        ?? $decoded['settings']['meta']['logoSekolah']
+        ?? $decoded['settings']['meta']['school_logo']
+        ?? $decoded['settings']['meta']['logoSchool']
+        ?? '');
+    }
+    if ($logoCandidate === '') $logoCandidate = (string)($decoded['settings']['logo'] ?? $decoded['settings']['logo_url'] ?? $decoded['settings']['logoSekolah'] ?? '');
+  }
+  $logoCandidate = trim($logoCandidate);
+  if ($logoCandidate !== '' && $__sp_is_safe_img_src($logoCandidate)) $logoSekolah = $logoCandidate;
   if (isset($decoded['items']) && is_array($decoded['items'])) {
     $items = $decoded['items'];
     $maxAbsen = isset($decoded['settings']['max_absen']) ? (int)$decoded['settings']['max_absen'] : 0;
@@ -98,14 +141,22 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
   <div class="max-w-4xl mx-auto p-4 md:p-6">
     <div id="paper" class="bg-white text-black p-6 md:p-10 shadow-paper border border-gray-200 rounded-2xl">
       <div class="border-b-2 border-black pb-6 mb-8 relative">
-        <div class="text-center mb-6">
-          <h2 class="font-bold text-2xl uppercase tracking-wider mb-1">
-            <?php echo htmlspecialchars((strtoupper(trim((string)($decoded['settings']['meta']['sekolah'] ?? ''))) ?: 'NAMA SEKOLAH')); ?>
-          </h2>
-          <h3 class="font-bold text-lg uppercase tracking-wide">
-            NASKAH SOAL
-          </h3>
-          <div class="text-sm mt-1">Mata Pelajaran <?php echo htmlspecialchars($mapel ?: '-'); ?></div>
+        <div class="grid grid-cols-[96px_1fr_72px] items-start gap-3 mb-6">
+          <div id="reviewScoreBox" class="flex items-start"></div>
+          <div class="text-center">
+            <h2 class="font-bold text-2xl uppercase tracking-wider mb-1">
+              <?php echo htmlspecialchars((strtoupper(trim((string)($decoded['settings']['meta']['sekolah'] ?? ''))) ?: 'NAMA SEKOLAH')); ?>
+            </h2>
+            <h3 class="font-bold text-lg uppercase tracking-wide">
+              NASKAH SOAL
+            </h3>
+            <div class="text-sm mt-1">Mata Pelajaran <?php echo htmlspecialchars($mapel ?: '-'); ?></div>
+          </div>
+          <div class="flex justify-end">
+            <?php if ($logoSekolah !== ''): ?>
+              <img src="<?php echo htmlspecialchars($logoSekolah); ?>" alt="Logo sekolah" class="w-[72px] h-[72px] object-contain">
+            <?php endif; ?>
+          </div>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-2 text-sm">
           <div class="space-y-1.5">
@@ -173,6 +224,7 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
     let studentName = <?php echo json_encode($studentName, JSON_UNESCAPED_UNICODE); ?>;
     const showSolution = <?php echo (int)$showSolution; ?> === 1;
     const answerKey = <?php echo json_encode($answerKeySettings, JSON_UNESCAPED_UNICODE); ?>;
+    const isReview = <?php echo $isReview ? 'true' : 'false'; ?>;
     (function(){
       const el = document.getElementById('dtNow');
       if (el) {
@@ -190,6 +242,25 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
     let activeTab = 'soal';
     let soalTypeTab = 'pg';
     const studentAnswers = {};
+    let reviewPct = null;
+    function renderReviewScoreBox() {
+      const box = document.getElementById('reviewScoreBox');
+      if (!box) return;
+      if (!isReview || !Number.isFinite(Number(reviewPct))) { box.innerHTML = ''; return; }
+      const pct = Math.max(0, Math.min(100, Math.round(Number(reviewPct))));
+      const ok = pct >= 60;
+      const c = ok ? 'text-green-600 border-green-500' : 'text-red-600 border-red-500';
+      box.innerHTML = `
+        <div class="w-24 h-24 rounded-xl border-2 ${c} flex flex-col overflow-hidden bg-white">
+          <div class="flex-1 flex items-center justify-center">
+            <div class="text-3xl font-extrabold leading-none">${pct}</div>
+          </div>
+          <div class="h-7 border-t border-black/10 flex items-center justify-center text-xs font-extrabold tracking-wide text-gray-700">
+            NILAI
+          </div>
+        </div>
+      `;
+    }
     function escapeHtml(s) {
       return String(s ?? '')
         .replaceAll('&', '&amp;')
@@ -214,11 +285,12 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
     }
     function normalizeQType(q) {
       const t = String(q?.type || '').trim();
+      if (t === 'isian_singkat' || t === 'isian') return 'isian_singkat';
       if (t === 'benar_salah' || t === 'pg_kompleks' || t === 'pg') return t;
       return 'pg';
     }
     function buildOrderData(questions, seed) {
-      const typeOrder = ['pg', 'benar_salah', 'pg_kompleks'];
+      const typeOrder = ['pg', 'benar_salah', 'pg_kompleks', 'isian_singkat'];
       const groups = {};
       for (const t of typeOrder) groups[t] = [];
       const others = [];
@@ -258,9 +330,44 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       }
       studentAnswers[p] = v;
     }
+    function onShortAnswerChange(pos, value) {
+      const p = Number(pos);
+      if (!Number.isFinite(p) || p < 0) return;
+      studentAnswers[p] = String(value ?? '');
+    }
+    function normalizeShortText(s) {
+      let v = String(s ?? '');
+      v = v.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+      v = v.replace(/\s+/g, ' ');
+      v = v.replace(/^[\s"'`]+/, '').replace(/[\s"'`]+$/, '');
+      v = v.replace(/[.,;:!?]+$/g, '');
+      return v.toLowerCase();
+    }
+    function shortKeyList(raw) {
+      const out = [];
+      const push = (x) => {
+        const t = String(x ?? '').trim();
+        if (!t) return;
+        const n = normalizeShortText(t);
+        if (!n) return;
+        if (!out.includes(n)) out.push(n);
+      };
+      if (Array.isArray(raw)) raw.forEach(push);
+      else if (typeof raw === 'string') {
+        if (raw.includes('|')) raw.split('|').forEach(push);
+        else push(raw);
+      } else push(raw);
+      return out;
+    }
+    function isShortCorrect(answerRaw, keyRaw) {
+      const ans = normalizeShortText(answerRaw);
+      if (!ans) return false;
+      const keys = shortKeyList(keyRaw);
+      return keys.includes(ans);
+    }
     function renderTabs() {
       const container = document.getElementById('root');
-      if (!absen || absen <= 0 || !studentName || String(studentName).trim() === '') {
+      if (!isReview && (!absen || absen <= 0 || !studentName || String(studentName).trim() === '')) {
         container.innerHTML = `
           <div class="p-4 rounded-xl border bg-gray-50 text-sm text-gray-700">
             Silakan isi No Absen dan Nama untuk mulai mengerjakan.
@@ -290,8 +397,21 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       const availableTypes = orderData.typeOrder.filter(t => Array.isArray(orderData.groups[t]) && orderData.groups[t].length > 0);
       const activeTypes = availableTypes.length ? availableTypes : ['pg'];
       if (!activeTypes.includes(soalTypeTab)) soalTypeTab = activeTypes[0];
-      const tabLabel = { pg: 'Pilihan Ganda', benar_salah: 'Benar/Salah', pg_kompleks: 'PG Kompleks' };
-      const tabSubtitle = { pg: 'Pilihlah salah satu jawaban yang paling tepat!', benar_salah: 'Pilihlah jawaban Benar atau Salah!', pg_kompleks: 'Pilih jawaban yang benar (bisa lebih dari satu)!' };
+      const tabLabel = { pg: 'Pilihan Ganda', benar_salah: 'Benar/Salah', pg_kompleks: 'PG Kompleks', isian_singkat: 'Isian Singkat' };
+      const tabSubtitle = { pg: 'Pilihlah salah satu jawaban yang paling tepat!', benar_salah: 'Pilihlah jawaban Benar atau Salah!', pg_kompleks: 'Pilih jawaban yang benar (bisa lebih dari satu)!', isian_singkat: 'Jawablah dengan singkat dan tepat!' };
+      const getCorrectSet = (type, key) => {
+        if (type === 'pg_kompleks') {
+          const arr = Array.isArray(key) ? key : [];
+          const out = new Set();
+          for (const v of arr) {
+            const n = Number(v);
+            if (Number.isFinite(n) && n >= 0) out.add(Math.floor(n));
+          }
+          return out;
+        }
+        const n = Number(key);
+        return Number.isFinite(n) && n >= 0 ? new Set([Math.floor(n)]) : new Set();
+      };
       const tabs = `
         <div class="flex flex-wrap items-center gap-2 mb-4">
           ${activeTypes.map(t => `
@@ -315,6 +435,43 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       const cards = group.map((origIdx, localIdx) => {
         const q = questions[origIdx] || {};
         const type = normalizeQType(q);
+        if (type === 'isian_singkat') {
+          const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+          const ctxHtml = ctxRaw ? `<div class="mb-3 p-3 rounded-xl border bg-gray-50 text-sm leading-relaxed">${renderMathText(ctxRaw).replaceAll('\n','<br>')}</div>` : ``;
+          const pos = Number(orderData.posByOrig[origIdx] ?? -1);
+          const picked = studentAnswers[pos];
+          const pickedText = typeof picked === 'string' ? picked : (picked === null || picked === undefined ? '' : String(picked));
+          const keyRaw = answerKey[origIdx];
+          const keyDisplay = Array.isArray(keyRaw) ? keyRaw.map(x => String(x ?? '').trim()).filter(Boolean).join(' / ') : String(keyRaw ?? '').trim();
+          const showMark = isReview && String(pickedText || '').trim() !== '';
+          const ok = showMark ? isShortCorrect(pickedText, keyRaw) : false;
+          return `
+            <div class="mb-6">
+              <div class="flex gap-4">
+                <span class="font-bold text-lg min-w-[1.5rem]">${localIdx + 1}.</span>
+                <div class="flex-1">
+                  ${ctxHtml}
+                  <p class="mb-3 text-justify leading-relaxed">${renderMathText(String(q.question || ''))}</p>
+                  ${q.image ? `<img src="${String(q.image)}" class="w-64 h-64 object-contain rounded-lg mb-3 border shadow-sm">` : ``}
+                  <div class="flex items-center gap-3">
+                    <input
+                      type="text"
+                      class="h-11 w-full rounded-lg border border-gray-300 px-4 text-sm"
+                      placeholder="Jawaban..."
+                      value="${escapeHtml(pickedText)}"
+                      ${isReview ? 'disabled' : `oninput="onShortAnswerChange(${pos},this.value)"`}
+                    >
+                    ${showMark ? (ok
+                      ? `<span class="text-green-600 font-extrabold text-3xl leading-none" aria-label="Benar">✓</span>`
+                      : `<span class="text-red-600 font-extrabold text-3xl leading-none" aria-label="Salah">✕</span>`
+                    ) : ``}
+                  </div>
+                  ${isReview && keyDisplay ? `<div class="mt-2 text-xs font-semibold text-gray-600">(Kunci) ${escapeHtml(keyDisplay)}</div>` : ``}
+                </div>
+              </div>
+            </div>
+          `;
+        }
         const isMulti = type === 'pg_kompleks';
         const inputKind = isMulti ? 'checkbox' : 'radio';
         const opts = type === 'benar_salah' ? ['Benar', 'Salah'] : (Array.isArray(q.options) ? q.options : []);
@@ -322,22 +479,52 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         const ctxHtml = ctxRaw ? `<div class="mb-3 p-3 rounded-xl border bg-gray-50 text-sm leading-relaxed">${renderMathText(ctxRaw).replaceAll('\n','<br>')}</div>` : ``;
         const pos = Number(orderData.posByOrig[origIdx] ?? -1);
         const picked = studentAnswers[pos];
-        const optsHtml = opts.map((t, oi) => `
+        const correct = getCorrectSet(type, answerKey[origIdx]);
+        const isPicked = (oi) => isMulti ? (Array.isArray(picked) && picked.includes(oi)) : (Number(picked) === oi);
+        const renderOptItem = (t, oi) => `
           <div class="flex gap-3 items-start">
             <label class="font-semibold pt-0.5">${String.fromCharCode(65 + oi)}.</label>
-            <label class="flex-1 flex gap-3 p-2 rounded-lg hover:bg-gray-50 transition">
+            <label class="flex-1 flex gap-3 p-2 rounded-lg transition ${isReview ? '' : 'hover:bg-gray-50'}">
               <input
                 type="${inputKind}"
                 name="q_${pos}"
                 value="${oi}"
                 class="mt-1 rounded border-gray-300"
-                onchange="onAnswerChange(${pos},${oi},this.checked,${isMulti?1:0})"
+                ${isReview ? 'disabled' : `onchange="onAnswerChange(${pos},${oi},this.checked,${isMulti?1:0})"`}
                 ${isMulti ? (Array.isArray(picked) && picked.includes(oi) ? 'checked' : '') : (Number(picked) === oi ? 'checked' : '')}
               >
-              <span class="text-sm leading-relaxed">${renderMathText(String(t || ''))}</span>
+              <div class="flex-1 min-w-0">
+                <span class="text-sm leading-relaxed">
+                  ${renderMathText(String(t || ''))}
+                  ${isReview && correct.has(oi) ? ` <span class="text-xs font-semibold text-gray-600">(Kunci)</span>` : ``}
+                </span>
+                ${isReview && isPicked(oi) ? (correct.has(oi)
+                  ? `<span class="ml-2 text-green-600 font-extrabold text-3xl leading-none align-middle" aria-label="Benar">✓</span>`
+                  : `<span class="ml-2 text-red-600 font-extrabold text-3xl leading-none align-middle" aria-label="Salah">✕</span>`
+                ) : ``}
+              </div>
             </label>
           </div>
-        `).join('');
+        `;
+        const optsHtml = (() => {
+          if (type === 'benar_salah') {
+            return `
+              <div class="grid grid-cols-2 gap-x-12 gap-y-2 pl-1">
+                ${opts.slice(0, 2).map((t, oi) => renderOptItem(t, oi)).join('')}
+              </div>
+            `;
+          }
+          const n = opts.length;
+          const leftCount = Math.ceil(n / 2);
+          const left = opts.slice(0, leftCount).map((t, oi) => renderOptItem(t, oi)).join('');
+          const right = opts.slice(leftCount).map((t, oi) => renderOptItem(t, oi + leftCount)).join('');
+          return `
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-2 pl-1">
+              <div class="space-y-2">${left}</div>
+              <div class="space-y-2">${right}</div>
+            </div>
+          `;
+        })();
         return `
           <div class="mb-6">
             <div class="flex gap-4">
@@ -346,15 +533,13 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
                 ${ctxHtml}
                 <p class="mb-3 text-justify leading-relaxed">${renderMathText(String(q.question || ''))}</p>
                 ${q.image ? `<img src="${String(q.image)}" class="w-64 h-64 object-contain rounded-lg mb-3 border shadow-sm">` : ``}
-                <div class="grid grid-cols-1 gap-2 pl-1">
-                  ${optsHtml}
-                </div>
+                ${optsHtml}
               </div>
             </div>
           </div>
         `;
       }).join('');
-      const showSubmit = soalTypeTab === lastTab;
+      const showSubmit = !isReview && soalTypeTab === lastTab;
       return `
         <div class="space-y-6">
           ${tabs}
@@ -375,12 +560,17 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
     function renderSolusi() {
       const questions = Array.isArray(payload) ? payload : [];
       const rows = questions.map((q, i) => {
-        const type = String(q.type || '').trim() || (Array.isArray(answerKey[i]) ? 'pg_kompleks' : 'pg');
+        let type = String(q.type || '').trim() || (Array.isArray(answerKey[i]) ? 'pg_kompleks' : 'pg');
+        type = normalizeQType({ type });
         const opts = type === 'benar_salah' ? ['Benar', 'Salah'] : (Array.isArray(q.options) ? q.options : []);
         const key = answerKey[i];
         let kunciText = '-';
         let correctText = '';
-        if (type === 'pg_kompleks') {
+        if (type === 'isian_singkat') {
+          const arr = Array.isArray(key) ? key.map(x => String(x ?? '').trim()).filter(Boolean) : (String(key ?? '').trim() ? [String(key ?? '').trim()] : []);
+          kunciText = arr.length ? arr.join(' / ') : '-';
+          correctText = '';
+        } else if (type === 'pg_kompleks') {
           const arr = Array.isArray(key) ? key : [];
           const letters = arr.filter(n => Number.isFinite(Number(n))).map(n => String.fromCharCode(65 + Number(n)));
           kunciText = letters.length ? letters.join(', ') : '-';
@@ -410,6 +600,7 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       return rows || `<div class="text-sm text-gray-600">Belum ada data pembahasan.</div>`;
     }
     function bindSubmit() {
+      if (isReview) return;
       const btn = document.getElementById('btnSubmit');
       if (!btn) return;
       btn.addEventListener('click', async () => {
@@ -422,7 +613,10 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
           const origIdx = order[p];
           const q = questions[origIdx] || {};
           const type = normalizeQType(q);
-          if (type === 'pg_kompleks') {
+          if (type === 'isian_singkat') {
+            const v = studentAnswers[p];
+            answers.push(String(v ?? '').trim());
+          } else if (type === 'pg_kompleks') {
             const arr = Array.isArray(studentAnswers[p]) ? studentAnswers[p] : [];
             const out = arr.map(n => Number(n)).filter(n => Number.isFinite(n) && n >= 0).sort((a, b) => a - b);
             answers.push(Array.from(new Set(out)));
@@ -498,6 +692,7 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       } catch {}
     }
     function bindIdentityModal() {
+      if (isReview) return;
       const btn = document.getElementById('btnStart');
       if (!btn) return;
       btn.addEventListener('click', () => {
@@ -521,11 +716,85 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       if (inpA) inpA.addEventListener('keydown', onEnter);
       if (inpN) inpN.addEventListener('keydown', onEnter);
     }
-    loadIdentity();
-    setIdentity(absen, studentName);
-    bindIdentityModal();
-    renderTabs();
-    if (!absen || absen <= 0 || !studentName || String(studentName).trim() === '') openIdentityModal();
+    async function loadReviewAnswers() {
+      const infoEl = document.getElementById('root');
+      try {
+        if (infoEl) infoEl.innerHTML = `<div class="text-sm text-gray-600">Memuat jawaban…</div>`;
+        const res = await fetch('api/published_quiz_results.php?' + new URLSearchParams({ slug, mode: 'answers', absen: String(absen) }), { credentials: 'same-origin' });
+        const js = await res.json().catch(() => null);
+        if (!res.ok || !js || !js.ok) {
+          const msg = String(js?.message || js?.error || `http_${res.status}`);
+          if (infoEl) infoEl.innerHTML = `<div class="text-sm text-red-600">Gagal memuat jawaban: ${escapeHtml(msg)}</div>`;
+          return;
+        }
+        const sc = Number(js?.student?.score || 0);
+        const tt = Number(js?.student?.total || 0);
+        reviewPct = tt > 0 ? Math.round((sc / tt) * 100) : 0;
+        renderReviewScoreBox();
+        const nm = String(js?.student?.nama || '').trim();
+        if (!studentName && nm) studentName = nm;
+        setIdentity(absen, studentName);
+        const answers = Array.isArray(js?.answers) ? js.answers : [];
+        const questions = Array.isArray(payload) ? payload : [];
+        const orderData = buildOrderData(questions, absen);
+        const toIdx = (type, val) => {
+          if (val === null || val === undefined) return -1;
+          if (typeof val === 'number' && Number.isFinite(val)) return Math.floor(val);
+          const v = String(val || '').trim();
+          if (!v) return -1;
+          if (type === 'benar_salah') {
+            if (/^benar$/i.test(v)) return 0;
+            if (/^salah$/i.test(v)) return 1;
+          }
+          const m = v.toUpperCase().match(/^[A-E]$/);
+          if (m) return m[0].charCodeAt(0) - 65;
+          const n = Number(v);
+          return Number.isFinite(n) ? Math.floor(n) : -1;
+        };
+        const toIdxList = (type, val) => {
+          if (type !== 'pg_kompleks') {
+            const idx = toIdx(type, val);
+            return idx >= 0 ? [idx] : [];
+          }
+          if (Array.isArray(val)) return val.map(x => toIdx('pg', x)).filter(n => n >= 0);
+          const v = String(val || '').trim();
+          if (!v) return [];
+          const parts = v.split(/[,\s;\/|]+/).map(x => x.trim()).filter(Boolean);
+          return parts.map(x => toIdx('pg', x)).filter(n => n >= 0);
+        };
+        for (let origIdx = 0; origIdx < questions.length; origIdx++) {
+          const q = questions[origIdx] || {};
+          const type = normalizeQType(q);
+          const pos = Number(orderData.posByOrig[origIdx] ?? -1);
+          if (!Number.isFinite(pos) || pos < 0) continue;
+          const raw = answers[origIdx];
+          if (type === 'isian_singkat') {
+            studentAnswers[pos] = String(raw ?? '');
+          } else if (type === 'pg_kompleks') {
+            const arr = Array.from(new Set(toIdxList(type, raw))).sort((a, b) => a - b);
+            studentAnswers[pos] = arr;
+          } else {
+            studentAnswers[pos] = toIdx(type, raw);
+          }
+        }
+        submitted = true;
+        activeTab = 'soal';
+        renderTabs();
+      } catch {
+        if (infoEl) infoEl.innerHTML = `<div class="text-sm text-red-600">Gagal memuat jawaban (network).</div>`;
+      }
+    }
+
+    if (isReview) {
+      setIdentity(absen, studentName);
+      loadReviewAnswers();
+    } else {
+      loadIdentity();
+      setIdentity(absen, studentName);
+      bindIdentityModal();
+      renderTabs();
+      if (!absen || absen <= 0 || !studentName || String(studentName).trim() === '') openIdentityModal();
+    }
   </script>
 </body>
 </html>

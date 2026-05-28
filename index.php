@@ -187,6 +187,20 @@ if ($__uid > 0) {
   }
   $stmt->close();
 }
+$__gsheetServiceEmail = '';
+$__gsheetServiceAccountCandidates = [
+  __DIR__ . '/storage/gsheet/service_account.json',
+  __DIR__ . '/project/storage/gsheet/service_account.json',
+];
+foreach ($__gsheetServiceAccountCandidates as $__gsheetServiceAccountPath) {
+  if (!is_file($__gsheetServiceAccountPath)) continue;
+  $rawSa = @file_get_contents($__gsheetServiceAccountPath);
+  if (!is_string($rawSa) || $rawSa === '') continue;
+  $jSa = json_decode($rawSa, true);
+  if (!is_array($jSa)) continue;
+  $__gsheetServiceEmail = trim((string)($jSa['client_email'] ?? ''));
+  if ($__gsheetServiceEmail !== '') break;
+}
 session_write_close();
 ?>
 <!DOCTYPE html>
@@ -578,6 +592,7 @@ session_write_close();
       const HAS_LKPD_INTERAKTIF_ACCESS = IS_ADMIN || ACCESS_LKPD_INTERAKTIF;
       const HAS_RPP_ACCESS = IS_ADMIN || ACCESS_RPP;
       const USER_PROFILE = <?php echo json_encode($__userProfile, JSON_UNESCAPED_UNICODE); ?>;
+      const GSHEET_SERVICE_EMAIL = <?php echo json_encode((string)($__gsheetServiceEmail ?? ''), JSON_UNESCAPED_UNICODE); ?>;
       const LOGIN_NAME = <?php echo json_encode(trim((string)(($_SESSION['nama'] ?? '') !== '' ? $_SESSION['nama'] : ($_SESSION['username'] ?? ''))), JSON_UNESCAPED_UNICODE); ?>;
       const IS_DEMO_USER = <?php echo (trim(strtolower((string)($_SESSION['username'] ?? ''))) === 'coba@gmail.com') ? 'true' : 'false'; ?>;
 
@@ -627,6 +642,7 @@ session_write_close();
           "Pendidikan Agama Buddha dan Budi Pekerti",
           "Pendidikan Agama Khonghucu dan Budi Pekerti",
           "Al-Qur'an Hadis",
+          "Tahsin / Tahfizh",
           "Akidah Akhlak",
           "Fikih",
           "Sejarah Kebudayaan Islam (SKI)",
@@ -663,6 +679,7 @@ session_write_close();
           "Pendidikan Agama Buddha dan Budi Pekerti",
           "Pendidikan Agama Khonghucu dan Budi Pekerti",
           "Al-Qur'an Hadis",
+          "Tahsin / Tahfizh",
           "Akidah Akhlak",
           "Fikih",
           "Sejarah Kebudayaan Islam (SKI)",
@@ -701,6 +718,7 @@ session_write_close();
           "Pendidikan Agama Buddha dan Budi Pekerti",
           "Pendidikan Agama Khonghucu dan Budi Pekerti",
           "Al-Qur'an Hadis",
+          "Tahsin / Tahfizh",
           "Akidah Akhlak",
           "Fikih",
           "Sejarah Kebudayaan Islam (SKI)",
@@ -745,6 +763,7 @@ session_write_close();
           "Pendidikan Agama Hindu dan Budi Pekerti",
           "Pendidikan Agama Buddha dan Budi Pekerti",
           "Pendidikan Agama Khonghucu dan Budi Pekerti",
+          "Tahsin / Tahfizh",
           "Bahasa Arab",
           "Sejarah Kebudayaan Islam (SKI)",
           "Pendidikan Pancasila",
@@ -943,17 +962,22 @@ session_write_close();
         quiz: { idx: 0, answered: {}, input: "", reveal: false },
         quizSubtab: "live",
         quizShareTab: "buat_link",
-        quizPublishForm: { slug: "", jumlah: 32, expire: "", roster: [] },
+        quizPublishForm: { slug: "", _slugAuto: true, kelas: "", jumlah: 32, expire: "", includeImages: false, roster: [] },
         quizLastLink: "",
         quizLastPubId: 0,
         quizLastRoster: [],
         quizLastSlug: "",
+        quizShowPublishSuccess: false,
         quizPublications: [],
         quizResults: [],
         quizResultsQuery: "",
         quizResultsCategoryFilter: "semua",
         quizResultsLoadedAt: "",
         quizSelectedSlug: "",
+        _showJawabanSiswaModal: false,
+        jawabanSiswaLoading: false,
+        jawabanSiswaError: "",
+        jawabanSiswaData: null,
         quizPreviewCount: 10,
         quizShowPreview: false,
         quizPaketId: null,
@@ -964,6 +988,19 @@ session_write_close();
         _paketBrowseLoading: false,
         _showPubBrowseModal: false,
         _pubBrowseSearch: "",
+        gsheetSettings: [],
+        gsheetMapelsWithQuiz: [],
+        gsheetLoading: false,
+        gsheetError: "",
+        gsheetSyncing: false,
+        gsheetSyncResult: null,
+        gsheetPreviewTab: "soal",
+        _showGSheetModal: false,
+        gsheetForm: { mapel: "", sheet_title: "", spreadsheet_url: "", is_active: 1, auto_sync: 1, include_detail: 0 },
+        gsheetEditMapel: "",
+        gsheetSaving: false,
+        gsheetTesting: false,
+        gsheetTestResult: null,
         riwayatKreditSearch: "",
         rekap: { 
           raw: [], 
@@ -1665,9 +1702,9 @@ session_write_close();
           };
           const drawHeader = (title, kind) => {
             y = margin;
-            addCenter(String(state.identity.namaSekolah || "NAMA SEKOLAH").toUpperCase(), 16, "bold", 4);
-            addCenter(String(title || "").toUpperCase(), 13, "bold", 6);
-            addCenter(`Tahun Pelajaran ${String(state.paket.tahunAjaran || "-")}`, 11, "normal", 16);
+            addCenter(String(state.identity.namaSekolah || "NAMA SEKOLAH").toUpperCase(), 16, "bold", 0);
+            addCenter(String(title || "").toUpperCase(), 13, "bold", 2);
+            addCenter(`Tahun Pelajaran ${String(state.paket.tahunAjaran || "-")}`, 11, "normal", 10);
 
             const logo = state.identity.logo || "";
             if (logo) {
@@ -1678,65 +1715,57 @@ session_write_close();
               } catch {}
             }
 
-            const labelW = 140;
-            const colGap = 40;
-            const colW = (maxW - colGap) / 2;
-            const leftX = margin;
-            const rightX = margin + colW + colGap;
-            const colonX = labelW;
-            const valX = colonX + 12;
-            const rowH = 18;
             const topikDisplay = identityTopikDisplay(state.identity);
             const isSpesifik = !!topikDisplay;
 
-            const leftRows = [
-              ["Mata Pelajaran", String(state.identity.mataPelajaran || "-"), "text"],
-              ["Kelas / Fase", `${String(state.identity.kelas || "-")} / ${String(state.identity.fase || "-")}`, "text"],
-              ...(isSpesifik ? [["Topik / Lingkup Materi", String(topikDisplay || "-"), "text"]] : []),
-              ...(kind === "soal" ? [["Hari / Tanggal", "", "line"]] : []),
-            ];
-            const rightRows = kind === "soal"
-              ? [
-                  ["Waktu", "", "line"],
-                  ["Nama", "", "line"],
-                  ["No. Absen", "", "line"],
-                ]
-              : [
-                  ["Kurikulum", "Merdeka", "text"],
-                  ["Jumlah Soal", String((state.questions || []).length), "text"],
-                ];
-
-            const rowCount = Math.max(leftRows.length, rightRows.length);
-            for (let i = 0; i < rowCount; i++) {
-              const l = leftRows[i] || ["", "", "text"];
-              const r = rightRows[i] || ["", "", "text"];
-              newPageIfNeeded(80);
-              setFont("normal", 11);
-
-              const drawCol = (baseX, row) => {
-                const [label, value, mode] = row;
-                if (!label) return 1;
-                doc.text(String(label), baseX, y);
-                doc.text(":", baseX + colonX, y);
-                if (mode === "line") {
-                  drawDottedLine(baseX + valX, baseX + colW, y + 3);
-                  return 1;
-                }
-                const lines = doc.splitTextToSize(String(value || ""), colW - valX);
-                doc.text(lines, baseX + valX, y);
-                return Math.max(1, lines.length);
-              };
-
-              const lLines = drawCol(leftX, l);
-              const rLines = drawCol(rightX, r);
-              y += rowH * Math.max(lLines, rLines);
+            const tableRows = [];
+            if (kind === "soal") {
+              const line = "____________________";
+              tableRows.push(["Mata Pelajaran", `: ${state.identity.mataPelajaran || "-"}`, "Waktu", `: ${line}`]);
+              tableRows.push(["Kelas / Fase", `: ${state.identity.kelas || "-"} / ${state.identity.fase || "-"}`, "Nama Siswa", `: ${line}`]);
+              tableRows.push(["Hari / Tanggal", `: ${line}`, "No. Absen / Ruang", `: ${line}`]);
+            } else {
+              tableRows.push(["Mata Pelajaran", `: ${state.identity.mataPelajaran || "-"}`, "Kurikulum", `: ${state.identity.kurikulum || "Merdeka"}`]);
+              tableRows.push(["Kelas / Fase", `: ${state.identity.kelas || "-"} / ${state.identity.fase || "-"}`, "Jumlah Soal", `: ${(state.questions || []).length}`]);
+              if (isSpesifik) {
+                tableRows.push(["Topik / Lingkup Materi", `: ${topikDisplay}`, "", ""]);
+              }
             }
 
-            y += 6;
+            const colW1 = maxW * 0.20;
+            const colW2 = maxW * 0.30;
+            const colW3 = maxW * 0.20;
+            const colW4 = maxW * 0.30;
+
+            doc.autoTable({
+              startY: y,
+              margin: { left: margin, right: margin },
+              body: tableRows,
+              theme: "plain",
+              styles: {
+                font: "times",
+                fontSize: 11,
+                textColor: [0, 0, 0],
+                cellPadding: { top: 2, right: 2, bottom: 2, left: 0 },
+                overflow: "linebreak",
+                valign: "top",
+                lineWidth: 0,
+              },
+              columnStyles: {
+                0: { cellWidth: colW1, fontStyle: "bold" },
+                1: { cellWidth: colW2 },
+                2: { cellWidth: colW3, fontStyle: "bold" },
+                3: { cellWidth: colW4 },
+              },
+              tableWidth: maxW,
+            });
+
+            y = (doc.lastAutoTable?.finalY || y) + 8;
+
             doc.setDrawColor(0);
             doc.setLineWidth(1.2);
             doc.line(margin, y, pageW - margin, y);
-            y += 22;
+            y += 18;
           };
           return { doc, pageW, pageH, margin, footerY, maxW, getY: () => y, setY: (v) => { y = v; }, newPage, newPageIfNeeded, addCenter, addPara, addHanging, drawHeader };
         };
@@ -1810,6 +1839,8 @@ session_write_close();
           ctx.drawHeader(String(state.paket.judul || "NASKAH SOAL"), "soal");
 
           let firstTypeRendered = false;
+          let sectionLetterIdx = 0;
+          const sectionLetters = ['A', 'B', 'C', 'D', 'E', 'F'];
           for (const t of order) {
             const qs = items.filter((q) => q && q.type === t);
             if (!qs.length) continue;
@@ -1821,14 +1852,17 @@ session_write_close();
               if (needPageBreak) ctx.newPage();
 
               if (chunkIdx === 0) {
-                ctx.addPara(`${titleMap[t]}`, 12, "bold", 0, 4);
+                const letter = sectionLetters[sectionLetterIdx] || '';
+                const titleWithPrefix = letter ? `${letter}. ${titleMap[t]}` : titleMap[t];
+                ctx.addPara(titleWithPrefix, 12, "bold", 0, 4);
                 ctx.addPara(subtitleMap[t], 11, "italic", 0, 14);
+                sectionLetterIdx++;
               }
 
               const startIndex = chunkIdx * 10;
               const normKey = (t) => String(t || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/\s+/g, ' ').trim();
               const renderOne = (q, num) => {
-                ctx.addHanging(`${num}.`, String(formatQuestionText(q.type, q.question) || "").trim(), 12, "normal", 0, 8);
+                ctx.addHanging(`${num}.`, String(formatQuestionText(q.type, q.question) || "").trim(), 12, "normal", 0, 0);
                 if (q._pdfImg) {
                   try {
                     const img = q._pdfImg;
@@ -1850,60 +1884,86 @@ session_write_close();
 
                 if (q.type === "pg" || q.type === "benar_salah" || q.type === "pg_kompleks") {
                   const opts = Array.isArray(q.options) ? q.options : [];
-                  const twoCols = (q.type === "pg" || q.type === "pg_kompleks") && opts.length >= 4;
-                  const twoColsTF = q.type === "benar_salah" && opts.length >= 2;
-                  if (twoColsTF) {
-                    const x0 = ctx.margin + 30;
-                    const gap = 30;
-                    const colW = Math.max(120, (ctx.maxW - 30 - gap) / 2);
-                    const x1 = x0 + colW + gap;
-                    const lineH = 13;
-                    const leftText = String(opts[0] || "Benar");
-                    const rightText = String(opts[1] || "Salah");
-                    const leftLines = leftText ? ctx.doc.splitTextToSize(leftText, Math.max(10, colW)) : [""];
-                    const rightLines = rightText ? ctx.doc.splitTextToSize(rightText, Math.max(10, colW)) : [""];
-                    const rowLines = Math.max(leftLines.length, rightLines.length, 1);
-                    ctx.newPageIfNeeded(rowLines * lineH + 2);
-                    ctx.doc.setFont("times", "normal");
-                    ctx.doc.setFontSize(11);
-                    ctx.doc.text(leftLines, x0, ctx.getY());
-                    ctx.doc.text(rightLines, x1, ctx.getY());
-                    ctx.setY(ctx.getY() + rowLines * lineH + 10);
-                  } else
-                  if (twoCols) {
+                  const cleanOpt = (s) => powTextDocxPdf.forPdf(cleanInlineHtml(String(s ?? "")));
+                  if (q.type === "benar_salah" && opts.length >= 2) {
+                    const a = cleanOpt(opts[0] ?? "Benar") || "Benar";
+                    const b = cleanOpt(opts[1] ?? "Salah") || "Salah";
+                    ctx.doc.autoTable({
+                      startY: ctx.getY(),
+                      margin: { left: ctx.margin + 30, right: ctx.margin },
+                      body: [[a, b]],
+                      theme: 'plain',
+                      styles: {
+                        font: 'times',
+                        fontStyle: 'bold',
+                        fontSize: 11,
+                        textColor: [0, 0, 0],
+                        cellPadding: { top: 1, right: 8, bottom: 1, left: 0 },
+                        overflow: 'linebreak',
+                        valign: 'top',
+                      },
+                      columnStyles: {
+                        0: { cellWidth: (ctx.maxW - 30) / 2 },
+                        1: { cellWidth: (ctx.maxW - 30) / 2 },
+                      },
+                    });
+                    ctx.setY((ctx.doc.lastAutoTable?.finalY || ctx.getY()) + 12);
+                  } else if (q.type === "pg_kompleks" && opts.length >= 4) {
                     const n = opts.length;
                     const leftCount = Math.ceil(n / 2);
-                    const gap = 30;
-                    const x0 = ctx.margin + 30;
-                    const colW = Math.max(120, (ctx.maxW - 30 - gap) / 2);
-                    const x1 = x0 + colW + gap;
-                    const labelW = 18;
-                    const lineH = 13;
-                    for (let r = 0; r < leftCount; r++) {
-                      const li = r;
-                      const ri = r + leftCount;
-                      const leftText = li < n ? String(opts[li] || "") : "";
-                      const rightText = ri < n ? String(opts[ri] || "") : "";
-                      const leftLines = leftText ? ctx.doc.splitTextToSize(leftText, Math.max(10, colW - labelW)) : [""];
-                      const rightLines = rightText ? ctx.doc.splitTextToSize(rightText, Math.max(10, colW - labelW)) : [""];
-                      const rowLines = Math.max(leftLines.length, rightLines.length, 1);
-                      ctx.newPageIfNeeded(rowLines * lineH + 2);
-                      ctx.doc.setFont("times", "normal");
-                      ctx.doc.setFontSize(11);
-                      ctx.doc.text(`${String.fromCharCode(65 + li)}.`, x0, ctx.getY());
-                      ctx.doc.text(leftLines, x0 + labelW, ctx.getY());
-                      if (rightText) {
-                        ctx.doc.text(`${String.fromCharCode(65 + ri)}.`, x1, ctx.getY());
-                        ctx.doc.text(rightLines, x1 + labelW, ctx.getY());
-                      }
-                      ctx.setY(ctx.getY() + rowLines * lineH);
-                    }
-                    ctx.setY(ctx.getY() + 8);
+                    const left = opts.slice(0, leftCount).map((t, i) => `${String.fromCharCode(65 + i)}. ${cleanOpt(t)}`).join("\n");
+                    const right = opts.slice(leftCount).map((t, i) => `${String.fromCharCode(65 + leftCount + i)}. ${cleanOpt(t)}`).join("\n");
+                    ctx.doc.autoTable({
+                      startY: ctx.getY(),
+                      margin: { left: ctx.margin + 30, right: ctx.margin },
+                      body: [[left, right]],
+                      theme: 'plain',
+                      styles: {
+                        font: 'times',
+                        fontSize: 11,
+                        textColor: [0, 0, 0],
+                        cellPadding: { top: 1, right: 8, bottom: 1, left: 0 },
+                        overflow: 'linebreak',
+                        valign: 'top',
+                      },
+                      columnStyles: {
+                        0: { cellWidth: (ctx.maxW - 30) / 2 },
+                        1: { cellWidth: (ctx.maxW - 30) / 2 },
+                      },
+                    });
+                    ctx.setY((ctx.doc.lastAutoTable?.finalY || ctx.getY()) + 12);
+                  } else if (q.type === "pg" && opts.length === 4) {
+                    const cellA = `A. ${cleanOpt(opts[0] || "")}`;
+                    const cellB = `B. ${cleanOpt(opts[1] || "")}`;
+                    const cellC = `C. ${cleanOpt(opts[2] || "")}`;
+                    const cellD = `D. ${cleanOpt(opts[3] || "")}`;
+                    ctx.doc.autoTable({
+                      startY: ctx.getY(),
+                      margin: { left: ctx.margin + 18, right: ctx.margin },
+                      body: [
+                        [cellA, cellC],
+                        [cellB, cellD]
+                      ],
+                      theme: 'plain',
+                      styles: {
+                        font: 'times',
+                        fontSize: 11,
+                        textColor: [0, 0, 0],
+                        cellPadding: { top: 2, right: 8, bottom: 2, left: 0 },
+                        overflow: 'linebreak',
+                        valign: 'top',
+                      },
+                      columnStyles: {
+                        0: { cellWidth: (ctx.maxW - 18) / 2 },
+                        1: { cellWidth: (ctx.maxW - 18) / 2 },
+                      },
+                    });
+                    ctx.setY((ctx.doc.lastAutoTable?.finalY || ctx.getY()) + 14);
                   } else {
                     for (let oi = 0; oi < opts.length; oi++) {
-                      ctx.addHanging(`${String.fromCharCode(65 + oi)}.`, String(opts[oi] || ""), 11, "normal", 30, 4);
+                      ctx.addHanging(`${String.fromCharCode(65 + oi)}.`, cleanOpt(opts[oi] || ""), 11, "normal", 30, 4);
                     }
-                    ctx.setY(ctx.getY() + 6);
+                    ctx.setY(ctx.getY() + 12);
                   }
                 } else if (q.type === "menjodohkan") {
                   const leftList = Array.isArray(q.options) ? q.options : [];
@@ -1921,11 +1981,11 @@ session_write_close();
                   });
                   ctx.setY((ctx.doc.lastAutoTable?.finalY || ctx.getY()) + 26);
                 } else if (q.type === "isian") {
-                  ctx.addPara("Jawaban:", 11, "normal", 30, 2);
+                  ctx.addPara("Jawaban:", 11, "normal", 30, 0);
                   ctx.doc.setDrawColor(0);
                   ctx.doc.setLineWidth(0.8);
                   try { ctx.doc.setLineDashPattern([1.2, 2.2], 0); } catch {}
-                  const y0 = ctx.getY() + 6;
+                  const y0 = ctx.getY() + 4;
                   ctx.doc.line(ctx.margin + 90, y0, ctx.pageW - ctx.margin, y0);
                   try { ctx.doc.setLineDashPattern([], 0); } catch {}
                   ctx.setY(ctx.getY() + 16);
@@ -1935,7 +1995,7 @@ session_write_close();
                     ctx.doc.setDrawColor(0);
                     ctx.doc.setLineWidth(0.8);
                     try { ctx.doc.setLineDashPattern([1.2, 2.2], 0); } catch {}
-                    const yy = ctx.getY() + 10;
+                    const yy = ctx.getY() + 6;
                     ctx.doc.line(ctx.margin + 30, yy, ctx.pageW - ctx.margin, yy);
                     try { ctx.doc.setLineDashPattern([], 0); } catch {}
                     ctx.setY(ctx.getY() + 18);
@@ -2617,6 +2677,15 @@ session_write_close();
               <div>Membatasi nomor absen/siswa yang boleh mengisi.</div>
               <ul class="list-disc pl-5 space-y-1">
                 <li>Jika memakai Data Siswa (diunggah), batasnya mengikuti jumlah data siswa.</li>
+              </ul>
+            </div>`,
+          },
+          kelas: {
+            title: 'Kelas',
+            html: `<div class="space-y-2">
+              <div>Nama kelas akan disimpan pada link quiz dan dipakai juga untuk nama sheet saat export ke Google Sheets.</div>
+              <ul class="list-disc pl-5 space-y-1">
+                <li>Contoh: <b>7A</b>, <b>8B</b>, <b>X IPA 1</b></li>
               </ul>
             </div>`,
           },
@@ -3505,6 +3574,13 @@ session_write_close();
           if (qst === "results") { state.quizSubtab = "share"; state.quizShareTab = "hasil"; }
           if (!state.quizShareTab) state.quizShareTab = "buat_link";
           if (state.quizSubtab !== "live" && state.quizSubtab !== "share") state.quizSubtab = "live";
+        } catch {}
+        try {
+          state.quizShowPublishSuccess = false;
+          state.quizLastLink = "";
+          state.quizLastPubId = 0;
+          state.quizLastRoster = [];
+          state.quizLastSlug = "";
         } catch {}
         return true;
       };
@@ -5704,7 +5780,7 @@ session_write_close();
                     </button>
                   </div>
                   <button
-                    class="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold shadow-sm transition-colors"
+                    class="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors"
                     onclick="window.__sp.setModulAjarTab('detail')"
                     title="Lanjut ke Detail Pembelajaran"
                   >
@@ -5768,7 +5844,7 @@ session_write_close();
                     </button>
                   </div>
                   <button
-                    class="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold shadow-sm transition-colors"
+                    class="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold shadow-sm transition-colors"
                     onclick="window.__sp.openModulAjarFromDetail()"
                     title="Buka tab Modul Ajar (generate jika belum ada)"
                   >
@@ -9836,17 +9912,444 @@ ${baselineModulAjar}
         `;
       };
 
+      const loadGSheetSettings = async () => {
+        state.gsheetLoading = true;
+        state.gsheetError = '';
+        saveDebounced(false);
+        render();
+        try {
+          const res = await fetch('api/gsheet_settings_get.php', { credentials: 'same-origin' });
+          const js = await res.json().catch(() => null);
+          if (res.ok && js && js.ok) {
+            state.gsheetSettings = js.items || [];
+            state.gsheetMapelsWithQuiz = js.mapels_with_quiz || [];
+          } else {
+            state.gsheetError = String(js?.error || `http_${res.status}` || 'error');
+          }
+        } catch {
+          state.gsheetError = 'network';
+        }
+        state.gsheetLoading = false;
+        saveDebounced(false);
+        render();
+      };
+      const openGSheetModal = (mapel = '', spreadsheetUrl = '') => {
+        try {
+          const hasMapels = Array.isArray(state.gsheetMapelsWithQuiz) && state.gsheetMapelsWithQuiz.length > 0;
+          if (!hasMapels && !state.gsheetLoading) {
+            loadGSheetSettings();
+          }
+        } catch {}
+        const m = String(mapel || '').trim();
+        const url = String(spreadsheetUrl || '').trim();
+        const existing = (Array.isArray(state.gsheetSettings) ? state.gsheetSettings : []).find(x => String(x?.mapel || '') === m);
+        state.gsheetEditMapel = existing ? m : '';
+        state.gsheetForm = {
+          mapel: existing ? String(existing.mapel || '') : m,
+          spreadsheet_url: existing ? String(existing.spreadsheet_url || '') : url,
+          sheet_title: existing ? String(existing.sheet_title || '') : '',
+          is_active: existing ? (Number(existing.is_active) === 1 ? 1 : 0) : 1,
+          auto_sync: existing ? (Number(existing.auto_sync) === 1 ? 1 : 0) : 1,
+          include_detail: existing ? (Number(existing.include_detail) === 1 ? 1 : 0) : 0,
+        };
+        state.gsheetTestResult = null;
+        state._showGSheetModal = true;
+        saveDebounced(false);
+        render();
+      };
+      const closeGSheetModal = () => {
+        state._showGSheetModal = false;
+        state.gsheetSaving = false;
+        state.gsheetTesting = false;
+        state.gsheetTestResult = null;
+        state.gsheetEditMapel = '';
+        saveDebounced(false);
+        render();
+      };
+      const setGSheetForm = (k, v) => {
+        state.gsheetForm = state.gsheetForm || { mapel: "", spreadsheet_url: "", sheet_title: "", is_active: 1, auto_sync: 1, include_detail: 0 };
+        if (k === 'is_active' || k === 'auto_sync' || k === 'include_detail') {
+          state.gsheetForm[k] = Number(v) === 1 ? 1 : 0;
+        } else {
+          state.gsheetForm[k] = v;
+        }
+        saveDebounced(false);
+      };
+      const testGSheetConnection = async (spreadsheetUrl) => {
+        const url = String(spreadsheetUrl || '').trim();
+        if (!url) return { ok: false, message: 'URL Google Sheet wajib diisi.' };
+        try {
+          const res = await fetch('api/gsheet_test_connection.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ spreadsheet_url: url }),
+          });
+          const js = await res.json().catch(() => null);
+          if (res.ok && js && js.ok) return { ok: true, title: String(js.title || '') };
+          return { ok: false, message: String(js?.message || js?.error || `http_${res.status}`) };
+        } catch {
+          return { ok: false, message: 'Network error' };
+        }
+      };
+      const saveGSheetSettings = async () => {
+        const f = state.gsheetForm || {};
+        const mapel = String(f.mapel || '').trim();
+        const spreadsheet_url = String(f.spreadsheet_url || '').trim();
+        const sheet_title_input = String(f.sheet_title || '').trim();
+        if (!mapel) { alert('Pilih mata pelajaran dulu.'); return; }
+        if (!spreadsheet_url) { alert('URL Google Sheet wajib diisi.'); return; }
+        state.gsheetSaving = true;
+        state.gsheetTestResult = null;
+        state.gsheetTesting = true;
+        saveDebounced(false);
+        render();
+        try {
+          const test = await testGSheetConnection(spreadsheet_url);
+          state.gsheetTestResult = test;
+          if (!test.ok) {
+            alert(String(test.message || 'Koneksi Google Sheet gagal.'));
+            state.gsheetSaving = false;
+            state.gsheetTesting = false;
+            saveDebounced(false);
+            render();
+            return;
+          }
+          const sheet_title = sheet_title_input || String(test.title || '').trim();
+          const res = await fetch('api/gsheet_settings_save.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              mapel,
+              spreadsheet_url,
+              sheet_title,
+              is_active: Number(f.is_active) === 1 ? 1 : 0,
+              auto_sync: Number(f.auto_sync) === 1 ? 1 : 0,
+              include_detail: Number(f.include_detail) === 1 ? 1 : 0,
+            }),
+          });
+          const resClone = res.clone();
+          const js = await res.json().catch(() => null);
+          if (!res.ok || !js || !js.ok) {
+            let why = String(js?.message || js?.error || `http_${res.status}`);
+            if (!js) {
+              const t = await resClone.text().catch(() => '');
+              const tt = String(t || '').trim();
+              if (tt) why = tt.length > 180 ? (tt.slice(0, 180) + '…') : tt;
+            }
+            alert(`Gagal menyimpan (${why}).`);
+            state.gsheetSaving = false;
+          state.gsheetTesting = false;
+            saveDebounced(false);
+            render();
+            return;
+          }
+          state.gsheetTesting = false;
+          state.gsheetSaving = false;
+          await loadGSheetSettings();
+          closeGSheetModal();
+        } catch {
+          alert('Gagal menyimpan (network).');
+          state.gsheetSaving = false;
+          state.gsheetTesting = false;
+          saveDebounced(false);
+          render();
+        }
+      };
+      const saveGSheetRow = async (mapel, patch) => {
+        const m = String(mapel || '').trim();
+        const items = Array.isArray(state.gsheetSettings) ? state.gsheetSettings : [];
+        const cur = items.find(x => String(x?.mapel || '') === m);
+        if (!cur) return;
+        const body = {
+          mapel: m,
+          spreadsheet_url: String(cur.spreadsheet_url || ''),
+          is_active: Object.prototype.hasOwnProperty.call(patch, 'is_active') ? (Number(patch.is_active) === 1 ? 1 : 0) : (Number(cur.is_active) === 1 ? 1 : 0),
+          auto_sync: Object.prototype.hasOwnProperty.call(patch, 'auto_sync') ? (Number(patch.auto_sync) === 1 ? 1 : 0) : (Number(cur.auto_sync) === 1 ? 1 : 0),
+          include_detail: Object.prototype.hasOwnProperty.call(patch, 'include_detail') ? (Number(patch.include_detail) === 1 ? 1 : 0) : (Number(cur.include_detail) === 1 ? 1 : 0),
+        };
+        try {
+          const res = await fetch('api/gsheet_settings_save.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify(body),
+          });
+          const js = await res.json().catch(() => null);
+          if (!res.ok || !js || !js.ok) return;
+          await loadGSheetSettings();
+        } catch {}
+      };
+      const syncGSheetNow = async () => {
+        state.gsheetSyncing = true;
+        state.gsheetSyncResult = null;
+        saveDebounced(false);
+        render();
+        try {
+          const res = await fetch('api/gsheet_export.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({}),
+          });
+          const js = await res.json().catch(() => null);
+          state.gsheetSyncResult = js || { ok: false, error: `http_${res.status}` };
+        } catch {
+          state.gsheetSyncResult = { ok: false, error: 'network' };
+        }
+        state.gsheetSyncing = false;
+        saveDebounced(false);
+        render();
+      };
+      const setGSheetPreviewTab = (tab) => {
+        const t = String(tab || '').trim();
+        const allowed = new Set(['soal', '7A', '7B']);
+        state.gsheetPreviewTab = allowed.has(t) ? t : 'soal';
+        saveDebounced(false);
+        render();
+      };
+      const renderGSheetSettings = () => {
+        const loading = !!state.gsheetLoading;
+        const err = String(state.gsheetError || '').trim();
+        const items = Array.isArray(state.gsheetSettings) ? state.gsheetSettings : [];
+        const mapels = Array.isArray(state.gsheetMapelsWithQuiz) ? state.gsheetMapelsWithQuiz : [];
+        const f = state.gsheetForm || { mapel: "", sheet_title: "", spreadsheet_url: "", is_active: 1, auto_sync: 1, include_detail: 0 };
+        const editMapel = String(state.gsheetEditMapel || '');
+        const test = state.gsheetTestResult;
+        const previewTab = String(state.gsheetPreviewTab || 'soal');
+        const mapelIcon = (name) => {
+          const s = String(name || '').toLowerCase();
+          if (s.includes('matematika')) return { icon: 'functions', bg: 'bg-green-100', fg: 'text-green-700' };
+          if (s === 'ipa' || s.includes('ilmu pengetahuan alam') || s.includes(' ipa ')) return { icon: 'science', bg: 'bg-purple-100', fg: 'text-purple-700' };
+          if (s === 'ips' || s.includes('ilmu pengetahuan sosial') || s.includes(' ips ')) return { icon: 'public', bg: 'bg-blue-100', fg: 'text-blue-700' };
+          if (s.includes('bahasa indonesia')) return { icon: 'menu_book', bg: 'bg-orange-100', fg: 'text-orange-700' };
+          if (s.includes('bahasa inggris') || s.includes('english')) return { icon: 'translate', bg: 'bg-teal-100', fg: 'text-teal-700' };
+          if (s.includes('bahasa jawa') || s.includes('bahasa daerah')) return { icon: 'translate', bg: 'bg-teal-100', fg: 'text-teal-700' };
+          return { icon: 'note_alt', bg: 'bg-gray-100', fg: 'text-gray-700' };
+        };
+        const isConnected = (it) => {
+          const sid = String(it?.spreadsheet_id || '').trim();
+          return sid !== '' && Number(it?.is_active) === 1;
+        };
+        const statusBadge = (connected) => {
+          return connected
+            ? `<span class="inline-flex items-center h-7 px-2 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">Terhubung</span>`
+            : `<span class="inline-flex items-center h-7 px-2 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200">Belum diset</span>`;
+        };
+        const header = `
+          <div class="px-4 py-5 md:px-6 md:py-6 space-y-4">
+            <div>
+              <div class="text-xl font-bold">Atur Penyimpanan (Google Sheets)</div>
+              <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Atur penyimpanan otomatis hasil Quiz ke Google Sheet per mata pelajaran.</div>
+            </div>
+            <div class="rounded-xl border border-blue-200 bg-blue-50 text-blue-900 p-4 text-sm">
+              <div class="font-bold mb-1">Share Google Sheet ke Service Account</div>
+              <div class="break-all">Email: <span class="font-semibold">${safeText(GSHEET_SERVICE_EMAIL || '-')}</span></div>
+              <div class="text-xs mt-1 text-blue-900/80">Buka Google Sheet → Share → tambahkan email ini sebagai Editor.</div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button class="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-white dark:bg-surface-dark border hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                onclick="window.__sp.loadGSheetSettings()">
+                <span class="material-symbols-outlined text-[18px]">refresh</span>
+                Refresh
+              </button>
+              <button class="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-white dark:bg-surface-dark border hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold ${state.gsheetSyncing ? 'opacity-70 cursor-wait' : ''}"
+                onclick="window.__sp.syncGSheetNow()">
+                <span class="material-symbols-outlined text-[18px]">sync</span>
+                Sync semua
+              </button>
+              <div class="ml-auto"></div>
+              <button class="inline-flex items-center gap-2 h-10 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold"
+                onclick="window.__sp.openGSheetModal()">
+                <span class="material-symbols-outlined text-[18px]">add</span>
+                Tambah mata pelajaran
+              </button>
+              ${loading ? `<div class="text-sm text-text-sub-light dark:text-text-sub-dark">Memuat…</div>` : err ? `<div class="text-sm text-red-600">Gagal memuat (${safeText(err)})</div>` : ``}
+            </div>
+          </div>
+        `;
+        const list = `
+          <div class="px-4 pb-6 md:px-6">
+            <div class="rounded-xl border bg-white dark:bg-surface-dark overflow-hidden">
+              <div class="divide-y">
+                ${items.length ? items.map(it => {
+                  const m = String(it.mapel || '');
+                  const quizCount = Number(it.quiz_count || 0);
+                  const connected = isConnected(it);
+                  const url = String(it.spreadsheet_url || '').trim();
+                  const title = String(it.sheet_title || '').trim();
+                  const icon = mapelIcon(m);
+                  const subtitle = title
+                    ? `<span class="text-text-sub-light dark:text-text-sub-dark">${quizCount} quiz · ${safeText(title)}</span>`
+                    : `<span class="text-amber-700 dark:text-amber-300">${quizCount} quiz · belum ada spreadsheet</span>`;
+                  return `
+                    <div class="p-4 flex items-center gap-3">
+                      <div class="size-[34px] rounded-lg ${icon.bg} ${icon.fg} flex items-center justify-center flex-shrink-0">
+                        <span class="material-symbols-outlined text-[18px]">${icon.icon}</span>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="font-semibold truncate">${safeText(m)}</div>
+                        <div class="text-xs mt-0.5 truncate">${subtitle}</div>
+                      </div>
+                      <div class="flex items-center gap-2 flex-shrink-0">
+                        ${statusBadge(connected)}
+                        <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark inline-flex items-center justify-center"
+                          title="Edit"
+                          onclick="window.__sp.openGSheetModal('${safeAttr(m)}','${safeAttr(url)}')">
+                          <span class="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                        ${connected && url ? `
+                          <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark inline-flex items-center justify-center"
+                            title="Buka Google Sheet"
+                            onclick="window.open('${safeAttr(url)}','_blank','noopener')">
+                            <span class="material-symbols-outlined text-[18px]">open_in_new</span>
+                          </button>
+                        ` : ``}
+                      </div>
+                    </div>
+                  `;
+                }).join('') : `
+                  <div class="p-6 text-sm text-text-sub-light dark:text-text-sub-dark">Belum ada pengaturan. Klik “Tambah mata pelajaran”.</div>
+                `}
+              </div>
+            </div>
+          </div>
+        `;
+        const preview = `
+          <div class="px-4 pb-8 md:px-6">
+            <div class="rounded-xl border bg-white dark:bg-surface-dark p-5">
+              <div class="flex items-center gap-2 font-bold">
+                <span class="material-symbols-outlined text-[18px]">table</span>
+                Preview struktur sheet
+              </div>
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <button class="h-8 px-3 rounded-full border text-xs font-bold ${previewTab==='soal'?'bg-green-100 border-green-300 text-green-900':'bg-white hover:bg-gray-50'}"
+                  onclick="window.__sp.setGSheetPreviewTab('soal')">Soal</button>
+                <button class="h-8 px-3 rounded-full border text-xs font-bold ${previewTab==='7A'?'bg-blue-100 border-blue-300 text-blue-900':'bg-white hover:bg-gray-50'}"
+                  onclick="window.__sp.setGSheetPreviewTab('7A')">7A</button>
+                <button class="h-8 px-3 rounded-full border text-xs font-bold ${previewTab==='7B'?'bg-purple-100 border-purple-300 text-purple-900':'bg-white hover:bg-gray-50'}"
+                  onclick="window.__sp.setGSheetPreviewTab('7B')">7B</button>
+              </div>
+              <div class="mt-3 overflow-auto">
+                ${previewTab === 'soal' ? `
+                  <table class="min-w-full text-xs border">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        ${['No','Pertanyaan','A','B','C','D','Kunci'].map(h => `<th class="px-2 py-1 border font-bold text-left">${h}</th>`).join('')}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        ${['1','Contoh pertanyaan','Opsi A','Opsi B','Opsi C','Opsi D','B'].map(v => `<td class="px-2 py-1 border">${safeText(v)}</td>`).join('')}
+                      </tr>
+                    </tbody>
+                  </table>
+                ` : `
+                  <table class="min-w-full text-xs border">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        ${['No Absen','Nama','Skor','Total','Nilai (%)','Waktu Submit'].map(h => `<th class="px-2 py-1 border font-bold text-left">${h}</th>`).join('')}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        ${['12','Siti','8','10','80','2026-05-28 13:10'].map(v => `<td class="px-2 py-1 border">${safeText(v)}</td>`).join('')}
+                      </tr>
+                    </tbody>
+                  </table>
+                `}
+              </div>
+            </div>
+          </div>
+        `;
+        const modal = state._showGSheetModal ? `
+          <div class="fixed inset-0 flex items-center justify-center" style="background: rgba(0,0,0,0.5); z-index:50;">
+            <div class="bg-white dark:bg-surface-dark rounded-2xl border shadow-xl w-[92vw] max-w-[720px] overflow-hidden">
+              <div class="p-5 border-b flex items-center justify-between">
+                <div class="font-bold text-lg">${editMapel ? `Edit pengaturan — ${safeText(editMapel)}` : 'Tambah mata pelajaran'}</div>
+                <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeGSheetModal()">&times;</button>
+              </div>
+              <div class="p-5 space-y-4">
+                <div class="space-y-1.5">
+                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Mata pelajaran</label>
+                  ${editMapel ? `
+                    <input class="w-full h-11 rounded-lg border px-3 bg-gray-50 dark:bg-gray-900/20" value="${safeText(editMapel)}" disabled>
+                  ` : `
+                    ${mapels.length ? `
+                      <select class="w-full h-11 rounded-lg border px-3 bg-white dark:bg-surface-dark" onchange="window.__sp.setGSheetForm('mapel', this.value)">
+                        <option value="">Pilih mapel…</option>
+                        ${mapels.map(x => {
+                          const m = String(x.mapel || '');
+                          const cnt = Number(x.quiz_count || 0);
+                          return `<option value="${safeAttr(m)}" ${String(f.mapel||'')===m?'selected':''}>${safeText(m)}${cnt>0?` (${cnt} quiz)`:''}</option>`;
+                        }).join('')}
+                      </select>
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-1">Daftar mapel muncul otomatis dari quiz yang sudah dipublish.</div>
+                    ` : `
+                      <input class="w-full h-11 rounded-lg border px-3 bg-white dark:bg-surface-dark" placeholder="Ketik mata pelajaran (contoh: Bahasa Indonesia)" value="${safeText(String(f.mapel||''))}"
+                        oninput="window.__sp.setGSheetForm('mapel', this.value)">
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-1">Daftar mapel muncul otomatis dari quiz yang sudah dipublish.</div>
+                    `}
+                  `}
+                </div>
+                <div class="space-y-1.5">
+                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Nama spreadsheet <span class="text-xs font-normal text-text-sub-light">(opsional)</span></label>
+                  <input class="w-full h-11 rounded-lg border px-3 bg-white dark:bg-surface-dark" placeholder="contoh: Nilai IPA Kelas 7" value="${safeText(String(f.sheet_title||''))}"
+                    oninput="window.__sp.setGSheetForm('sheet_title', this.value)">
+                  <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-1">Opsional — default menggunakan nama file Google Sheet.</div>
+                </div>
+                <div class="space-y-1.5">
+                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">URL Google Sheet</label>
+                  <input class="w-full h-11 rounded-lg border px-3 bg-white dark:bg-surface-dark font-mono text-xs" placeholder="https://docs.google.com/spreadsheets/d/..." value="${safeText(String(f.spreadsheet_url||''))}"
+                    oninput="window.__sp.setGSheetForm('spreadsheet_url', this.value)">
+                </div>
+                <div class="h-2"></div>
+                <div class="flex flex-wrap items-center gap-6">
+                  <label class="flex items-center gap-2 text-sm font-semibold">
+                    <input type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary" ${Number(f.auto_sync)===1?'checked':''} onchange="window.__sp.setGSheetForm('auto_sync', this.checked?1:0)">
+                    <span>Auto sync</span>
+                  </label>
+                  <label class="flex items-center gap-2 text-sm font-semibold">
+                    <input type="checkbox" class="rounded border-gray-300 text-primary focus:ring-primary" ${Number(f.include_detail)===1?'checked':''} onchange="window.__sp.setGSheetForm('include_detail', this.checked?1:0)">
+                    <span>Sertakan detail jawaban</span>
+                  </label>
+                </div>
+                <div class="rounded-lg border bg-gray-100/70 dark:bg-gray-900/20 p-3 text-sm text-text-sub-light dark:text-text-sub-dark flex items-start gap-2">
+                  <span class="material-symbols-outlined text-[18px]">lightbulb</span>
+                  <div>
+                    Opsi “auto sync” akan mengirim data ke sheet setiap kali siswa submit jawaban. “Sertakan detail jawaban” menambah kolom J1, J2, J3… di sheet jawaban.
+                  </div>
+                </div>
+                ${test ? `
+                  <div class="rounded-lg border ${test.ok ? 'border-green-200 bg-green-50 text-green-900' : 'border-amber-200 bg-amber-50 text-amber-900'} p-3 text-sm">
+                    ${test.ok ? `Koneksi OK. Judul spreadsheet: <b>${safeText(test.title || '')}</b>` : `Koneksi gagal: <b>${safeText(test.message || '')}</b>`}
+                  </div>
+                ` : ``}
+                <div class="h-3"></div>
+                <button class="w-full h-11 rounded-lg bg-primary hover:bg-blue-600 text-white font-bold ${state.gsheetSaving||state.gsheetTesting?'opacity-70 cursor-wait':''}"
+                  onclick="window.__sp.saveGSheetSettings()">
+                  ${state.gsheetSaving ? 'Menyimpan…' : (state.gsheetTesting ? 'Menguji koneksi…' : (editMapel ? 'Simpan perubahan' : 'Hubungkan & simpan'))}
+                </button>
+                <button class="w-full h-10 rounded-lg border bg-white dark:bg-surface-dark font-bold" onclick="window.__sp.closeGSheetModal()">Batal</button>
+              </div>
+            </div>
+          </div>
+        ` : '';
+        return header + list + preview + modal;
+      };
+
       const renderQuizLanding = () => {
         const sub = state.quizSubtab || "live";
         const shareTab = state.quizShareTab || "buat_link";
-        const mapel = String(state.identity.mataPelajaran || "");
-        const judulPaket = String(state.paket?.judul || "");
-        const baseForSlug = mapel || judulPaket || 'soal';
-        const slugDefault = baseForSlug.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
-        if (!state.quizPublishForm.slug) state.quizPublishForm.slug = slugDefault || 'kelas';
+        const slugDefault = getDefaultQuizSlug();
+        state.quizPublishForm = state.quizPublishForm || {};
+        if (state.quizPublishForm._slugAuto == null) state.quizPublishForm._slugAuto = !String(state.quizPublishForm.slug || '').trim();
+        if (!String(state.quizPublishForm.slug || '').trim()) state.quizPublishForm._slugAuto = true;
+        if (state.quizPublishForm._slugAuto) state.quizPublishForm.slug = slugDefault;
         const page = state.quizShowPreview
           ? 'pilih'
-          : (sub === 'share' ? (shareTab === 'hasil' ? 'hasil' : 'buat_link') : 'live');
+          : (sub === 'gsheet' ? 'gsheet' : (sub === 'share' ? (shareTab === 'hasil' ? 'hasil' : 'buat_link') : 'live'));
         const topNav = !HAS_QUIZ_ACCESS ? '' : `
           <div class="flex items-center justify-between gap-2 pt-4">
             <div class="flex-1 min-w-0">
@@ -9859,6 +10362,8 @@ ${baselineModulAjar}
                   onclick="window.__sp.setQuizPage('hasil')">3. Lihat Hasil Quiz</button>
                 <button class="${page==='live'?'bg-primary text-white':'bg-white dark:bg-surface-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap"
                   onclick="window.__sp.setQuizPage('live')">4. Quiz Live</button>
+                <button class="${page==='gsheet'?'bg-primary text-white':'bg-white dark:bg-surface-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap"
+                  onclick="window.__sp.setQuizPage('gsheet')">5. Pengaturan penyimpanan</button>
               </div>
             </div>
             <div class="flex items-center gap-2">
@@ -9952,7 +10457,7 @@ ${baselineModulAjar}
                 </div>
               </div>
               <div class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div class="space-y-1.5 md:col-span-2">
                     <div class="flex items-center gap-2">
                       <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">
@@ -9963,6 +10468,16 @@ ${baselineModulAjar}
                       </button>
                     </div>
                     <input class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm outline-none" value="${safeText(f.slug || '')}" placeholder="contoh: ulangan-pencernaan-5a" oninput="window.__sp.setQuizPublish('slug', this.value)">
+                  </div>
+
+                  <div class="space-y-1.5">
+                    <div class="flex items-center gap-2">
+                      <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Kelas</label>
+                      <button type="button" class="flex size-7 items-center justify-center rounded-full border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark text-text-sub-light hover:bg-primary/10 hover:text-primary transition-colors" title="Petunjuk" onclick="window.__sp.openBagikanLinkFieldHelp('kelas')">
+                        <span class="material-symbols-outlined text-[15px]">help</span>
+                      </button>
+                    </div>
+                    <input class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm outline-none" value="${safeText(f.kelas || '')}" placeholder="contoh: 7A" oninput="window.__sp.setQuizPublish('kelas', this.value)">
                   </div>
 
                   <div class="space-y-1.5">
@@ -10025,8 +10540,8 @@ ${baselineModulAjar}
                     </div>
                   </label>
 
-                  <label class="flex items-start gap-2.5 p-3 border ${(f.includeImages ?? true) ? 'border-primary bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'} rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <input type="checkbox" ${(f.includeImages ?? true) ? 'checked' : ''} onchange="window.__sp.setQuizPublish('includeImages', this.checked)" class="mt-0.5">
+                  <label class="flex items-start gap-2.5 p-3 border ${(f.includeImages ?? false) ? 'border-primary bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'} rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <input type="checkbox" ${(f.includeImages ?? false) ? 'checked' : ''} onchange="window.__sp.setQuizPublish('includeImages', this.checked)" class="mt-0.5">
                     <div class="flex-1">
                       <div class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Sertakan gambar soal</div>
                       <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5">Maksimal 5 gambar pertama akan ditampilkan</div>
@@ -10090,7 +10605,7 @@ ${baselineModulAjar}
               </div>
               ${(() => {
                 const hasRoster = Array.isArray(f.roster) && f.roster.length > 0;
-                const showLast = last && (!hasRoster || !state.quizLastPubId);
+                const showLast = !!state.quizShowPublishSuccess && last && (!hasRoster || !state.quizLastPubId);
                 if (!showLast) return ``;
                 const paketTitle = state.paket?.judul || state.identity?.mataPelajaran || 'Quiz';
                 const expRaw = String(state.quizPublishForm?.expire || '').trim();
@@ -10308,6 +10823,10 @@ ${baselineModulAjar}
             return (a.absen||0) - (b.absen||0);
           });
           const pubObj = items.find(it => it.slug === sel);
+          const mapelSel = String(pubObj?.mapel || state.quizResultsMapel || '').trim();
+          const gitems = Array.isArray(state.gsheetSettings) ? state.gsheetSettings : [];
+          const gconn = gitems.find(x => String(x?.mapel || '').trim() === mapelSel && Number(x?.is_active) === 1 && String(x?.spreadsheet_id || '').trim()) || null;
+          const canViewJawaban = !!gconn;
           const roster = Array.isArray(state.quizPublishForm?.roster) ? state.quizPublishForm.roster : [];
           const nameMap = new Map(roster.map(r => [Number(r.absen), String(r.nama||'')]));
           const query = String(state.quizResultsQuery || '').trim().toLowerCase();
@@ -10392,6 +10911,9 @@ ${baselineModulAjar}
             } else if (idx % 2) {
               rowCls = 'bg-gray-50 dark:bg-gray-800/30';
             }
+            const btnCls = canViewJawaban
+              ? 'bg-primary hover:bg-blue-600 text-white'
+              : 'bg-gray-200 text-gray-500 cursor-not-allowed';
             return `<tr class="${rowCls} hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
               <td class="px-3 py-1.5 text-center font-semibold border-b border-gray-100 dark:border-gray-800">${idx+1} ${trophyIcon}</td>
               <td class="px-3 py-1.5 text-center border-b border-gray-100 dark:border-gray-800">${ab}</td>
@@ -10400,6 +10922,13 @@ ${baselineModulAjar}
                 <span class="inline-flex items-center justify-center min-w-[44px] px-2.5 py-0.5 rounded-full ${label.bg} ${label.color} font-bold text-xs border">${pct}</span>
               </td>
               <td class="px-3 py-1.5 text-center text-xs ${label.color} font-semibold border-b border-gray-100 dark:border-gray-800">${label.text}</td>
+              <td class="px-3 py-1.5 text-center border-b border-gray-100 dark:border-gray-800">
+                <button type="button" ${canViewJawaban ? '' : 'disabled'} onclick="window.__sp.openJawabanSiswa(${ab})"
+                  class="inline-flex items-center gap-1 h-8 px-2.5 rounded-md text-xs font-bold ${btnCls}">
+                  <span class="material-symbols-outlined text-[16px]">visibility</span>
+                  Lihat
+                </button>
+              </td>
             </tr>`;
           }).join('');
 
@@ -10614,9 +11143,10 @@ ${baselineModulAjar}
                           <th class="px-3 py-2 text-left font-semibold uppercase text-[10px] tracking-wide text-text-sub-light dark:text-text-sub-dark border-b">Nama Siswa</th>
                           <th class="px-3 py-2 text-center font-semibold uppercase text-[10px] tracking-wide text-text-sub-light dark:text-text-sub-dark border-b">Nilai</th>
                           <th class="px-3 py-2 text-center font-semibold uppercase text-[10px] tracking-wide text-text-sub-light dark:text-text-sub-dark border-b">Kategori</th>
+                          <th class="px-3 py-2 text-center font-semibold uppercase text-[10px] tracking-wide text-text-sub-light dark:text-text-sub-dark border-b">Lihat Jawaban</th>
                         </tr>
                       </thead>
-                      <tbody>${rows || `<tr><td colspan="5" class="px-3 py-6 text-center text-text-sub-light dark:text-text-sub-dark">${(query || catFilter !== 'semua') ? 'Tidak ada siswa yang cocok dengan filter.' : 'Belum ada hasil.'}</td></tr>`}</tbody>
+                      <tbody>${rows || `<tr><td colspan="6" class="px-3 py-6 text-center text-text-sub-light dark:text-text-sub-dark">${(query || catFilter !== 'semua') ? 'Tidak ada siswa yang cocok dengan filter.' : 'Belum ada hasil.'}</td></tr>`}</tbody>
                     </table>
                   </div>
 
@@ -10647,6 +11177,202 @@ ${baselineModulAjar}
                   <span class="material-symbols-outlined text-[16px] flex-shrink-0">info</span>
                   <div>Data hasil dan gambar di server akan dihapus otomatis 14 hari setelah publish. Segera unduh laporan untuk arsip.</div>
                 </div>
+
+                ${(() => {
+                  if (!state._showJawabanSiswaModal) return ``;
+                  const loading = !!state.jawabanSiswaLoading;
+                  const err = String(state.jawabanSiswaError || '').trim();
+                  const data = state.jawabanSiswaData;
+                  const renderQ = () => {
+                    if (!data || !data.ok) return ``;
+                    const quiz = data.quiz || {};
+                    const student = data.student || {};
+                    const items = Array.isArray(data.items) ? data.items : [];
+                    const answers = Array.isArray(data.answers) ? data.answers : [];
+                    const key = Array.isArray(data.answer_key) ? data.answer_key : [];
+                    const pct = Number(student.total || 0) > 0 ? Math.round((Number(student.score || 0) / Number(student.total || 1)) * 100) : 0;
+                    const normType = (t) => {
+                      const s = String(t || '').trim();
+                      if (s === 'pg_kompleks' || s === 'benar_salah' || s === 'pg') return s;
+                      return 'pg';
+                    };
+                    const toIdx = (type, val) => {
+                      const v = String(val || '').trim();
+                      if (!v) return -1;
+                      if (type === 'benar_salah') {
+                        if (/^benar$/i.test(v)) return 0;
+                        if (/^salah$/i.test(v)) return 1;
+                      }
+                      const m = v.toUpperCase().match(/^[A-E]$/);
+                      if (m) return m[0].charCodeAt(0) - 65;
+                      const n = Number(v);
+                      if (Number.isFinite(n)) return Math.floor(n);
+                      return -1;
+                    };
+                    const toSet = (type, val) => {
+                      if (type !== 'pg_kompleks') {
+                        const idx = toIdx(type, val);
+                        return idx >= 0 ? new Set([idx]) : new Set();
+                      }
+                      const v = String(val || '').trim();
+                      if (!v) return new Set();
+                      const parts = v.split(/[,\s;\/|]+/).map(x => x.trim()).filter(Boolean);
+                      const out = new Set();
+                      for (const p of parts) {
+                        const idx = toIdx('pg', p);
+                        if (idx >= 0) out.add(idx);
+                      }
+                      return out;
+                    };
+                    const keySet = (type, raw) => {
+                      if (Array.isArray(raw)) {
+                        const out = new Set();
+                        raw.forEach(v => {
+                          const idx = Number.isFinite(Number(v)) ? Math.floor(Number(v)) : -1;
+                          if (idx >= 0) out.add(idx);
+                        });
+                        return out;
+                      }
+                      const idx = Number.isFinite(Number(raw)) ? Math.floor(Number(raw)) : -1;
+                      return idx >= 0 ? new Set([idx]) : new Set();
+                    };
+                    const escapeHtml = (s) => {
+                      return String(s ?? '')
+                        .replaceAll('&', '&amp;')
+                        .replaceAll('<', '&lt;')
+                        .replaceAll('>', '&gt;');
+                    };
+                    const renderMathText = (s) => {
+                      const esc = escapeHtml(String(s ?? '')).replace(/[＾ˆ˄]/g, '^');
+                      return esc
+                        .replace(/([0-9A-Za-z\)\]])\^\(([^)]+)\)/g, '$1<sup>$2</sup>')
+                        .replace(/([0-9A-Za-z\)\]])\^([-+]?[0-9A-Za-z]+)/g, '$1<sup>$2</sup>');
+                    };
+                    const fmtText = (s) => {
+                      const t = String(s ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+                      return renderMathText(t).replaceAll('\n', '<br>');
+                    };
+                    const fmtLetter = (idx) => (idx >= 0 && idx < 26) ? String.fromCharCode(65 + idx) : '';
+                    const rows = items.map((q, i) => {
+                      const qq = q && typeof q === 'object' ? q : {};
+                      const type = normType(qq.type);
+                      const opts = type === 'benar_salah' ? ['Benar', 'Salah'] : (Array.isArray(qq.options) ? qq.options : []);
+                      const correct = keySet(type, key[i]);
+                      const picked = toSet(type, answers[i]);
+                      const pickedText = (() => {
+                        if (type === 'pg_kompleks') {
+                          const arr = Array.from(picked).sort((a,b)=>a-b).map(fmtLetter).filter(Boolean);
+                          return arr.join(', ') || '-';
+                        }
+                        const idx = Array.from(picked)[0];
+                        if (type === 'benar_salah') return idx === 0 ? 'Benar' : idx === 1 ? 'Salah' : '-';
+                        return fmtLetter(Number.isFinite(idx) ? idx : -1) || '-';
+                      })();
+                      const correctText = (() => {
+                        const arr = Array.from(correct).sort((a,b)=>a-b);
+                        if (type === 'benar_salah') {
+                          if (arr.length === 1) return arr[0] === 0 ? 'Benar' : arr[0] === 1 ? 'Salah' : '-';
+                          return '-';
+                        }
+                        return arr.map(fmtLetter).filter(Boolean).join(', ') || '-';
+                      })();
+                      const img = String(qq.image || '').trim();
+                      const ctxRaw = String(qq.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+                      const ctxLine = ctxRaw ? `<div class="mt-2 mb-2 p-3 rounded-lg border bg-gray-50 dark:bg-gray-800 text-sm leading-relaxed">${fmtText(ctxRaw)}</div>` : ``;
+                      const qLine = `<p class="mb-3 text-justify leading-relaxed">${fmtText(String(qq.question || ''))}</p>`;
+                      const imgLine = img ? `<img src="${safeAttr(img)}" alt="Gambar" class="w-64 h-64 object-contain rounded-lg mb-3 border shadow-sm">` : ``;
+                      const meta = `<div class="mt-3 text-xs text-text-sub-light dark:text-text-sub-dark">Jawaban siswa: <span class="font-bold">${safeText(pickedText)}</span> • Kunci: <span class="font-bold text-green-700 dark:text-green-300">${safeText(correctText)}</span></div>`;
+                      const renderOptItem = (op, oi) => {
+                        const isCorrect = correct.has(oi);
+                        const isPicked = picked.has(oi);
+                        const base = 'border rounded-lg px-3 py-2 text-sm flex gap-2 items-start';
+                        const cls = isCorrect
+                          ? (isPicked ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-green-400 bg-green-50/60 dark:bg-green-900/10')
+                          : (isPicked ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-surface-dark');
+                        const badge = isPicked
+                          ? (isCorrect
+                              ? `<span class="inline-flex items-center justify-center size-6 rounded-full bg-green-600 text-white text-xs font-bold">✓</span>`
+                              : `<span class="inline-flex items-center justify-center size-6 rounded-full bg-red-600 text-white text-xs font-bold">×</span>`
+                            )
+                          : (isCorrect
+                              ? `<span class="inline-flex items-center justify-center size-6 rounded-full bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 text-[10px] font-extrabold border border-green-200 dark:border-green-700">K</span>`
+                              : `<span class="inline-flex items-center justify-center size-6 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs font-bold">${safeText(fmtLetter(oi) || '')}</span>`
+                            );
+                        const tag = isPicked
+                          ? `<span class="inline-flex items-center h-6 px-2 rounded-full text-[10px] font-extrabold bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border border-blue-200 dark:border-blue-700">Jawaban siswa</span>`
+                          : (isCorrect
+                              ? `<span class="inline-flex items-center h-6 px-2 rounded-full text-[10px] font-extrabold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-700">Kunci</span>`
+                              : ``);
+                        return `<div class="${base} ${cls}"><div class="flex-shrink-0">${badge}</div><div class="flex-1 leading-relaxed"><span class="text-sm leading-relaxed">${fmtText(String(op || ''))}</span>${tag ? `<div class="mt-1">${tag}</div>` : ``}</div></div>`;
+                      };
+                      const optsHtml = (() => {
+                        if (type === 'benar_salah') {
+                          return `
+                            <div class="grid grid-cols-2 gap-x-12 gap-y-2 pl-1">
+                              ${opts.slice(0, 2).map((t, oi) => renderOptItem(t, oi)).join('')}
+                            </div>
+                          `;
+                        }
+                        const n = opts.length;
+                        const leftCount = Math.ceil(n / 2);
+                        const left = opts.slice(0, leftCount).map((t, oi) => renderOptItem(t, oi)).join('');
+                        const right = opts.slice(leftCount).map((t, oi) => renderOptItem(t, oi + leftCount)).join('');
+                        return `
+                          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-2 pl-1">
+                            <div class="space-y-2">${left}</div>
+                            <div class="space-y-2">${right}</div>
+                          </div>
+                        `;
+                      })();
+                      return `
+                        <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-4 space-y-2">
+                          ${ctxLine}
+                          <div class="flex gap-4">
+                            <span class="font-bold text-lg min-w-[1.5rem]">${i + 1}.</span>
+                            <div class="flex-1">
+                              ${qLine}
+                              ${imgLine}
+                              ${optsHtml}
+                            </div>
+                          </div>
+                          ${meta}
+                        </div>
+                      `;
+                    }).join('');
+                    return `
+                      <div class="space-y-4">
+                        <div class="rounded-xl border bg-white dark:bg-surface-dark p-4 flex items-start justify-between gap-4">
+                          <div class="min-w-0">
+                            <div class="text-lg font-bold truncate">${safeText(String(quiz.mapel || ''))}${String(quiz.kelas || '').trim() ? ` • ${safeText(String(quiz.kelas || ''))}` : ''}</div>
+                            <div class="text-sm text-text-sub-light dark:text-text-sub-dark">Slug: <span class="font-semibold">${safeText(String(quiz.slug || ''))}</span></div>
+                            <div class="text-sm text-text-sub-light dark:text-text-sub-dark">Absen ${safeText(String(student.absen || ''))} • ${safeText(String(student.nama || '-'))} • Nilai ${pct}</div>
+                            <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${safeText(String(student.created_at || ''))}</div>
+                          </div>
+                          <div class="flex-shrink-0">
+                            <span class="inline-flex items-center justify-center min-w-[56px] h-10 px-3 rounded-full bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 text-green-800 dark:text-green-200 font-extrabold">${pct}</span>
+                          </div>
+                        </div>
+                        ${rows || `<div class="text-sm text-text-sub-light dark:text-text-sub-dark">Tidak ada data soal.</div>`}
+                      </div>
+                    `;
+                  };
+                  return `
+                    <div class="fixed inset-0 flex items-center justify-center" style="background: rgba(0,0,0,0.55); z-index:70;">
+                      <div class="bg-background-light dark:bg-background-dark w-[96vw] max-w-[1100px] max-h-[90vh] rounded-2xl border border-border-light dark:border-border-dark shadow-xl overflow-hidden flex flex-col">
+                        <div class="px-5 py-4 border-b border-border-light dark:border-border-dark bg-white dark:bg-surface-dark flex items-center justify-between gap-3">
+                          <div class="font-bold text-lg flex items-center gap-2">
+                            <span class="material-symbols-outlined">visibility</span>
+                            Jawaban Siswa
+                          </div>
+                          <button class="size-10 rounded-lg border bg-white dark:bg-surface-dark" onclick="window.__sp.closeJawabanSiswaModal()">&times;</button>
+                        </div>
+                        <div class="p-4 md:p-5 overflow-auto flex-1">
+                          ${loading ? `<div class="text-sm text-text-sub-light dark:text-text-sub-dark">Memuat jawaban…</div>` : err ? `<div class="rounded-lg border border-red-200 bg-red-50 text-red-800 p-3 text-sm">Gagal memuat: <b>${safeText(err)}</b></div>` : renderQ()}
+                        </div>
+                      </div>
+                    </div>
+                  `;
+                })()}
               `}
             </div>
           `;
@@ -10748,7 +11474,7 @@ ${baselineModulAjar}
         ` : ``;
         const body = !HAS_QUIZ_ACCESS
           ? noAccess
-          : (page === 'pilih' ? previewInline : page === 'live' ? live : page === 'hasil' ? res : pub);
+          : (page === 'gsheet' ? renderGSheetSettings() : (page === 'pilih' ? previewInline : page === 'live' ? live : page === 'hasil' ? res : pub));
         const quickPickerCard = (HAS_QUIZ_ACCESS && page === 'pilih') ? renderQuickPickerCard() : '';
         const supportNote = (HAS_QUIZ_ACCESS && page === 'pilih') ? `
           <div class="rounded-lg border border-amber-200 bg-amber-50 text-amber-900 text-sm font-bold px-4 h-10 inline-flex items-center gap-2">
@@ -10990,6 +11716,14 @@ ${baselineModulAjar}
           await setQuizShareTab('hasil');
           return;
         }
+        if (v === 'gsheet') {
+          state.quizShowPreview = false;
+          state.quizSubtab = 'gsheet';
+          saveDebounced(true);
+          try { await loadGSheetSettings(); } catch {}
+          render();
+          return;
+        }
         setQuizTab('live');
       };
       const setQuizShareTab = async (t) => {
@@ -11003,13 +11737,107 @@ ${baselineModulAjar}
         }
         render();
       };
+      const slugifyLinkName = (s) => {
+        return String(s || "")
+          .toLowerCase()
+          .trim()
+          .replace(/[\s_]+/g, '-')
+          .replace(/[^a-z0-9-]+/g, '-')
+          .replace(/-+/g, '-')
+          .replace(/^-+|-+$/g, '');
+      };
+      const getDefaultQuizSlug = () => {
+        const mapel = String(state.identity?.mataPelajaran || "").trim();
+        const judulPaket = String(state.paket?.judul || "").trim();
+        const base = mapel || judulPaket || 'soal';
+        const slug = slugifyLinkName(base);
+        return slug || 'kelas';
+      };
+      const QUIZ_PUBLISH_PREF_KEY = APP_KEY + ":quiz_publish_pref:v1:";
+      const getQuizPublishPrefKey = (mapel) => {
+        const m = slugifyLinkName(String(mapel || '').trim());
+        return QUIZ_PUBLISH_PREF_KEY + (m || 'unknown');
+      };
+      const loadQuizPublishPrefsForMapel = (mapel) => {
+        const key = getQuizPublishPrefKey(mapel);
+        try {
+          const raw = localStorage.getItem(key);
+          if (!raw) return null;
+          const j = JSON.parse(raw);
+          return (j && typeof j === 'object') ? j : null;
+        } catch {
+          return null;
+        }
+      };
+      const saveQuizPublishPrefsForMapel = () => {
+        const mapel = String(state.identity?.mataPelajaran || '').trim();
+        if (!mapel) return;
+        const f = state.quizPublishForm || {};
+        const roster = Array.isArray(f.roster) ? f.roster : [];
+        const payload = {
+          kelas: String(f.kelas || '').trim(),
+          jumlah: Math.min(50, Math.max(1, Math.floor(Number(f.jumlah || 32) || 32))),
+          roster,
+          includeImages: !!f.includeImages,
+        };
+        try {
+          localStorage.setItem(getQuizPublishPrefKey(mapel), JSON.stringify(payload));
+        } catch {}
+      };
+      const applyQuizPublishDefaultsForMapel = () => {
+        const mapel = String(state.identity?.mataPelajaran || '').trim();
+        state.quizPublishForm = state.quizPublishForm || {};
+        const f = state.quizPublishForm;
+
+        const pref = mapel ? loadQuizPublishPrefsForMapel(mapel) : null;
+        const kelasPref = pref ? String(pref.kelas || '').trim() : '';
+        const jumlahPref = pref ? Math.floor(Number(pref.jumlah || 0)) : 0;
+        const rosterPref = pref && Array.isArray(pref.roster) ? pref.roster : [];
+        const includeImagesPref = pref && Object.prototype.hasOwnProperty.call(pref, 'includeImages') ? !!pref.includeImages : null;
+
+        f.kelas = kelasPref || String(state.identity?.kelas || '').trim() || '';
+        f.roster = rosterPref.length ? rosterPref.slice(0, 50) : [];
+        f.jumlah = rosterPref.length
+          ? rosterPref.length
+          : (jumlahPref > 0 ? Math.min(50, Math.max(1, jumlahPref)) : 32);
+        f.expire = '';
+        f.includeImages = includeImagesPref !== null ? includeImagesPref : false;
+
+        if (f._slugAuto == null) f._slugAuto = !String(f.slug || '').trim();
+        if (!String(f.slug || '').trim()) f._slugAuto = true;
+        if (f._slugAuto) f.slug = getDefaultQuizSlug();
+
+        state.quizShowPublishSuccess = false;
+        state.quizLastLink = "";
+        state.quizLastPubId = 0;
+        state.quizLastRoster = [];
+        state.quizLastSlug = "";
+        saveDebounced(false);
+      };
       const setQuizPublish = (k, v) => {
         state.quizPublishForm = state.quizPublishForm || {};
         if (k === 'jumlah') {
           const n = Math.floor(Number(v || 0));
           state.quizPublishForm.jumlah = Math.min(50, Math.max(1, Number.isFinite(n) ? n : 1));
+          saveQuizPublishPrefsForMapel();
+        } else if (k === 'slug') {
+          const raw = String(v ?? '');
+          state.quizPublishForm.slug = raw;
+          const t = raw.trim();
+          if (!t) {
+            state.quizPublishForm._slugAuto = true;
+          } else {
+            const def = getDefaultQuizSlug();
+            state.quizPublishForm._slugAuto = slugifyLinkName(t) === def;
+          }
+          state.quizShowPublishSuccess = false;
+          state.quizLastLink = "";
+          state.quizLastPubId = 0;
+          state.quizLastRoster = [];
+          state.quizLastSlug = "";
         } else {
           state.quizPublishForm[k] = v;
+          if (k === 'kelas' || k === 'roster' || k === 'includeImages') saveQuizPublishPrefsForMapel();
         }
         saveDebounced(false);
       };
@@ -11115,6 +11943,7 @@ ${baselineModulAjar}
           state.quizPublishForm = state.quizPublishForm || {};
           state.quizPublishForm.roster = rows;
           if (rows.length > 0) state.quizPublishForm.jumlah = rows.length;
+          saveQuizPublishPrefsForMapel();
           saveDebounced(false);
           render();
           if (rows0.length > 50) alert('Maksimal 50 siswa. Hanya 50 baris pertama yang dipakai.');
@@ -11127,6 +11956,7 @@ ${baselineModulAjar}
         state.quizPublishForm.roster = [];
         const inp = document.getElementById('rosterPicker');
         if (inp) inp.value = '';
+        saveQuizPublishPrefsForMapel();
         saveDebounced(false);
         render();
       };
@@ -11216,17 +12046,32 @@ ${baselineModulAjar}
       };
       const publishQuiz = async () => {
         const mapel = String(state.identity.mataPelajaran || "").trim();
+        const kelas = String(state.quizPublishForm?.kelas || state.identity.kelas || "").trim();
         if (!mapel) { alert("Lengkapi mata pelajaran di Identitas."); return; }
         if (!Array.isArray(state.questions) || state.questions.length === 0) {
           alert("Buat naskah soal terlebih dahulu.");
           return;
         }
         const items = Array.isArray(state.questions) ? state.questions : [];
-        const allowedTypes = new Set(['pg', 'benar_salah', 'pg_kompleks']);
+        const normalizePublishType = (raw) => {
+          const t = String(raw || '').trim();
+          if (t === 'isian') return 'isian_singkat';
+          return t;
+        };
+        const countByType = (arr) => {
+          const out = {};
+          for (const q of (Array.isArray(arr) ? arr : [])) {
+            const t = normalizePublishType(String(q?.type || '').trim()) || 'unknown';
+            out[t] = (out[t] || 0) + 1;
+          }
+          return out;
+        };
+        const allowedTypes = new Set(['pg', 'benar_salah', 'pg_kompleks', 'isian_singkat', 'isian']);
         const quizItems = items
           .filter(q => q && allowedTypes.has(String(q.type || '').trim()))
           .map(q => {
-            const t = String(q.type || '').trim();
+            const rawType = String(q.type || '').trim();
+            const t = rawType === 'isian' ? 'isian_singkat' : rawType;
             const base = { ...q, type: t };
             if (t === 'benar_salah') {
               return { ...base, options: ['Benar', 'Salah'] };
@@ -11239,11 +12084,21 @@ ${baselineModulAjar}
               return Array.isArray(q.options) && q.options.length >= 3;
             }
             if (t === 'benar_salah') return true;
+            if (t === 'isian_singkat') return true;
             return false;
           });
-        if (quizItems.length === 0) { alert("Hanya mendukung PG, Benar/Salah, dan PG Kompleks. Tidak ada soal yang bisa dipublish pada paket ini."); return; }
+        const allCounts = countByType(items);
+        const pubCounts = countByType(quizItems);
+        const excluded = Object.keys(allCounts)
+          .map((k) => ({ type: k, count: Math.max(0, (allCounts[k] || 0) - (pubCounts[k] || 0)) }))
+          .filter(x => x.count > 0 && !['pg', 'benar_salah', 'pg_kompleks', 'isian_singkat'].includes(x.type))
+          .sort((a, b) => b.count - a.count);
+        if (excluded.length > 0) {
+          alert(`Sebagian soal tidak ikut dipublish karena tipe belum didukung: ${excluded.map(x => `${x.type}(${x.count})`).join(', ')}.\n\nPublish saat ini mendukung: PG, Benar/Salah, PG Kompleks, Isian Singkat.`);
+        }
+        if (quizItems.length === 0) { alert("Hanya mendukung PG, Benar/Salah, PG Kompleks, dan Isian Singkat. Tidak ada soal yang bisa dipublish pada paket ini."); return; }
         if (quizItems.length > 50) { alert(`Maksimal 50 soal untuk Quiz. Saat ini terdeteksi ${quizItems.length} soal.`); return; }
-        const includeImages = state.quizPublishForm?.includeImages ?? true;
+        const includeImages = state.quizPublishForm?.includeImages ?? false;
         const imageCount = includeImages ? quizItems.reduce((acc, q) => acc + (String(q.image || '').trim() ? 1 : 0), 0) : 0;
         if (includeImages && imageCount > 5) {
           alert(`Maksimal 5 gambar per paket publish. Saat ini terdeteksi ${imageCount} gambar.`);
@@ -11272,11 +12127,32 @@ ${baselineModulAjar}
           const maxIdx = Math.max(-1, Number(optCount || 0) - 1);
           return uniq.map(n => Math.min(maxIdx, Math.max(0, n)));
         };
+        const normalizeShortAnswerKey = (raw) => {
+          const out = [];
+          const push = (v) => {
+            const s = String(v ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+            if (!s) return;
+            out.push(s);
+          };
+          if (Array.isArray(raw)) {
+            raw.forEach(push);
+          } else if (typeof raw === 'string') {
+            const s = raw.trim();
+            if (s.includes('|')) s.split('|').forEach(push);
+            else push(s);
+          } else {
+            push(raw);
+          }
+          const uniq = Array.from(new Set(out));
+          if (uniq.length <= 1) return uniq[0] || '';
+          return uniq;
+        };
         const answer_key = quizItems.map((q) => {
           const t = String(q.type || '').trim();
           const opts = Array.isArray(q.options) ? q.options : [];
           if (t === 'pg_kompleks') return normalizeMultiAnswer(q.answer, opts.length);
           if (t === 'benar_salah') return normalizeAnswerIndex(q.answer, ['Benar', 'Salah']);
+          if (t === 'isian_singkat') return normalizeShortAnswerKey(q.answer);
           return normalizeAnswerIndex(Array.isArray(q.answer) ? q.answer[0] : q.answer, opts);
         });
         const slug = String(state.quizPublishForm?.slug || "").trim().toLowerCase().replace(/[^a-z0-9\-]+/g,'-').replace(/^-+|-+$/g,'');
@@ -11305,12 +12181,7 @@ ${baselineModulAjar}
           if (m4) return new Date(Number(m4[1]), Number(m4[2]) - 1, Number(m4[3]), 23, 59, 0, 0);
           return null;
         };
-        if (!expireRaw) {
-          expireRaw = `${fmtDDMMYYYY(maxExpireDate)} 23:59`;
-          state.quizPublishForm = state.quizPublishForm || {};
-          state.quizPublishForm.expire = expireRaw;
-          saveDebounced(false);
-        } else {
+        if (expireRaw) {
           const dt = parseExpireToDate(expireRaw);
           if (dt && !Number.isNaN(dt.getTime()) && dt.getTime() > maxExpireDate.getTime()) {
             const fixed = `${fmtDDMMYYYY(maxExpireDate)} 23:59`;
@@ -11321,8 +12192,8 @@ ${baselineModulAjar}
             alert('Batas waktu link maksimal 14 hari dari tanggal pembuatan. Nilai otomatis disesuaikan.');
           }
         }
-        if (/^\d{2}-\d{2}-\d{4}$/.test(expireRaw)) expireRaw = `${expireRaw} 23:59`;
-        if (/^\d{4}-\d{2}-\d{2}$/.test(expireRaw)) expireRaw = `${expireRaw} 23:59`;
+        if (expireRaw && /^\d{2}-\d{2}-\d{4}$/.test(expireRaw)) expireRaw = `${expireRaw} 23:59`;
+        if (expireRaw && /^\d{4}-\d{2}-\d{2}$/.test(expireRaw)) expireRaw = `${expireRaw} 23:59`;
         const normalizeExpireDate = (s) => {
           const v = String(s || "").trim();
           const vv = v.replace('T', ' ');
@@ -11348,7 +12219,7 @@ ${baselineModulAjar}
           }
           return v;
         };
-        const expire = normalizeExpireDate(expireRaw);
+        const expire = expireRaw ? normalizeExpireDate(expireRaw) : '';
         if (!slug) { alert("Isi slug."); return; }
         const btn = document.getElementById('pubMsg');
         if (btn) btn.textContent = "Memproses...";
@@ -11420,13 +12291,15 @@ ${baselineModulAjar}
           const params = new URLSearchParams();
           params.set('slug', slug);
           params.set('mapel', mapel);
-          params.set('kelas', String(state.identity.kelas||''));
+          params.set('kelas', String(kelas || ''));
           params.set('sekolah', String(state.identity.namaSekolah||''));
           params.set('guru', String(state.identity.namaGuru||''));
+          params.set('logo', String(state.identity.logo||''));
           // tambahkan pembahasan jika ada
           const payloadWithExplain = await Promise.all(quizItems.map(async (q) => {
             const imgUrl = await uploadIfNeeded(q.image);
-            const t = String(q.type || '').trim() || 'pg';
+            const rawType = String(q.type || '').trim() || 'pg';
+            const t = rawType === 'isian' ? 'isian_singkat' : rawType;
             const opts = (t === 'benar_salah') ? ['Benar', 'Salah'] : (Array.isArray(q.options) ? q.options : []);
             return {
               type: t,
@@ -11450,13 +12323,14 @@ ${baselineModulAjar}
           let js = null;
           try { js = JSON.parse(raw); } catch {}
           if (res.ok && js && js.ok) {
-            const expText = (expireRaw && expireRaw.trim()) ? expireRaw.trim() : '14 hari (otomatis)';
+            const expText = (expireRaw && expireRaw.trim()) ? expireRaw.trim() : 'Tanpa batas waktu';
             const classLink = `${location.origin}/soal_view.php?id=${encodeURIComponent(String(js.id))}`;
             const exampleLink = `${classLink}&n=1`;
             const adjusted = Number(js.slug_adjusted || 0) === 1 && String(js.slug_original || '') && String(js.slug || '') !== String(js.slug_original || '');
             const adjustedMsg = adjusted ? `<br><span class="text-amber-700">Slug disesuaikan menjadi: <b>${safeText(String(js.slug||''))}</b></span>` : ``;
             if (btn) btn.innerHTML = `Berhasil buat link siswa.${adjustedMsg}<br>Link untuk siswa: <a class="text-blue-600 underline" href="${classLink}" target="_blank" rel="noopener">${classLink}</a><br><span class="text-xs text-text-sub-light">Siswa akan diminta mengisi No Absen dan Nama saat membuka link.</span><br>Maks absen: ${Number(state.quizPublishForm?.jumlah||0) || '-'} • Expire: ${expText}<br><span class="text-xs text-text-sub-light">Contoh akses:</span> <a class="text-blue-600 underline text-xs" href="${exampleLink}" target="_blank" rel="noopener">${exampleLink}</a>`;
             state.quizLastLink = classLink;
+            state.quizShowPublishSuccess = true;
             await loadPublications();
             state.quizSelectedSlug = String(js.slug);
             state.quizLastPubId = Number(js.id);
@@ -11513,6 +12387,18 @@ ${baselineModulAjar}
           }
         } catch {}
       };
+      const ensureGSheetSettingsCache = async () => {
+        try {
+          const res = await fetch('api/gsheet_settings_get.php', { credentials: 'same-origin' });
+          if (!res.ok) return;
+          const js = await res.json().catch(() => null);
+          if (js && js.ok) {
+            state.gsheetSettings = js.items || [];
+            state.gsheetMapelsWithQuiz = js.mapels_with_quiz || [];
+            saveDebounced(false);
+          }
+        } catch {}
+      };
       const loadResults = async () => {
         const selEl = document.getElementById('selPub');
         if (selEl) state.quizSelectedSlug = selEl.value;
@@ -11526,10 +12412,50 @@ ${baselineModulAjar}
             state.quizResults = js.items || [];
             state.quizResultsMapel = js.mapel || '';
             state.quizResultsLoadedAt = new Date().toISOString();
+            try { await ensureGSheetSettingsCache(); } catch {}
             saveDebounced(false);
             render();
           }
         } catch {}
+      };
+      const closeJawabanSiswaModal = () => {
+        state._showJawabanSiswaModal = false;
+        state.jawabanSiswaLoading = false;
+        state.jawabanSiswaError = "";
+        state.jawabanSiswaData = null;
+        saveDebounced(false);
+        render();
+      };
+      const openJawabanSiswa = async (absen) => {
+        const ab = Math.floor(Number(absen || 0));
+        const slug = String(state.quizSelectedSlug || "").trim();
+        if (!slug || ab <= 0) return;
+        try {
+          await ensureGSheetSettingsCache();
+          const pubs = Array.isArray(state.quizPublications) ? state.quizPublications : [];
+          const pub = pubs.find(it => String(it.slug) === slug) || null;
+          const mapel = String(pub?.mapel || state.quizResultsMapel || state.identity?.mataPelajaran || "").trim();
+          const gitems = Array.isArray(state.gsheetSettings) ? state.gsheetSettings : [];
+          const g = gitems.find(x => String(x?.mapel || '').trim() === mapel) || null;
+          const okConn = !!(g && Number(g.is_active) === 1 && String(g.spreadsheet_id || '').trim());
+          if (!okConn) {
+            alert("Hubungkan Google Sheet dulu di tab Pengaturan penyimpanan.");
+            return;
+          }
+          const id = Number(pub?.id || 0);
+          if (!id) {
+            alert("ID publikasi tidak ditemukan.");
+            return;
+          }
+          const rows = Array.isArray(state.quizResults) ? state.quizResults : [];
+          const row = rows.find(r => Math.floor(Number(r?.absen || 0)) === ab) || null;
+          const nmRaw = row ? String(row?.nama || row?.name || '') : '';
+          const nm = decodeMaybeUrlText(nmRaw);
+          const url = 'soal_view.php?' + new URLSearchParams({ id: String(id), review: '1', n: String(ab), name: nm || '' }).toString();
+          window.open(url, '_blank', 'noopener');
+        } catch {
+          alert("Gagal membuka jawaban (network).");
+        }
       };
       const exportResultsCSV = (slug) => {
         const rows = Array.isArray(state.quizResults) ? state.quizResults.slice() : [];
@@ -13185,6 +14111,12 @@ ${out}`;
 
           node.addEventListener("input", updateValue);
           node.addEventListener("change", () => {
+            try { updateValue(); } catch {}
+            try {
+              if (path === 'identity.mataPelajaran') {
+                applyQuizPublishDefaultsForMapel();
+              }
+            } catch {}
             saveDebounced(true);
             render();
           });
@@ -15798,6 +16730,16 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         clearQuizRoster,
         loadPublications,
         loadResults,
+        openJawabanSiswa,
+        closeJawabanSiswaModal,
+        loadGSheetSettings,
+        openGSheetModal,
+        closeGSheetModal,
+        setGSheetForm,
+        saveGSheetSettings,
+        saveGSheetRow,
+        syncGSheetNow,
+        setGSheetPreviewTab,
         setQuizResultsQuery,
         setQuizResultsCategoryFilter,
         exportJSON,
@@ -16490,6 +17432,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         autoFillPaket();
       }
       applyUserProfileDefaults();
+      try { applyQuizPublishDefaultsForMapel(); } catch {}
       render();
       if (ensureProfileComplete()) ensureUsagePolicyAck();
     </script>

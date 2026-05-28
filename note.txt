@@ -1,346 +1,107 @@
-File: `index.php`
+Kamu sedang mengerjakan project GuruPintar (PHP + MySQL + Tailwind CSS).
+Fitur "5. Pengaturan Penyimpanan (Google Sheets)" di tab Quiz SUDAH BERFUNGSI.
+Sekarang perlu perbaikan UI agar lebih rapi dan user-friendly.
 
-KONTEKS: Halaman Identitas section di renderIdentitas (sekitar baris 8503-8700) berisi 9+ field. Kebanyakan field cuma muncul di kop lembar soal cetak, tidak mempengaruhi soal yang dibuat AI. Saya mau pisahkan field inti (4 saja) dari field cosmetic (sisanya ke Pengaturan Lanjutan).
+KONTEKS:
+- File utama: index.php (bagian renderGSheetSettings)
+- API: api/gsheet_settings_get.php, api/gsheet_settings_save.php, api/gsheet_test_connection.php
+- Tabel DB: gsheet_settings (id, user_id, mapel, spreadsheet_url, spreadsheet_id, is_active, auto_sync, include_detail)
 
----
+===========================
+PERBAIKAN 1 — Tambah kolom `sheet_title` di tabel gsheet_settings
+===========================
 
-## A. KLASIFIKASI FIELD
+ALTER TABLE gsheet_settings ADD COLUMN sheet_title VARCHAR(255) DEFAULT NULL AFTER spreadsheet_id;
 
-### Field INTI (selalu terlihat, di section utama):
-1. **Jenjang** — mempengaruhi vocabulary & kompleksitas AI
-2. **Kelas** — mempengaruhi tingkat kesulitan AI
-3. **Mata Pelajaran** — domain knowledge AI
-4. **Sumber Materi / Acuan Utama** — topik soal yang akan dibuat
+Saat guru menyimpan / test koneksi spreadsheet, ambil judul spreadsheet dari Google Sheets API response (endpoint GET https://sheets.googleapis.com/v4/spreadsheets/{spreadsheetId}?fields=properties.title).
+Simpan hasilnya ke kolom sheet_title.
+Update api/gsheet_test_connection.php → setelah berhasil connect, return juga field "title" dari response.
+Update api/gsheet_settings_save.php → terima field sheet_title, simpan ke DB.
 
-### Field LANJUTAN (collapse, default tertutup):
+===========================
+PERBAIKAN 2 — Tabel daftar mapel: ganti URL dengan nama spreadsheet
+===========================
 
-**Sub-grup 1: "Identitas Kop Lembar Soal"**
-- Nama Guru
-- Nama Sekolah
-- Logo Sekolah
-- Tahun Ajaran
-- Judul Paket Soal
-- Semester (kalau ada)
+Di renderGSheetSettings(), bagian tabel daftar mapel:
 
-**Sub-grup 2: "Untuk Power User"**
-- Perintah Khusus
+SEBELUM (sekarang):
+- Kolom: Mata Pelajaran | Google Sheet (tampil URL) | Status | Opsi (checkbox auto sync + detail) | Aksi
 
-### Field yang DIHAPUS dari UI:
-- **Fase** — auto-derive dari Jenjang + Kelas (logic backend tetap ada, tapi tidak ditampilkan input-nya)
+SESUDAH:
+- Hapus kolom "Opsi" dari tabel (checkbox dipindah ke modal)
+- Ganti tampilan tabel dari <table> menjadi card-list (div per row):
+  Setiap baris mapel tampilkan:
+  - Kiri: icon mapel (kotak warna 34px, rounded-lg, icon tabler di tengah) + nama mapel (font-semibold) + subtitle "X quiz · {sheet_title}" (font kecil abu-abu)
+  - Kanan: badge status ("Terhubung" hijau atau "Belum diset" kuning) + tombol icon edit (pencil) + tombol icon buka (external-link, hanya tampil kalau sudah terhubung)
 
----
+Kalau sheet_title kosong/null, tampilkan "belum ada spreadsheet" dengan warna warning.
 
-## B. STRUKTUR HTML BARU
+Mapping icon per mapel (case-insensitive contains):
+- "matematika" → ti-math-function, bg green-100
+- "ipa" / "ilmu pengetahuan alam" → ti-flask, bg purple-100  
+- "ips" / "ilmu pengetahuan sosial" → ti-world, bg blue-100
+- "bahasa indonesia" → ti-book, bg coral/orange-100
+- "bahasa inggris" / "english" → ti-language, bg teal-100
+- "bahasa jawa" / "bahasa daerah" → ti-language, bg teal-100
+- default → ti-notebook, bg gray-100
 
-Cari renderIdentitas (sekitar baris 8503). Ubah struktur jadi:
+===========================
+PERBAIKAN 3 — Toolbar: ubah hierarki tombol
+===========================
 
-```html
-<!-- SECTION UTAMA -->
-<div class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark p-5 md:p-6 mb-3">
-  
-  <div class="flex items-start justify-between mb-5">
-    <div>
-      <div class="text-lg font-medium">Identitas Soal</div>
-      <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-0.5">
-        Yang mempengaruhi soal yang dibuat AI
-      </div>
-    </div>
-  </div>
+Toolbar di atas tabel, ubah menjadi:
+- Kiri: tombol "Refresh" (outline/secondary, icon ti-refresh)
+- Kiri: tombol "Sync semua" (outline/secondary, icon ti-arrows-sort)  
+- Kanan (ml-auto): tombol "Tambah mata pelajaran" (primary biru, icon ti-plus)
 
-  <!-- Row 1: 3 kolom utama -->
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-    <div>
-      <label class="text-sm font-medium block mb-2">Jenjang</label>
-      <select onchange="..." class="w-full h-10 ...">
-        <!-- options -->
-      </select>
-    </div>
-    <div>
-      <label class="text-sm font-medium block mb-2">Kelas</label>
-      <select onchange="..." class="w-full h-10 ...">
-        <!-- options -->
-      </select>
-    </div>
-    <div>
-      <label class="text-sm font-medium block mb-2">Mata Pelajaran</label>
-      <select onchange="..." class="w-full h-10 ...">
-        <!-- options -->
-      </select>
-    </div>
-  </div>
+Tombol "Sync manual sekarang" yang sekarang warna hijau mencolok → ubah jadi "Sync semua" dengan style outline (border saja, tidak filled).
 
-  <!-- Sumber Materi (textarea besar) -->
-  <div>
-    <label class="text-sm font-medium block mb-2">Sumber Materi / Acuan Utama</label>
-    <textarea onchange="..." 
-              class="w-full min-h-[110px] px-3 py-2.5 text-sm rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark resize-y"
-              placeholder="Tempel materi pelajaran di sini atau unggah dari file/buku..."></textarea>
-    
-    <div class="flex gap-2 mt-2.5 flex-wrap">
-      <button onclick="window.__sp.openFotoBuku()" class="h-9 px-3.5 text-xs ...">
-        <span class="material-symbols-outlined text-[16px] -mt-0.5 mr-1">photo_camera</span>
-        Foto Buku
-      </button>
-      <button onclick="window.__sp.openUploadFile()" class="h-9 px-3.5 text-xs ...">
-        <span class="material-symbols-outlined text-[16px] -mt-0.5 mr-1">upload_file</span>
-        Unggah PDF/Word
-      </button>
-    </div>
-  </div>
+===========================
+PERBAIKAN 4 — Modal tambah/edit: perbaiki layout
+===========================
 
-</div>
+Modal "Tambah Mata Pelajaran" yang sekarang layoutnya 2 kolom horizontal (mata pelajaran + URL sejajar) → ubah jadi VERTIKAL (stack):
 
-<!-- PENGATURAN LANJUTAN (collapse) -->
-<details class="bg-white dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark group">
-  <summary class="px-5 md:px-6 py-4 cursor-pointer flex items-center gap-3 list-none">
-    <span class="material-symbols-outlined text-[22px] text-text-sub-light dark:text-text-sub-dark flex-shrink-0">settings</span>
-    <div class="flex-1 min-w-0">
-      <div class="text-sm md:text-base font-medium">Pengaturan Lanjutan</div>
-      <div class="text-xs md:text-sm text-text-sub-light dark:text-text-sub-dark mt-0.5">
-        Identitas kop, semester, perintah khusus
-      </div>
-    </div>
-    <span class="bg-background-light dark:bg-background-dark text-text-sub-light dark:text-text-sub-dark px-2.5 py-1 rounded-full text-xs font-medium flex-shrink-0">
-      7 pengaturan
-    </span>
-    <span class="material-symbols-outlined text-[18px] text-text-sub-light dark:text-text-sub-dark group-open:rotate-180 transition-transform">expand_more</span>
-  </summary>
+Urutan field dari atas ke bawah:
+1. Header: "Tambah mata pelajaran" + tombol close (X) di kanan
+2. Field "Mata pelajaran" — dropdown select, isinya dari mapel yang sudah pernah dipublish quiz-nya. Tambah hint kecil di bawah: "Daftar mapel muncul otomatis dari quiz yang sudah dipublish."
+3. Field "Nama spreadsheet" (opsional) — input text, placeholder "contoh: Nilai IPA Kelas 7". Hint: "Opsional — default menggunakan nama file Google Sheet."
+4. Field "URL Google Sheet" — input text, font mono, placeholder "https://docs.google.com/spreadsheets/d/..."
+5. Gap 8px
+6. Checkbox row (horizontal): ☑ Auto sync | ☐ Sertakan detail jawaban
+7. Info box kecil (bg gray-100, rounded, icon ti-bulb): "Opsi 'auto sync' akan mengirim data ke sheet setiap kali siswa submit jawaban. 'Sertakan detail jawaban' menambah kolom J1, J2, J3... di sheet kelas."
+8. Gap 14px
+9. Tombol "Hubungkan & simpan" (full width, primary biru, icon ti-plug)
+10. Tombol "Batal" (full width, text only, secondary)
 
-  <div class="px-5 md:px-6 pb-6 border-t border-border-light dark:border-border-dark">
-    
-    <!-- Sub-grup 1: Identitas Kop -->
-    <div class="pt-4">
-      <div class="text-xs font-medium text-text-sub-light dark:text-text-sub-dark uppercase tracking-wide mb-3">
-        Identitas Kop Lembar Soal
-      </div>
+Saat mode EDIT (klik tombol edit di daftar mapel), modal yang sama terbuka tapi:
+- Header berubah: "Edit pengaturan — {nama mapel}"
+- Field mapel disabled (tidak bisa diubah)
+- Field terisi data existing
+- Tombol berubah: "Simpan perubahan"
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 mb-3.5">
-        <div>
-          <label class="text-xs md:text-sm font-medium block mb-1.5">Nama Guru</label>
-          <input type="text" 
-                 value="${escapeHtml(p.namaGuru || __userProfile.nama || '')}"
-                 onchange="updatePaket('namaGuru', this.value)"
-                 class="w-full h-9 md:h-10 px-3 text-sm ..." />
-        </div>
-        <div>
-          <label class="text-xs md:text-sm font-medium block mb-1.5">Nama Sekolah</label>
-          <input type="text" 
-                 value="${escapeHtml(p.namaSekolah || __userProfile.nama_sekolah || '')}"
-                 onchange="updatePaket('namaSekolah', this.value)"
-                 class="w-full h-9 md:h-10 px-3 text-sm ..." />
-        </div>
-      </div>
+===========================
+PERBAIKAN 5 — Tambah preview struktur sheet
+===========================
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5 mb-3.5">
-        <div>
-          <label class="text-xs md:text-sm font-medium block mb-1.5">Logo Sekolah</label>
-          <!-- Logo uploader yang sudah ada, tinggal copy-paste -->
-        </div>
-        <div>
-          <label class="text-xs md:text-sm font-medium block mb-1.5">Tahun Ajaran</label>
-          <input type="text" 
-                 value="${escapeHtml(p.tahunAjaran || '')}"
-                 onchange="updatePaket('tahunAjaran', this.value)"
-                 class="w-full h-9 md:h-10 px-3 text-sm ..." />
-        </div>
-      </div>
+Di bawah daftar mapel, tambahkan card "Preview struktur sheet":
+- Judul: icon ti-table + "Preview struktur sheet"
+- Tampilkan tab-tab visual (bukan tab fungsional, hanya visual statis):
+  - Tab "Soal" (bg green-100, border green-300)
+  - Tab "7A" (bg blue-100, border blue-300)  
+  - Tab "7B" (bg purple-100, border purple-300)
+- Di bawah tab, tampilkan mini tabel contoh:
+  Sheet Soal: No | Pertanyaan | A | B | C | D | Kunci
+  Sheet Kelas: No Absen | Nama | Skor | Total | Nilai (%) | Waktu Submit
+- Tab ini bisa di-toggle untuk lihat contoh masing-masing sheet
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-        <div class="md:col-span-2">
-          <label class="text-xs md:text-sm font-medium block mb-1.5">Judul Paket Soal</label>
-          <input type="text" 
-                 value="${escapeHtml(p.judul || '')}"
-                 onchange="updatePaket('judul', this.value)"
-                 placeholder="Contoh: Penilaian Harian Sistem Pencernaan"
-                 class="w-full h-9 md:h-10 px-3 text-sm ..." />
-        </div>
-        <div>
-          <label class="text-xs md:text-sm font-medium block mb-1.5">Semester</label>
-          <select onchange="updatePaket('semester', this.value)" class="w-full h-9 md:h-10 text-sm ...">
-            <option value="">— Pilih —</option>
-            <option value="ganjil" ${p.semester === 'ganjil' ? 'selected' : ''}>Ganjil</option>
-            <option value="genap" ${p.semester === 'genap' ? 'selected' : ''}>Genap</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <!-- Sub-grup 2: Power User -->
-    <div class="pt-5 mt-4 border-t border-border-light dark:border-border-dark">
-      <div class="text-xs font-medium text-text-sub-light dark:text-text-sub-dark uppercase tracking-wide mb-3">
-        Untuk Power User
-      </div>
-
-      <div>
-        <label class="text-xs md:text-sm font-medium block mb-1.5">Perintah Khusus untuk AI</label>
-        <textarea onchange="updatePaket('perintahKhusus', this.value)"
-                  class="w-full min-h-[70px] px-3 py-2 text-sm rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark resize-y"
-                  placeholder='Contoh: "Perbanyak soal cerita" atau "Gunakan Bahasa Jawa ngoko"'>${escapeHtml(p.perintahKhusus || '')}</textarea>
-      </div>
-    </div>
-
-  </div>
-</details>
-```
-
----
-
-## C. AUTO-DERIVE FASE DARI JENJANG + KELAS
-
-Field "Fase" dihapus dari UI tapi state.paket.fase harus tetap terisi otomatis.
-
-Tambahkan fungsi helper:
-
-```javascript
-function deriveFase(jenjang, kelas) {
-  // Fase Kurikulum Merdeka
-  if (jenjang === 'PAUD') return 'Fondasi';
-  if (jenjang === 'TK') return 'Fondasi';
-  
-  if (jenjang === 'SD/MI') {
-    if (['Kelas 1', 'Kelas 2'].includes(kelas)) return 'Fase A';
-    if (['Kelas 3', 'Kelas 4'].includes(kelas)) return 'Fase B';
-    if (['Kelas 5', 'Kelas 6'].includes(kelas)) return 'Fase C';
-  }
-  
-  if (jenjang === 'SMP/MTs') {
-    return 'Fase D';
-  }
-  
-  if (jenjang === 'SMA/MA') {
-    if (kelas === 'Kelas 10') return 'Fase E';
-    if (['Kelas 11', 'Kelas 12'].includes(kelas)) return 'Fase F';
-  }
-  
-  if (jenjang === 'SMK/MAK') {
-    if (kelas === 'Kelas 10') return 'Fase E';
-    if (['Kelas 11', 'Kelas 12', 'Kelas 13'].includes(kelas)) return 'Fase F';
-  }
-  
-  return '';
-}
-```
-
-Lalu di handler onChange Jenjang & Kelas, panggil:
-
-```javascript
-state.paket.fase = deriveFase(state.paket.jenjang, state.paket.kelas);
-saveDebounced(true);
-render();
-```
-
-PENTING: Pastikan logic lain yang pakai `state.paket.fase` (mis. prompt OpenAI, kop dokumen Word/PDF) tetap berfungsi dengan fase yang auto-derived.
-
----
-
-## D. TAMBAHKAN BADGE DI PENGATURAN LANJUTAN
-
-Saat user sudah mengisi setting di Pengaturan Lanjutan, tampilkan indicator visual supaya jelas:
-
-```html
-<span class="...badge..." id="lanjutanBadge">
-  ${countFilledLanjutan()} pengaturan
-</span>
-```
-
-Di mana `countFilledLanjutan()`:
-
-```javascript
-function countFilledLanjutan() {
-  const p = state.paket || {};
-  let count = 0;
-  if ((p.namaGuru || '').trim()) count++;
-  if ((p.namaSekolah || '').trim()) count++;
-  if (p.logo) count++;
-  if ((p.tahunAjaran || '').trim()) count++;
-  if ((p.judul || '').trim()) count++;
-  if ((p.semester || '').trim()) count++;
-  if ((p.perintahKhusus || '').trim()) count++;
-  return count > 0 ? `${count} terisi` : '7 pengaturan';
-}
-```
-
-Saat ada yang terisi, badge berubah jadi "3 terisi" dengan warna primary (biru) untuk visual feedback.
-
----
-
-## E. PRE-FILL DARI PROFIL USER (Phase 5 sebelumnya)
-
-Saat first time buka halaman, pre-fill dari profil:
-
-```javascript
-function initIdentitasFromProfile() {
-  if (!state.paket.namaGuru && __userProfile.nama) {
-    state.paket.namaGuru = __userProfile.nama;
-  }
-  if (!state.paket.namaSekolah && __userProfile.nama_sekolah) {
-    state.paket.namaSekolah = __userProfile.nama_sekolah;
-  }
-  if (!state.paket.jenjang && __userProfile.jenjang) {
-    state.paket.jenjang = __userProfile.jenjang;
-  }
-  if (!state.paket.tahunAjaran) {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = now.getMonth() + 1;
-    state.paket.tahunAjaran = m >= 7 ? `${y}/${y+1}` : `${y-1}/${y}`;
-  }
-}
-```
-
-Panggil di state init.
-
----
-
-## F. CARA VERIFIKASI
-
-1. ✅ Section utama: cuma 4 field (Jenjang, Kelas, Mata Pelajaran, Sumber Materi)
-2. ✅ Field "Fase" tidak tampil di UI, tapi state.paket.fase tetap terisi otomatis
-3. ✅ "Pengaturan Lanjutan" collapse by default, ada badge "7 pengaturan"
-4. ✅ Klik expand → muncul 2 sub-grup (Identitas Kop, Power User)
-5. ✅ Sub-grup "Identitas Kop": 6 field (Nama Guru, Nama Sekolah, Logo, Tahun Ajaran, Judul Paket, Semester)
-6. ✅ Sub-grup "Power User": 1 field (Perintah Khusus)
-7. ✅ Saat ada setting yang terisi, badge berubah "3 terisi" (warna primary)
-8. ✅ Pre-fill profil bekerja saat first time buka
-9. ✅ Generate soal tetap berfungsi (cek prompt OpenAI sudah include semua data yang perlu)
-10. ✅ Export Word/PDF tetap include kop dengan benar (Nama Guru, Sekolah, Logo, Tahun Ajaran, Judul, Semester)
-
----
-
-## G. VALIDASI SEBELUM GENERATE
-
-Pastikan validasi `validateIdentitas()` tetap berfungsi. Cek field wajib:
-- Jenjang ✓
-- Kelas ✓
-- Mata Pelajaran ✓
-- Sumber Materi ✓
-
-Untuk field di Pengaturan Lanjutan (Nama Guru, Sekolah, dll.), tetap validasi kalau ada di prompt original tapi:
-- Kalau kosong: kasih default value yang masuk akal
-- ATAU: skip kop di lembar soal kalau benar-benar kosong
-
-JANGAN PAKSA user buka Pengaturan Lanjutan kalau cuma untuk validasi yang sebelumnya wajib (mis. Tahun Ajaran).
-
-Sarankan: Tahun Ajaran auto-fill, Judul Paket auto-generate dari mapel+materi kalau kosong.
-
----
-
-## H. YANG TIDAK BOLEH DIUBAH
-
-- JANGAN hapus state.paket field manapun (semua field tetap ada di data)
-- JANGAN ubah API endpoint atau database schema
-- JANGAN ubah logic generate soal
-- JANGAN ubah export Word/PDF (semua field kop tetap dipakai)
-- JANGAN ubah modal Help yang sudah ada
-
-## I. FILE YANG DIEDIT
-
-- `index.php` saja
-
-## J. OUTPUT YANG DIHARAPKAN
-
-1. Diff sebelum/sesudah untuk renderIdentitas
-2. Konfirmasi 4 field inti di section utama
-3. Konfirmasi 7 field cosmetic di Pengaturan Lanjutan
-4. Konfirmasi field Fase auto-derive bekerja
-5. Test generate soal sukses dengan & tanpa expand Pengaturan Lanjutan
+===========================
+CATATAN PENTING
+===========================
+- Jangan ubah logika API atau fungsi backend yang sudah berjalan
+- Hanya ubah bagian renderGSheetSettings() di index.php
+- Tambah ALTER TABLE untuk kolom sheet_title
+- Update api/gsheet_test_connection.php dan api/gsheet_settings_save.php untuk handle sheet_title
+- Gunakan class Tailwind yang SUDAH dipakai di file ini (cek pattern yang ada)
+- Pastikan modal bisa dipakai untuk TAMBAH dan EDIT (reuse komponen yang sama)
+- Test: buka tab 5, pastikan daftar mapel tampil dengan nama sheet, modal bisa buka/tutup, save tetap berfungsi

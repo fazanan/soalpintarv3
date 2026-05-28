@@ -87,6 +87,7 @@ $mapel = isset($data['mapel']) ? trim((string)$data['mapel']) : '';
 $kelas = isset($data['kelas']) ? trim((string)$data['kelas']) : '';
 $sekolah = isset($data['sekolah']) ? trim((string)$data['sekolah']) : '';
 $guru = isset($data['guru']) ? trim((string)$data['guru']) : '';
+$logo = isset($data['logo']) ? trim((string)$data['logo']) : '';
 $payload = $data['payload_public'] ?? null;
 $answerKey = $data['answer_key'] ?? null;
 $expire = isset($data['expire_at']) ? trim((string)$data['expire_at']) : '';
@@ -145,12 +146,20 @@ if (isset($payload['items']) && is_array($payload['items'])) {
 }
 if (!isset($payloadObject['settings']) || !is_array($payloadObject['settings'])) $payloadObject['settings'] = [];
 $payloadObject['settings']['max_absen'] = max(0, (int)$maxAbsen);
+$logoOk = false;
+if ($logo !== '') {
+  $low = strtolower($logo);
+  if (strpos($low, 'data:image/') === 0) $logoOk = true;
+  else if (preg_match('/^https?:\/\//i', $logo)) $logoOk = true;
+  else if (strpos($logo, '/') === 0) $logoOk = true;
+}
 $payloadObject['settings']['meta'] = [
   'sekolah' => $sekolah,
   'guru' => $guru,
   'mapel' => $mapel,
   'kelas' => $kelas
 ];
+if ($logoOk) $payloadObject['settings']['meta']['logo'] = $logo;
 $payloadObject['settings']['show_solution'] = $showSolution ? 1 : 0;
 $itemsList = is_array($payloadObject['items'] ?? null) ? $payloadObject['items'] : [];
 $normalizedAnswerKey = [];
@@ -220,12 +229,40 @@ if (is_array($answerKey)) {
     sort($out);
     return $out;
   };
+  $toShortKey = function ($val) {
+    $cands = [];
+    if (is_array($val)) {
+      $cands = $val;
+    } else if (is_string($val)) {
+      if (strpos($val, '|') !== false) $cands = explode('|', $val);
+      else $cands = [$val];
+    } else {
+      $cands = [$val];
+    }
+    $out = [];
+    $seen = [];
+    foreach ($cands as $x) {
+      $t = trim((string)($x ?? ''));
+      if ($t === '') continue;
+      $k = function_exists('mb_strtolower') ? mb_strtolower($t, 'UTF-8') : strtolower($t);
+      if (isset($seen[$k])) continue;
+      $seen[$k] = 1;
+      $out[] = $t;
+    }
+    if (count($out) <= 1) return $out[0] ?? '';
+    return $out;
+  };
   for ($i = 0; $i < $nItems; $i++) {
     $it = $itemsList[$i] ?? null;
     $opts = (is_array($it) && isset($it['options']) && is_array($it['options'])) ? $it['options'] : [];
     $optCount = count($opts);
     $raw = $answerKey[$i] ?? 0;
     $type = is_array($it) ? strtolower(trim((string)($it['type'] ?? ''))) : '';
+    if ($type === 'isian') $type = 'isian_singkat';
+    if ($type === 'isian_singkat') {
+      $normalizedAnswerKey[] = $toShortKey($raw);
+      continue;
+    }
     if ($type === 'benar_salah' && $optCount <= 0) $optCount = 2;
     $isMulti = ($type === 'pg_kompleks') || is_array($raw);
     $normalizedAnswerKey[] = $isMulti ? $toIndexList($raw, $optCount) : $toIndex($raw, $optCount);
@@ -246,9 +283,7 @@ if (!is_string($payloadJson) || $payloadJson === '' || !is_string($answerJson) |
   ]);
   exit;
 }
-if ($expire === '') {
-  $expire = date('Y-m-d H:i:s', time() + (14 * 86400));
-}
+$expire = ($expire === '') ? null : $expire;
 $sql = "INSERT INTO published_quizzes (user_id, slug, mapel, kelas, total_soal, payload_public, answer_key, is_active, expire_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)";
 $stmt = $mysqli->prepare($sql);
 if (!$stmt) {
