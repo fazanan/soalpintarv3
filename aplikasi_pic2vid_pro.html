@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pic2Vid Pro - Generator Video</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#151e2e',
+                            900: '#0f172a',
+                        },
+                        indigo: {
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom Scrollbar for image list */
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+        
+        #previewCanvas {
+            background-color: #000;
+            width: 100%;
+            aspect-ratio: 16/9;
+            object-fit: contain;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans antialiased flex flex-col">
+
+    <!-- Navbar -->
+    <header class="bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-10 shadow-md">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-play text-white text-xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400">
+                    Pic2Vid Pro
+                </h1>
+            </div>
+            <div class="text-sm text-slate-400">
+                <i class="fa-solid fa-cloud-arrow-up mr-2"></i>Berjalan lokal di browser
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow p-6">
+        <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Left Sidebar: Controls & Uploads -->
+            <div class="lg:col-span-4 flex flex-col gap-6">
+                
+                <!-- Settings Panel -->
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-sm">
+                    <h2 class="text-lg font-semibold mb-4 border-b border-slate-700 pb-2"><i class="fa-solid fa-sliders text-indigo-400 mr-2"></i>Pengaturan Slide</h2>
+                    
+                    <div class="mb-5">
+                        <label class="block text-sm font-medium text-slate-300 mb-2">Durasi per Slide (detik)</label>
+                        <div class="flex items-center gap-3">
+                            <input type="range" id="durationSlider" min="1" max="10" value="3" class="w-full accent-indigo-500">
+                            <span id="durationVal" class="bg-slate-700 px-3 py-1 rounded-md text-sm font-mono w-12 text-center">3s</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-5">
+                        <h3 class="text-sm font-medium text-slate-300 mb-3 border-b border-slate-700 pb-1">Pengaturan Audio</h3>
+                        
+                        <!-- Musik Latar (BGM) -->
+                        <div class="mb-4 bg-slate-700/30 p-3 rounded-lg border border-slate-700">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-xs font-semibold text-slate-300">Musik Latar (BGM)</label>
+                                <label for="bgmUpload" class="cursor-pointer text-xs bg-indigo-600 hover:bg-indigo-500 text-white py-1 px-2 rounded transition-colors"><i class="fa-solid fa-upload mr-1"></i>Unggah</label>
+                                <input id="bgmUpload" type="file" class="hidden" accept="audio/*" />
+                            </div>
+                            <div id="bgmInfo" class="hidden flex-col gap-2">
+                                <div class="flex items-center justify-between bg-indigo-500/10 p-2 rounded border border-indigo-500/20 text-xs text-indigo-400">
+                                    <span class="truncate pr-2" id="bgmName">bgm.mp3</span>
+                                    <button id="removeBgmBtn" class="text-slate-400 hover:text-red-400"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-slate-400">
+                                    <i class="fa-solid fa-volume-low"></i>
+                                    <input type="range" id="bgmVolume" min="0" max="100" value="30" class="w-full accent-indigo-500">
+                                    <span id="bgmVolumeVal" class="w-10 text-right">30%</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Voice Over (VO) -->
+                        <div class="bg-slate-700/30 p-3 rounded-lg border border-slate-700">
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-xs font-semibold text-slate-300">Voice Over (VO)</label>
+                                <label for="voUpload" class="cursor-pointer text-xs bg-purple-600 hover:bg-purple-500 text-white py-1 px-2 rounded transition-colors"><i class="fa-solid fa-upload mr-1"></i>Unggah</label>
+                                <input id="voUpload" type="file" class="hidden" accept="audio/*" />
+                            </div>
+                            <div id="voInfo" class="hidden flex-col gap-2">
+                                <div class="flex items-center justify-between bg-purple-500/10 p-2 rounded border border-purple-500/20 text-xs text-purple-400">
+                                    <span class="truncate pr-2" id="voName">vo.mp3</span>
+                                    <button id="removeVoBtn" class="text-slate-400 hover:text-red-400"><i class="fa-solid fa-xmark"></i></button>
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-slate-400">
+                                    <i class="fa-solid fa-volume-high"></i>
+                                    <input type="range" id="voVolume" min="0" max="100" value="100" class="w-full accent-purple-500">
+                                    <span id="voVolumeVal" class="w-10 text-right">100%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Images Panel -->
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-sm flex-grow flex flex-col">
+                    <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-2">
+                        <h2 class="text-lg font-semibold"><i class="fa-solid fa-images text-indigo-400 mr-2"></i>Koleksi Gambar</h2>
+                        <span id="imageCount" class="bg-indigo-500 text-white text-xs font-bold px-2 py-1 rounded-full">0</span>
+                    </div>
+
+                    <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-indigo-500/50 border-dashed rounded-lg cursor-pointer bg-indigo-500/5 hover:bg-indigo-500/10 transition-colors mb-4">
+                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                            <i class="fa-solid fa-cloud-arrow-up text-indigo-400 text-3xl mb-3"></i>
+                            <p class="text-sm text-slate-200"><span class="font-semibold">Klik untuk unggah</span> atau drag and drop</p>
+                            <p class="text-xs text-slate-400 mt-1">PNG, JPG, WEBP</p>
+                        </div>
+                        <input id="imageUpload" type="file" class="hidden" accept="image/*" multiple />
+                    </label>
+
+                    <div id="thumbnailContainer" class="grid grid-cols-3 gap-2 overflow-y-auto custom-scrollbar flex-grow max-h-[300px] content-start">
+                        <!-- Thumbnails will appear here -->
+                        <div class="col-span-3 text-center text-slate-500 text-sm py-8" id="emptyStateMsg">
+                            Belum ada gambar yang diunggah.
+                        </div>
+                    </div>
+                    
+                    <button id="clearImagesBtn" class="mt-4 w-full py-2 bg-slate-700 hover:bg-slate-600 text-sm rounded-lg transition-colors hidden">
+                        <i class="fa-solid fa-trash mr-2"></i>Hapus Semua Gambar
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- Right Area: Preview & Export -->
+            <div class="lg:col-span-8 flex flex-col gap-6">
+                
+                <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-sm">
+                    <h2 class="text-lg font-semibold mb-4 flex justify-between items-center">
+                        <span><i class="fa-solid fa-display text-indigo-400 mr-2"></i>Preview Canvas</span>
+                        <span id="timeIndicator" class="font-mono text-sm bg-slate-900 px-3 py-1 rounded border border-slate-700 text-slate-300">00:00 / 00:00</span>
+                    </h2>
+                    
+                    <div class="relative bg-black rounded-lg overflow-hidden border border-slate-700 mb-6 group">
+                        <!-- 1280x720 is 720p HD. CSS keeps it responsive -->
+                        <canvas id="previewCanvas" width="1280" height="720"></canvas>
+                        
+                        <!-- Video output container (hidden by default) -->
+                        <div id="videoContainer" class="absolute inset-0 z-20 bg-black hidden flex-col">
+                            <video id="resultVideo" controls class="w-full h-full object-contain"></video>
+                            <button id="closeVideoBtn" class="absolute top-4 right-4 bg-slate-800/80 hover:bg-slate-700 text-white p-2 rounded-full backdrop-blur transition-colors">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        <!-- Recording Overlay -->
+                        <div id="recordingOverlay" class="absolute inset-0 bg-black/80 z-30 hidden flex-col items-center justify-center">
+                            <div class="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                            <h3 class="text-xl font-bold text-white mb-2">Merender Video...</h3>
+                            <p class="text-slate-300 text-sm">Mohon tunggu, memproses frame ke <span id="renderFrame">0</span></p>
+                            <div class="w-64 bg-slate-700 h-2 rounded-full mt-4 overflow-hidden">
+                                <div id="renderProgress" class="bg-indigo-500 h-full w-0 transition-all duration-300"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <button id="previewBtn" class="py-3 px-4 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fa-solid fa-play"></i> Play Preview
+                        </button>
+                        <button id="generateBtn" class="py-3 px-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fa-solid fa-clapperboard"></i> Generate Video (MP4/WebM)
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-5 text-sm text-indigo-200 leading-relaxed">
+                    <h3 class="font-semibold text-indigo-300 mb-2"><i class="fa-solid fa-circle-info mr-2"></i>Informasi Ekspor</h3>
+                    <p>Karena aplikasi ini memproses video secara penuh di dalam browser Anda (tanpa server) demi privasi dan kecepatan, hasil akhir akan diunduh dalam format <strong>WebM</strong> (format web modern yang didukung luas) atau <strong>MP4</strong>, bergantung pada dukungan browser Anda. File ini dapat dengan mudah dibagikan atau diputar di pemutar media standar.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal System -->
+    <div id="customModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden flex items-center justify-center opacity-0 transition-opacity duration-300">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 max-w-md w-full shadow-2xl transform scale-95 transition-transform duration-300" id="modalContent">
+            <h3 id="modalTitle" class="text-xl font-bold mb-2">Pemberitahuan</h3>
+            <p id="modalMessage" class="text-slate-300 mb-6 leading-relaxed"></p>
+            <div class="flex justify-end">
+                <button id="closeModalBtn" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors">Mengerti</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State Management
+        const state = {
+            images: [], // Array of Image objects
+            bgmSrc: null,
+            bgmName: '',
+            bgmVolume: 30, // Default BGM volume lower
+            voSrc: null,
+            voName: '',
+            voVolume: 100, // Default VO volume max
+            durationPerSlide: 3,
+            isPlaying: false,
+            isRecording: false,
+            animationFrameId: null,
+            startTime: 0
+        };
+
+        // DOM Elements
+        const canvas = document.getElementById('previewCanvas');
+        const ctx = canvas.getContext('2d');
+        const durationSlider = document.getElementById('durationSlider');
+        const durationVal = document.getElementById('durationVal');
+        const imageUpload = document.getElementById('imageUpload');
+        
+        // Audio UI Elements
+        const bgmUpload = document.getElementById('bgmUpload');
+        const bgmInfo = document.getElementById('bgmInfo');
+        const bgmNameEl = document.getElementById('bgmName');
+        const removeBgmBtn = document.getElementById('removeBgmBtn');
+        const bgmVolume = document.getElementById('bgmVolume');
+        const bgmVolumeVal = document.getElementById('bgmVolumeVal');
+
+        const voUpload = document.getElementById('voUpload');
+        const voInfo = document.getElementById('voInfo');
+        const voNameEl = document.getElementById('voName');
+        const removeVoBtn = document.getElementById('removeVoBtn');
+        const voVolume = document.getElementById('voVolume');
+        const voVolumeVal = document.getElementById('voVolumeVal');
+
+        const thumbnailContainer = document.getElementById('thumbnailContainer');
+        const emptyStateMsg = document.getElementById('emptyStateMsg');
+        const imageCount = document.getElementById('imageCount');
+        const clearImagesBtn = document.getElementById('clearImagesBtn');
+        const audioInfo = document.getElementById('audioInfo');
+        const audioNameEl = document.getElementById('audioName');
+        const removeAudioBtn = document.getElementById('removeAudioBtn');
+        const previewBtn = document.getElementById('previewBtn');
+        const generateBtn = document.getElementById('generateBtn');
+        const timeIndicator = document.getElementById('timeIndicator');
+        const recordingOverlay = document.getElementById('recordingOverlay');
+        const renderProgress = document.getElementById('renderProgress');
+        const renderFrame = document.getElementById('renderFrame');
+        const videoContainer = document.getElementById('videoContainer');
+        const resultVideo = document.getElementById('resultVideo');
+        const closeVideoBtn = document.getElementById('closeVideoBtn');
+        
+        // Modal Elements
+        const customModal = document.getElementById('customModal');
+        const modalContent = document.getElementById('modalContent');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+
+        // Initial Canvas Setup
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#475569';
+        ctx.font = '30px Outfit, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Area Preview Video', canvas.width / 2, canvas.height / 2);
+
+        // --- Utility Functions ---
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function showModal(title, message) {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            customModal.classList.remove('hidden');
+            // Trigger reflow
+            void customModal.offsetWidth;
+            customModal.classList.remove('opacity-0');
+            modalContent.classList.remove('scale-95');
+        }
+
+        function hideModal() {
+            customModal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => {
+                customModal.classList.add('hidden');
+            }, 300);
+        }
+
+        closeModalBtn.addEventListener('click', hideModal);
+
+        function updateUI() {
+            const hasImages = state.images.length > 0;
+            imageCount.textContent = state.images.length;
+            
+            if (hasImages) {
+                emptyStateMsg.style.display = 'none';
+                clearImagesBtn.classList.remove('hidden');
+                previewBtn.disabled = false;
+                generateBtn.disabled = false;
+            } else {
+                emptyStateMsg.style.display = 'block';
+                clearImagesBtn.classList.add('hidden');
+                previewBtn.disabled = true;
+                generateBtn.disabled = true;
+                
+                // Reset canvas
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#475569';
+                ctx.fillText('Area Preview Video', canvas.width / 2, canvas.height / 2);
+                timeIndicator.textContent = "00:00 / 00:00";
+            }
+
+            const totalDuration = state.images.length * state.durationPerSlide;
+            if(!state.isPlaying && !state.isRecording && hasImages) {
+                timeIndicator.textContent = `00:00 / ${formatTime(totalDuration)}`;
+                drawFrame(0); // Draw first frame
+            }
+        }
+
+        // Draw image keeping aspect ratio (Contain)
+        function drawImageContain(img) {
+            const canvasAspect = canvas.width / canvas.height;
+            const imgAspect = img.width / img.height;
+            let drawWidth, drawHeight, startX, startY;
+
+            if (imgAspect > canvasAspect) {
+                drawWidth = canvas.width;
+                drawHeight = canvas.width / imgAspect;
+                startX = 0;
+                startY = (canvas.height - drawHeight) / 2;
+            } else {
+                drawHeight = canvas.height;
+                drawWidth = canvas.height * imgAspect;
+                startY = 0;
+                startX = (canvas.width - drawWidth) / 2;
+            }
+
+            // Clear with black background
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Draw Image
+            ctx.drawImage(img, startX, startY, drawWidth, drawHeight);
+        }
+
+        // --- Event Listeners ---
+
+        durationSlider.addEventListener('input', (e) => {
+            state.durationPerSlide = parseInt(e.target.value);
+            durationVal.textContent = `${state.durationPerSlide}s`;
+            updateUI();
+        });
+
+        imageUpload.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+
+            let loadedCount = 0;
+
+            files.forEach(file => {
+                if (!file.type.startsWith('image/')) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        state.images.push(img);
+                        
+                        // Create Thumbnail UI
+                        const thumbDiv = document.createElement('div');
+                        thumbDiv.className = 'relative group aspect-video bg-slate-700 rounded overflow-hidden border border-slate-600';
+                        thumbDiv.innerHTML = `
+                            <img src="${event.target.result}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity">
+                            <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <span class="text-xs font-bold text-white">${state.images.length}</span>
+                            </div>
+                        `;
+                        thumbnailContainer.insertBefore(thumbDiv, emptyStateMsg);
+
+                        loadedCount++;
+                        if (loadedCount === files.length) {
+                            updateUI();
+                        }
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+            // Reset input
+            e.target.value = '';
+        });
+
+        clearImagesBtn.addEventListener('click', () => {
+            state.images = [];
+            // Remove all children except empty state
+            Array.from(thumbnailContainer.children).forEach(child => {
+                if (child.id !== 'emptyStateMsg') {
+                    child.remove();
+                }
+            });
+            updateUI();
+        });
+
+        // --- Audio Events ---
+        
+        function handleAudioUpload(e, type) {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('audio/')) {
+                showModal('Format Tidak Didukung', 'Harap unggah file audio yang valid (MP3, WAV).');
+                return;
+            }
+
+            const url = URL.createObjectURL(file);
+            
+            if (type === 'bgm') {
+                if (state.bgmSrc) URL.revokeObjectURL(state.bgmSrc);
+                state.bgmSrc = url;
+                state.bgmName = file.name;
+                bgmNameEl.textContent = state.bgmName;
+                bgmInfo.classList.remove('hidden');
+                bgmInfo.classList.add('flex');
+            } else {
+                if (state.voSrc) URL.revokeObjectURL(state.voSrc);
+                state.voSrc = url;
+                state.voName = file.name;
+                voNameEl.textContent = state.voName;
+                voInfo.classList.remove('hidden');
+                voInfo.classList.add('flex');
+            }
+            e.target.value = ''; // reset
+        }
+
+        bgmUpload.addEventListener('change', (e) => handleAudioUpload(e, 'bgm'));
+        voUpload.addEventListener('change', (e) => handleAudioUpload(e, 'vo'));
+
+        removeBgmBtn.addEventListener('click', () => {
+            if (state.bgmSrc) URL.revokeObjectURL(state.bgmSrc);
+            state.bgmSrc = null;
+            state.bgmName = '';
+            bgmInfo.classList.add('hidden');
+            bgmInfo.classList.remove('flex');
+        });
+
+        removeVoBtn.addEventListener('click', () => {
+            if (state.voSrc) URL.revokeObjectURL(state.voSrc);
+            state.voSrc = null;
+            state.voName = '';
+            voInfo.classList.add('hidden');
+            voInfo.classList.remove('flex');
+        });
+
+        bgmVolume.addEventListener('input', (e) => {
+            state.bgmVolume = parseInt(e.target.value);
+            bgmVolumeVal.textContent = `${state.bgmVolume}%`;
+            // Update live preview if playing
+            if (previewBgmPlayer) previewBgmPlayer.volume = state.bgmVolume / 100;
+        });
+
+        voVolume.addEventListener('input', (e) => {
+            state.voVolume = parseInt(e.target.value);
+            voVolumeVal.textContent = `${state.voVolume}%`;
+            // Update live preview if playing
+            if (previewVoPlayer) previewVoPlayer.volume = state.voVolume / 100;
+        });
+
+        // --- Core Logic: Playback & Rendering ---
+
+        function drawFrame(elapsedTime) {
+            if (state.images.length === 0) return;
+            
+            const totalDurationSeconds = state.images.length * state.durationPerSlide;
+            const currentSeconds = elapsedTime / 1000;
+            
+            if (currentSeconds >= totalDurationSeconds) {
+                return false; // End of slideshow
+            }
+
+            const currentIndex = Math.floor(currentSeconds / state.durationPerSlide);
+            if (state.images[currentIndex]) {
+                drawImageContain(state.images[currentIndex]);
+            }
+            return true;
+        }
+
+        let previewBgmPlayer = null;
+        let previewVoPlayer = null;
+
+        function stopPreview() {
+            state.isPlaying = false;
+            cancelAnimationFrame(state.animationFrameId);
+            if (previewBgmPlayer) {
+                previewBgmPlayer.pause();
+                previewBgmPlayer.currentTime = 0;
+            }
+            if (previewVoPlayer) {
+                previewVoPlayer.pause();
+                previewVoPlayer.currentTime = 0;
+            }
+            previewBtn.innerHTML = '<i class="fa-solid fa-play"></i> Play Preview';
+            previewBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+            previewBtn.classList.add('bg-slate-700', 'hover:bg-slate-600');
+            updateUI(); // Resets timer display
+        }
+
+        previewBtn.addEventListener('click', () => {
+            if (state.images.length === 0) return;
+
+            if (state.isPlaying) {
+                stopPreview();
+                return;
+            }
+
+            // Start Playback
+            state.isPlaying = true;
+            previewBtn.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Preview';
+            previewBtn.classList.remove('bg-slate-700', 'hover:bg-slate-600');
+            previewBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+
+            if (state.bgmSrc) {
+                previewBgmPlayer = new Audio(state.bgmSrc);
+                previewBgmPlayer.volume = state.bgmVolume / 100;
+                previewBgmPlayer.play().catch(e => console.log("BGM play error:", e));
+            }
+            if (state.voSrc) {
+                previewVoPlayer = new Audio(state.voSrc);
+                previewVoPlayer.volume = state.voVolume / 100;
+                previewVoPlayer.play().catch(e => console.log("VO play error:", e));
+            }
+
+            state.startTime = performance.now();
+            const totalDuration = state.images.length * state.durationPerSlide;
+
+            function animate(currentTime) {
+                if (!state.isPlaying) return;
+
+                const elapsed = currentTime - state.startTime;
+                const isOngoing = drawFrame(elapsed);
+
+                // Update UI Time
+                const currentSec = Math.min(elapsed / 1000, totalDuration);
+                timeIndicator.textContent = `${formatTime(currentSec)} / ${formatTime(totalDuration)}`;
+
+                if (isOngoing) {
+                    state.animationFrameId = requestAnimationFrame(animate);
+                } else {
+                    stopPreview();
+                }
+            }
+
+            state.animationFrameId = requestAnimationFrame(animate);
+        });
+
+        // --- Core Logic: Export to Video ---
+
+        generateBtn.addEventListener('click', () => {
+            if (state.images.length === 0) return;
+            if (state.isPlaying) stopPreview();
+
+            startRecording();
+        });
+
+        closeVideoBtn.addEventListener('click', () => {
+            resultVideo.pause();
+            videoContainer.classList.add('hidden');
+            videoContainer.classList.remove('flex');
+        });
+
+        function startRecording() {
+            state.isRecording = true;
+            generateBtn.disabled = true;
+            previewBtn.disabled = true;
+            
+            // Show recording UI
+            recordingOverlay.classList.remove('hidden');
+            recordingOverlay.classList.add('flex');
+            renderProgress.style.width = '0%';
+            
+            const fps = 30;
+            // Capture canvas stream
+            const stream = canvas.captureStream(fps);
+            let bgmRecorderAudio = null;
+            let voRecorderAudio = null;
+
+            // Handle Audio Merging using Web Audio API
+            if (state.bgmSrc || state.voSrc) {
+                // Cross-browser AudioContext
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const audioCtx = new AudioContext();
+                const dest = audioCtx.createMediaStreamDestination();
+                
+                if (state.bgmSrc) {
+                    bgmRecorderAudio = new Audio(state.bgmSrc);
+                    const bgmSource = audioCtx.createMediaElementSource(bgmRecorderAudio);
+                    const bgmGain = audioCtx.createGain();
+                    bgmGain.gain.value = state.bgmVolume / 100;
+                    bgmSource.connect(bgmGain);
+                    bgmGain.connect(dest);
+                    bgmRecorderAudio.play().catch(e => console.error("Rec BGM err:", e));
+                }
+
+                if (state.voSrc) {
+                    voRecorderAudio = new Audio(state.voSrc);
+                    const voSource = audioCtx.createMediaElementSource(voRecorderAudio);
+                    const voGain = audioCtx.createGain();
+                    voGain.gain.value = state.voVolume / 100;
+                    voSource.connect(voGain);
+                    voGain.connect(dest);
+                    voRecorderAudio.play().catch(e => console.error("Rec VO err:", e));
+                }
+                
+                // Merge mixed audio track into canvas stream
+                const audioTrack = dest.stream.getAudioTracks()[0];
+                if (audioTrack) {
+                    stream.addTrack(audioTrack);
+                }
+            }
+
+            // Setup MediaRecorder
+            let chunks = [];
+            // Prefer MP4 if available (Safari), otherwise fallback to WebM (Chrome/Firefox)
+            let mimeType = 'video/webm; codecs=vp9,opus';
+            
+            if (!MediaRecorder.isTypeSupported(mimeType)) {
+                if (MediaRecorder.isTypeSupported('video/mp4')) {
+                    mimeType = 'video/mp4';
+                } else {
+                    mimeType = 'video/webm'; // Baseline fallback
+                }
+            }
+
+            const mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
+
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) {
+                    chunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                state.isRecording = false;
+                generateBtn.disabled = false;
+                previewBtn.disabled = false;
+                recordingOverlay.classList.add('hidden');
+                recordingOverlay.classList.remove('flex');
+
+                if (bgmRecorderAudio) bgmRecorderAudio.pause();
+                if (voRecorderAudio) voRecorderAudio.pause();
+
+                // Create final video file
+                const blob = new Blob(chunks, { type: mimeType });
+                chunks = []; // clear
+                const videoUrl = URL.createObjectURL(blob);
+                
+                // Determine extension based on mimeType
+                const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
+                
+                // Set to preview player
+                resultVideo.src = videoUrl;
+                videoContainer.classList.remove('hidden');
+                videoContainer.classList.add('flex');
+                
+                // Trigger auto download
+                const a = document.createElement('a');
+                a.href = videoUrl;
+                a.download = `pic2vid_export_${Date.now()}.${extension}`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                updateUI();
+                showModal('Video Selesai!', `Video Anda telah berhasil dirender dan diunduh otomatis dalam format .${extension}. Anda juga dapat memutarnya di jendela preview.`);
+            };
+
+            // Start Recording Loop
+            mediaRecorder.start();
+            state.startTime = performance.now();
+            const totalDuration = state.images.length * state.durationPerSlide;
+
+            function renderLoop(currentTime) {
+                if (!state.isRecording) return;
+
+                const elapsed = currentTime - state.startTime;
+                const isOngoing = drawFrame(elapsed);
+
+                // Update Progress UI
+                const currentSec = Math.min(elapsed / 1000, totalDuration);
+                const progressPct = (currentSec / totalDuration) * 100;
+                renderProgress.style.width = `${progressPct}%`;
+                
+                // Calculate frames processed (approximate visual)
+                renderFrame.textContent = Math.floor(currentSec * fps);
+
+                if (isOngoing) {
+                    requestAnimationFrame(renderLoop);
+                } else {
+                    mediaRecorder.stop();
+                    // Let the onstop handler clean up
+                }
+            }
+
+            requestAnimationFrame(renderLoop);
+        }
+
+    </script>
+</body>
+</html>

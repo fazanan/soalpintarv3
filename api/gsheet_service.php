@@ -27,6 +27,8 @@ function gsheet_write_json_file(string $path, array $data): bool {
 }
 
 function gsheet_http_json(string $method, string $url, array $headers = [], ?array $body = null): array {
+  if (function_exists('set_time_limit')) { @set_time_limit(60); }
+  if (function_exists('ini_set')) { @ini_set('max_execution_time', '60'); }
   $ch = curl_init($url);
   $outHeaders = array_values(array_filter($headers, fn($h) => is_string($h) && $h !== ''));
   if ($body !== null) {
@@ -38,8 +40,9 @@ function gsheet_http_json(string $method, string $url, array $headers = [], ?arr
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
   curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
   curl_setopt($ch, CURLOPT_HTTPHEADER, $outHeaders);
-  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-  curl_setopt($ch, CURLOPT_TIMEOUT, 25);
+  curl_setopt($ch, CURLOPT_NOSIGNAL, true);
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
+  curl_setopt($ch, CURLOPT_TIMEOUT, 20);
   $resp = curl_exec($ch);
   $errno = curl_errno($ch);
   $err = curl_error($ch);
@@ -63,13 +66,16 @@ function gsheet_http_json(string $method, string $url, array $headers = [], ?arr
 }
 
 function gsheet_http_form(string $url, array $data): array {
+  if (function_exists('set_time_limit')) { @set_time_limit(60); }
+  if (function_exists('ini_set')) { @ini_set('max_execution_time', '60'); }
   $ch = curl_init($url);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
   curl_setopt($ch, CURLOPT_POST, true);
   curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded; charset=utf-8']);
   curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
-  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-  curl_setopt($ch, CURLOPT_TIMEOUT, 25);
+  curl_setopt($ch, CURLOPT_NOSIGNAL, true);
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 8);
+  curl_setopt($ch, CURLOPT_TIMEOUT, 20);
   $resp = curl_exec($ch);
   $errno = curl_errno($ch);
   $err = curl_error($ch);

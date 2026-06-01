@@ -90,6 +90,8 @@ $guru = isset($data['guru']) ? trim((string)$data['guru']) : '';
 $logo = isset($data['logo']) ? trim((string)$data['logo']) : '';
 $payload = $data['payload_public'] ?? null;
 $answerKey = $data['answer_key'] ?? null;
+$pointsByType = $data['points_by_type'] ?? null;
+$pointsMode = isset($data['points_mode']) ? trim((string)$data['points_mode']) : '';
 $expire = isset($data['expire_at']) ? trim((string)$data['expire_at']) : '';
 // Normalisasi format expire ke 'YYYY-MM-DD HH:MM:SS'
 if ($expire !== '') {
@@ -112,6 +114,10 @@ if (is_string($payload)) {
 if (is_string($answerKey)) {
   $tmp = json_decode($answerKey, true);
   if (is_array($tmp)) $answerKey = $tmp;
+}
+if (is_string($pointsByType)) {
+  $tmp = json_decode($pointsByType, true);
+  if (is_array($tmp)) $pointsByType = $tmp;
 }
 $missing = [];
 if ($slug === '') $missing[] = 'slug';
@@ -161,7 +167,48 @@ $payloadObject['settings']['meta'] = [
 ];
 if ($logoOk) $payloadObject['settings']['meta']['logo'] = $logo;
 $payloadObject['settings']['show_solution'] = $showSolution ? 1 : 0;
+$pm = strtolower(trim($pointsMode));
+if ($pm !== 'per_type_total' && $pm !== 'per_question') $pm = 'per_type_total';
+$payloadObject['settings']['points_mode'] = $pm;
+$normPoints = [
+  'pg' => 1,
+  'benar_salah' => 1,
+  'pg_kompleks' => 1,
+  'menjodohkan' => 1,
+  'isian_singkat' => 1,
+  'uraian' => 1,
+];
+if (is_array($pointsByType)) {
+  foreach ($normPoints as $k => $_v) {
+    if (!array_key_exists($k, $pointsByType)) continue;
+    $n = (int)($pointsByType[$k] ?? 1);
+    if ($n < 0) $n = 0;
+    if ($n > 100) $n = 100;
+    $normPoints[$k] = $n;
+  }
+}
+$payloadObject['settings']['points_by_type'] = $normPoints;
 $itemsList = is_array($payloadObject['items'] ?? null) ? $payloadObject['items'] : [];
+$typeCounts = [];
+foreach ($itemsList as $it) {
+  $t = is_array($it) ? strtolower(trim((string)($it['type'] ?? ''))) : '';
+  if ($t === 'isian') $t = 'isian_singkat';
+  if ($t === '') $t = 'pg';
+  if (!array_key_exists($t, $normPoints)) continue;
+  $typeCounts[$t] = (int)($typeCounts[$t] ?? 0) + 1;
+}
+if ($pm === 'per_type_total') {
+  $sum = 0;
+  foreach ($typeCounts as $t => $cnt) {
+    if ((int)$cnt <= 0) continue;
+    $sum += (int)($normPoints[$t] ?? 0);
+  }
+  if ($sum !== 100) {
+    http_response_code(400);
+    echo json_encode(['ok'=>false,'error'=>'points_sum_mismatch','sum'=>$sum,'expected'=>100,'points'=>$normPoints], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
+}
 $normalizedAnswerKey = [];
 if (is_array($answerKey)) {
   $nItems = count($itemsList);
@@ -263,6 +310,46 @@ if (is_array($answerKey)) {
       $normalizedAnswerKey[] = $toShortKey($raw);
       continue;
     }
+    if ($type === 'uraian') {
+      $normalizedAnswerKey[] = '';
+      continue;
+    }
+    if ($type === 'menjodohkan') {
+      $right = [];
+      if (is_array($it)) {
+        if (isset($it['right_options']) && is_array($it['right_options'])) $right = $it['right_options'];
+        else if (isset($it['rightOptions']) && is_array($it['rightOptions'])) $right = $it['rightOptions'];
+        else if (isset($it['answer']) && is_array($it['answer'])) $right = $it['answer'];
+      }
+      $rightCount = count($right);
+      $n = min(count($opts), $rightCount);
+      if ($n < 2) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'invalid_menjodohkan', 'index' => $i], JSON_UNESCAPED_UNICODE);
+        exit;
+      }
+      $cands = [];
+      if (is_array($raw)) {
+        $cands = $raw;
+      } else if (is_string($raw)) {
+        $s = trim($raw);
+        if ($s !== '') {
+          $parts = preg_split('/[,\s;\/\|]+/', $s, -1, PREG_SPLIT_NO_EMPTY);
+          $cands = is_array($parts) ? $parts : [];
+        }
+      } else {
+        $cands = [$raw];
+      }
+      $out = [];
+      foreach ($cands as $x) $out[] = $toIndex($x, $rightCount);
+      if (count($out) !== $n) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'error' => 'menjodohkan_key_length_mismatch', 'index' => $i, 'expected' => $n, 'got' => count($out)], JSON_UNESCAPED_UNICODE);
+        exit;
+      }
+      $normalizedAnswerKey[] = $out;
+      continue;
+    }
     if ($type === 'benar_salah' && $optCount <= 0) $optCount = 2;
     $isMulti = ($type === 'pg_kompleks') || is_array($raw);
     $normalizedAnswerKey[] = $isMulti ? $toIndexList($raw, $optCount) : $toIndex($raw, $optCount);
@@ -272,7 +359,14 @@ $payloadObject['settings']['answer_key'] = $normalizedAnswerKey;
 $jsonFlags = JSON_UNESCAPED_UNICODE | (defined('JSON_INVALID_UTF8_SUBSTITUTE') ? JSON_INVALID_UTF8_SUBSTITUTE : 0);
 $payloadJson = json_encode($payloadObject, $jsonFlags);
 $answerJson = json_encode($normalizedAnswerKey, $jsonFlags);
-$total = is_array($payloadObject['items'] ?? null) ? count($payloadObject['items']) : 0;
+$total = 0;
+for ($i = 0; $i < $nItems; $i++) {
+  $it = $itemsList[$i] ?? null;
+  $type = is_array($it) ? strtolower(trim((string)($it['type'] ?? ''))) : '';
+  if ($type === 'isian') $type = 'isian_singkat';
+  if ($type === 'uraian') continue;
+  $total++;
+}
 if (!is_string($payloadJson) || $payloadJson === '' || !is_string($answerJson) || $answerJson === '') {
   http_response_code(500);
   echo json_encode(['ok'=>false,'error'=>'encode_fail'], JSON_UNESCAPED_UNICODE);

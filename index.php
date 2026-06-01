@@ -201,6 +201,20 @@ foreach ($__gsheetServiceAccountCandidates as $__gsheetServiceAccountPath) {
   $__gsheetServiceEmail = trim((string)($jSa['client_email'] ?? ''));
   if ($__gsheetServiceEmail !== '') break;
 }
+$__bgmPresetList = [];
+$__bgmDir = __DIR__ . '/storage/music';
+if (is_dir($__bgmDir)) {
+  $files = glob($__bgmDir . '/*.{mp3,MP3,wav,WAV,m4a,M4A,ogg,OGG}', GLOB_BRACE);
+  if (is_array($files)) {
+    foreach ($files as $p) {
+      $base = basename((string)$p);
+      if ($base === '') continue;
+      $label = pathinfo($base, PATHINFO_FILENAME);
+      $url = 'storage/music/' . rawurlencode($base);
+      $__bgmPresetList[] = ['label' => (string)$label, 'url' => (string)$url];
+    }
+  }
+}
 session_write_close();
 ?>
 <!DOCTYPE html>
@@ -567,6 +581,9 @@ session_write_close();
     <input id="topikPdfUpload" type="file" accept="application/pdf" class="hidden" />
     <input id="bahanAjarModulPdfUpload" type="file" accept="application/pdf" class="hidden" />
     <input id="bahanAjarImagesUpload" type="file" accept="image/*" multiple class="hidden" />
+    <input id="bahanAjarInteraktifImagesUpload" type="file" accept="image/*" multiple class="hidden" />
+    <input id="bahanAjarInteraktifBgmUpload" type="file" accept="audio/*" class="hidden" />
+    <input id="bahanAjarInteraktifVoUpload" type="file" accept="audio/*" class="hidden" />
     <input id="lkpdInteraktifModulPdfUpload" type="file" accept="application/pdf" class="hidden" />
     <input id="lkpdInteraktifImagesUpload" type="file" accept="image/*" multiple class="hidden" />
     <input id="rosterPicker" type="file" accept=".csv,.txt" class="hidden" />
@@ -595,6 +612,7 @@ session_write_close();
       const GSHEET_SERVICE_EMAIL = <?php echo json_encode((string)($__gsheetServiceEmail ?? ''), JSON_UNESCAPED_UNICODE); ?>;
       const LOGIN_NAME = <?php echo json_encode(trim((string)(($_SESSION['nama'] ?? '') !== '' ? $_SESSION['nama'] : ($_SESSION['username'] ?? ''))), JSON_UNESCAPED_UNICODE); ?>;
       const IS_DEMO_USER = <?php echo (trim(strtolower((string)($_SESSION['username'] ?? ''))) === 'coba@gmail.com') ? 'true' : 'false'; ?>;
+      const BAI_BGM_PRESETS = <?php echo json_encode($__bgmPresetList, JSON_UNESCAPED_UNICODE); ?>;
 
       const APP_KEY = "soalpintar:v1";
       const OPENAI_TIMEOUT_MS = 55000;
@@ -837,7 +855,9 @@ session_write_close();
         modulAjarTab: "informasi",
         rppTab: "informasi",
         bahanAjarTab: "info",
+        bahanAjarAdvancedOpen: false,
         lkpdInteraktifTab: "info",
+        lkpdInteraktifAdvancedOpen: false,
         soalError: null,
         modulAjarError: null,
         _isGenerating: false,
@@ -863,6 +883,7 @@ session_write_close();
           fase: "",
           kelas: "",
           mataPelajaran: "",
+          bahasa: "Bahasa Indonesia",
           topikUtama: "",
           subtopikSpesifik: "",
           modePembuatan: "cepat",
@@ -872,6 +893,11 @@ session_write_close();
           namaSekolah: "",
           generatedPrompt: "",
         },
+        bahanAjarInteraktif: {
+          defaultImageDuration: 3,
+          bgmVolume: 30,
+          voVolume: 100,
+        },
         lkpdInteraktif: {
           sumber: "modul_ajar",
           jenjang: "",
@@ -879,6 +905,7 @@ session_write_close();
           fase: "",
           kelas: "",
           mataPelajaran: "",
+          bahasa: "Bahasa Indonesia",
           topikUtama: "",
           subtopikSpesifik: "",
           modePembuatan: "cepat",
@@ -1482,6 +1509,13 @@ session_write_close();
           state.quizShareTab = saved.quizShareTab || "buat_link";
           state.quizShowPreview = saved.quizShowPreview || false;
           state.activeView = "quiz";
+
+          try {
+            state.quizPublishForm._pointsAuto = true;
+            delete state.quizPublishForm.pointsByType;
+            delete state.quizPublishForm._pointsSig;
+          } catch {}
+          try { applyQuizPublishDefaultsForMapel(); } catch {}
 
           state.quizPaketId = Number(paketId);
           state.quizPaketSnapshot = {
@@ -4944,7 +4978,7 @@ session_write_close();
         const isKesetaraan = String(B.jenjang || "").trim() === "Kesetaraan";
         const faseOpts = MA_FASE_MAP[jenjangEfektif] || [];
         const tabRaw = String(state.bahanAjarTab || "").trim();
-        const tab = (tabRaw === "info" || tabRaw === "gabung") ? tabRaw : "info";
+        const tab = (tabRaw === "info" || tabRaw === "gabung" || tabRaw === "interaktif") ? tabRaw : "info";
         const gabung = state.bahanAjarGabung || {};
         const pdfName = String(gabung.modulPdfName || "").trim();
         const imageNames = Array.isArray(gabung.imageNames) ? gabung.imageNames : [];
@@ -4954,6 +4988,7 @@ session_write_close();
               ${[
                 { id: "info", label: "1. Informasi Bahan Ajar" },
                 { id: "gabung", label: "2. Gabungkan ke Modul Ajar" },
+                { id: "interaktif", label: "3. Bahan Ajar Interaktif" },
               ].map(t => {
                 const active = tab === t.id;
                 return `<button class="${active ? 'bg-primary text-white' : 'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setBahanAjarTab('${t.id}')">${t.label}</button>`;
@@ -4978,27 +5013,45 @@ session_write_close();
                 Ambil
               </button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div class="flex flex-col gap-2">
-                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
-                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="bahanAjar.jenjang">
-                  <option value="">Pilih...</option>
-                  ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(B.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
-                </select>
-                <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
-                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
-                  <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="bahanAjar.kesetaraanPaket">
-                    <option value="">Pilih Paket...</option>
-                    ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(B.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
-                  </select>
+            <details class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5" ${state.bahanAjarAdvancedOpen ? 'open' : ''} ontoggle="window.__sp.setBahanAjarAdvancedOpen(this.open)">
+              <summary class="cursor-pointer select-none font-bold text-sm">Pengaturan Sekolah & Tampilan</summary>
+              <div class="mt-4 space-y-5">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div class="flex flex-col gap-2">
+                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
+                    <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="bahanAjar.jenjang">
+                      <option value="">Pilih...</option>
+                      ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(B.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                    </select>
+                    <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
+                      <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
+                      <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="bahanAjar.kesetaraanPaket">
+                        <option value="">Pilih Paket...</option>
+                        ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(B.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                      </select>
+                    </div>
+                  </div>
+                  ${selectField("Fase", "bahanAjar.fase", B.fase, faseOpts)}
+                  ${selectField("Kelas", "bahanAjar.kelas", B.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  ${inputText("Nama Sekolah", "bahanAjar.namaSekolah", B.namaSekolah, "Contoh: SMA Negeri 1 Bandung")}
+                  ${inputText("Username Instagram/TikTok untuk watermark", "bahanAjar.usernameWatermark", B.usernameWatermark, "Contoh: @gurusains.id")}
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div class="flex flex-col gap-2">
+                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Format rasio</label>
+                    <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm" data-path="bahanAjar.formatRasio">
+                      <option value="story_9_16"${String(B.formatRasio||'')==='story_9_16'?' selected':''}>Story 9:16</option>
+                      <option value="portrait_4_5"${String(B.formatRasio||'')==='portrait_4_5'?' selected':''}>Portrait 4:5</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              ${selectField("Fase", "bahanAjar.fase", B.fase, faseOpts)}
-              ${selectField("Kelas", "bahanAjar.kelas", B.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
-            </div>
+            </details>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
               ${selectField("Mata Pelajaran", "bahanAjar.mataPelajaran", B.mataPelajaran, SUBJECT_OPTIONS[jenjangEfektif] || [])}
-              ${inputText("Nama Sekolah", "bahanAjar.namaSekolah", B.namaSekolah, "Contoh: SMA Negeri 1 Bandung")}
+              ${selectField("Bahasa", "bahanAjar.bahasa", B.bahasa, ["Bahasa Indonesia","Bahasa Inggris","Bilingual","Bahasa Arab"])}
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
               ${inputText("Topik utama", "bahanAjar.topikUtama", B.topikUtama, "Contoh: Sistem Pencernaan")}
@@ -5020,16 +5073,6 @@ session_write_close();
                 </select>
               </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div class="flex flex-col gap-2">
-                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Format rasio</label>
-                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm" data-path="bahanAjar.formatRasio">
-                  <option value="story_9_16"${String(B.formatRasio||'')==='story_9_16'?' selected':''}>Story 9:16</option>
-                  <option value="portrait_4_5"${String(B.formatRasio||'')==='portrait_4_5'?' selected':''}>Portrait 4:5</option>
-                </select>
-              </div>
-              ${inputText("Username Instagram/TikTok untuk watermark", "bahanAjar.usernameWatermark", B.usernameWatermark, "Contoh: @gurusains.id")}
-            </div>
             <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5 space-y-3">
               <div class="flex items-center justify-between gap-3">
                 <div>
@@ -5044,7 +5087,12 @@ session_write_close();
                   <button class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold"
                     onclick="window.open('https://chatgpt.com/g/g-6a12a09069248191a7d76d45beb44c50-komik-pembelajaran-by-gurupintar','_blank','noopener')">
                     <span class="material-symbols-outlined text-[18px]">smart_toy</span>
-                    Buat Bahan Ajar
+                    Buat Bahan Ajar Komik
+                  </button>
+                  <button class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold"
+                    onclick="window.open('https://chatgpt.com/g/g-6a1c0d8225388191bb1496c9b2bcafb5-eduslide-ppt-by-gurupintar/c/6a1c490c-f8d0-83ec-8df3-578b44758426','_blank','noopener')">
+                    <span class="material-symbols-outlined text-[18px]">slideshow</span>
+                    Buat Bahan Ajar Formal (ppt)
                   </button>
                 </div>
               </div>
@@ -5145,11 +5193,117 @@ session_write_close();
             </div>
           </div>
         `;
+        const interaktifHtml = `
+          <div class="p-6 space-y-6">
+            <div>
+              <div class="text-xl font-bold">Bahan Ajar Interaktif</div>
+              <div class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">Buat video bahan ajar dari kumpulan gambar langsung di aplikasi.</div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="space-y-6">
+                <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5 space-y-4">
+                  <div class="text-sm font-bold">Pengaturan Audio</div>
+                  <div class="rounded-xl border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/30 p-4 space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="text-sm font-semibold">Musik Latar (BGM)</div>
+                      <button class="h-9 px-3 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold"
+                        onclick="window.__sp.pickBahanAjarInteraktifBgm()">
+                        Upload
+                      </button>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                      <div class="text-xs font-semibold text-text-sub-light dark:text-text-sub-dark">Pilih musik bawaan</div>
+                      <select id="baiBgmPreset" class="w-full rounded-lg border-border-light dark:border-border-dark bg-white dark:bg-surface-dark focus:border-primary focus:ring-primary h-10 px-3 text-sm"
+                        onchange="window.__sp.setBahanAjarInteraktifBgmPreset(this.value)">
+                        <option value="">Tidak pakai musik</option>
+                        ${(Array.isArray(BAI_BGM_PRESETS) ? BAI_BGM_PRESETS : []).map(o => `<option value="${safeAttr(String(o?.url || ''))}">${safeText(String(o?.label || o?.url || ''))}</option>`).join("")}
+                      </select>
+                    </div>
+                    <div id="baiBgmInfo" class="hidden flex-col gap-2">
+                      <div class="flex items-center justify-between gap-3 rounded-lg border bg-white dark:bg-surface-dark px-3 py-2">
+                        <div id="baiBgmName" class="text-sm font-semibold truncate"></div>
+                        <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark"
+                          onclick="window.__sp.clearBahanAjarInteraktifBgm()">&times;</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="rounded-xl border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/30 p-4 space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <div class="text-sm font-semibold">Voice Over (VO)</div>
+                      <button class="h-9 px-3 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold"
+                        onclick="window.__sp.pickBahanAjarInteraktifVo()">
+                        Upload
+                      </button>
+                    </div>
+                    <div id="baiVoInfo" class="hidden flex-col gap-2">
+                      <div class="flex items-center justify-between gap-3 rounded-lg border bg-white dark:bg-surface-dark px-3 py-2">
+                        <div id="baiVoName" class="text-sm font-semibold truncate"></div>
+                        <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark"
+                          onclick="window.__sp.clearBahanAjarInteraktifVo()">&times;</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5 space-y-4">
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="text-sm font-bold">Koleksi Gambar</div>
+                    <div class="flex items-center gap-2">
+                      <button class="h-8 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-xs font-bold"
+                        onclick="window.__sp.sortBahanAjarInteraktifImages('asc')">Sort A–Z</button>
+                      <button class="h-8 px-3 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-xs font-bold"
+                        onclick="window.__sp.sortBahanAjarInteraktifImages('desc')">Sort Z–A</button>
+                      <div id="baiImageCount" class="text-xs font-extrabold px-2 py-1 rounded-full bg-primary/10 text-primary">0</div>
+                    </div>
+                  </div>
+                  <button class="w-full h-12 rounded-xl border border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 text-sm font-bold"
+                    onclick="window.__sp.pickBahanAjarInteraktifImages()">
+                    Upload Gambar
+                  </button>
+                  <div id="baiImageList" class="space-y-2 max-h-[300px] overflow-y-auto">
+                    <div id="baiEmpty" class="text-center text-text-sub-light dark:text-text-sub-dark text-sm py-8">Belum ada gambar.</div>
+                  </div>
+                  <button id="baiClearImages" class="hidden w-full h-10 rounded-lg border bg-white dark:bg-surface-dark hover:bg-background-light dark:hover:bg-background-dark text-sm font-bold"
+                    onclick="window.__sp.clearBahanAjarInteraktifImages()">
+                    Hapus Semua Gambar
+                  </button>
+                </div>
+              </div>
+              <div class="space-y-4">
+                <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-4">
+                  <div class="flex items-center justify-between gap-3 mb-3">
+                    <div class="text-sm font-bold">Preview</div>
+                    <div id="baiTime" class="text-xs font-bold px-3 py-1 rounded-lg border bg-white dark:bg-surface-dark">00:00 / 00:00</div>
+                  </div>
+                  <div class="mx-auto w-full max-w-[180px]">
+                    <div id="baiCanvasWrap" class="relative rounded-xl overflow-hidden border border-border-light dark:border-border-dark bg-black" style="aspect-ratio: 9 / 16;">
+                      <canvas id="baiCanvas" width="720" height="1280" class="absolute inset-0 w-full h-full"></canvas>
+                    <div id="baiVideoContainer" class="absolute inset-0 hidden bg-black">
+                      <video id="baiResultVideo" controls class="w-full h-full object-contain"></video>
+                      <button class="absolute top-3 right-3 size-10 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                        onclick="window.__sp.closeBahanAjarInteraktifVideo()">&times;</button>
+                    </div>
+                    <div id="baiRecordingOverlay" class="absolute inset-0 hidden bg-black/70 flex-col items-center justify-center text-white">
+                      <div class="size-12 rounded-full border-4 border-white/80 border-t-transparent animate-spin"></div>
+                      <div id="baiOverlayTitle" class="mt-4 font-bold">Membuat Video....</div>
+                    </div>
+                    </div>
+                  </div>
+                  <div class="mt-4">
+                    <button id="baiGenerateBtn" class="w-full h-10 rounded-xl bg-primary hover:bg-blue-600 text-white text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                      onclick="window.__sp.generateBahanAjarInteraktifVideo()">
+                      Buat Video
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
         return `
           <div class="space-y-6">
             ${desktopTabs}
             <div class="bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm overflow-hidden">
-              ${tab === "gabung" ? gabungHtml : infoHtml}
+              ${tab === "gabung" ? gabungHtml : (tab === "interaktif" ? interaktifHtml : infoHtml)}
             </div>
           </div>
         `;
@@ -5197,27 +5351,45 @@ session_write_close();
                 Ambil
               </button>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div class="flex flex-col gap-2">
-                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
-                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="lkpdInteraktif.jenjang">
-                  <option value="">Pilih...</option>
-                  ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(X.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
-                </select>
-                <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
-                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
-                  <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="lkpdInteraktif.kesetaraanPaket">
-                    <option value="">Pilih Paket...</option>
-                    ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(X.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
-                  </select>
+            <details class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5" ${state.lkpdInteraktifAdvancedOpen ? 'open' : ''} ontoggle="window.__sp.setLkpdInteraktifAdvancedOpen(this.open)">
+              <summary class="cursor-pointer select-none font-bold text-sm">Pengaturan Sekolah & Tampilan</summary>
+              <div class="mt-4 space-y-5">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div class="flex flex-col gap-2">
+                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
+                    <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="lkpdInteraktif.jenjang">
+                      <option value="">Pilih...</option>
+                      ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(X.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                    </select>
+                    <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
+                      <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
+                      <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="lkpdInteraktif.kesetaraanPaket">
+                        <option value="">Pilih Paket...</option>
+                        ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(X.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                      </select>
+                    </div>
+                  </div>
+                  ${selectField("Fase", "lkpdInteraktif.fase", X.fase, faseOpts)}
+                  ${selectField("Kelas", "lkpdInteraktif.kelas", X.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  ${inputText("Nama Sekolah", "lkpdInteraktif.namaSekolah", X.namaSekolah, "Contoh: SMA Negeri 1 Bandung")}
+                  ${inputText("Username Instagram/TikTok untuk watermark", "lkpdInteraktif.usernameWatermark", X.usernameWatermark, "Contoh: @gurusains.id")}
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div class="flex flex-col gap-2">
+                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Format rasio</label>
+                    <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm" data-path="lkpdInteraktif.formatRasio">
+                      <option value="story_9_16"${String(X.formatRasio||'')==='story_9_16'?' selected':''}>Story 9:16</option>
+                      <option value="portrait_4_5"${String(X.formatRasio||'')==='portrait_4_5'?' selected':''}>Portrait 4:5</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-              ${selectField("Fase", "lkpdInteraktif.fase", X.fase, faseOpts)}
-              ${selectField("Kelas", "lkpdInteraktif.kelas", X.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
-            </div>
+            </details>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
               ${selectField("Mata Pelajaran", "lkpdInteraktif.mataPelajaran", X.mataPelajaran, SUBJECT_OPTIONS[jenjangEfektif] || [])}
-              ${inputText("Nama Sekolah", "lkpdInteraktif.namaSekolah", X.namaSekolah, "Contoh: SMA Negeri 1 Bandung")}
+              ${selectField("Bahasa", "lkpdInteraktif.bahasa", X.bahasa, ["Bahasa Indonesia","Bahasa Inggris","Bilingual","Bahasa Arab"])}
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
               ${inputText("Topik utama", "lkpdInteraktif.topikUtama", X.topikUtama, "Contoh: Sistem Pencernaan")}
@@ -5239,16 +5411,6 @@ session_write_close();
                 </select>
               </div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div class="flex flex-col gap-2">
-                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Format rasio</label>
-                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm" data-path="lkpdInteraktif.formatRasio">
-                  <option value="story_9_16"${String(X.formatRasio||'')==='story_9_16'?' selected':''}>Story 9:16</option>
-                  <option value="portrait_4_5"${String(X.formatRasio||'')==='portrait_4_5'?' selected':''}>Portrait 4:5</option>
-                </select>
-              </div>
-              ${inputText("Username Instagram/TikTok untuk watermark", "lkpdInteraktif.usernameWatermark", X.usernameWatermark, "Contoh: @gurusains.id")}
-            </div>
 
             <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5 space-y-3">
               <div class="flex items-center justify-between gap-3">
@@ -5264,7 +5426,12 @@ session_write_close();
                   <button class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold"
                     onclick="window.open('https://chatgpt.com/g/g-6a13d61020b08191910e219eb19937f9-lkpd-interaktif-by-gurupintar','_blank','noopener')">
                     <span class="material-symbols-outlined text-[18px]">smart_toy</span>
-                    Buat LKPD Interaktif
+                    LKPD Komik
+                  </button>
+                  <button class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold"
+                    onclick="window.open('https://chatgpt.com/g/g-6a1c0d8225388191bb1496c9b2bcafb5-eduslide-ppt-by-gurupintar/c/6a1c490c-f8d0-83ec-8df3-578b44758426','_blank','noopener')">
+                    <span class="material-symbols-outlined text-[18px]">slideshow</span>
+                    LKPD Formal (ppt)
                   </button>
                 </div>
               </div>
@@ -9112,6 +9279,9 @@ ${baselineModulAjar}
         const root = el("viewRoot");
         root.innerHTML = computeView();
         wireInputs(root);
+        if (state.activeView === "bahan_ajar" && String(state.bahanAjarTab || "").trim() === "interaktif") {
+          try { initBahanAjarInteraktif(); } catch {}
+        }
         if (state.activeView === "quiz" && state.quizSubtab === "share" && state.quizShareTab === "hasil") {
           try {
             const items = Array.isArray(state.quizPublications) ? state.quizPublications : [];
@@ -10360,10 +10530,10 @@ ${baselineModulAjar}
                   onclick="window.__sp.setQuizPage('buat_link')">2. Buat Link Quiz</button>
                 <button class="${page==='hasil'?'bg-primary text-white':'bg-white dark:bg-surface-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap"
                   onclick="window.__sp.setQuizPage('hasil')">3. Lihat Hasil Quiz</button>
-                <button class="${page==='live'?'bg-primary text-white':'bg-white dark:bg-surface-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap"
-                  onclick="window.__sp.setQuizPage('live')">4. Quiz Live</button>
                 <button class="${page==='gsheet'?'bg-primary text-white':'bg-white dark:bg-surface-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap"
-                  onclick="window.__sp.setQuizPage('gsheet')">5. Pengaturan penyimpanan</button>
+                  onclick="window.__sp.setQuizPage('gsheet')">4. Pengaturan penyimpanan</button>
+                <button class="${page==='live'?'bg-primary text-white':'bg-white dark:bg-surface-dark text-text-sub-light hover:bg-background-light dark:hover:bg-background-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap"
+                  onclick="window.__sp.setQuizPage('live')">5. Quiz Live</button>
               </div>
             </div>
             <div class="flex items-center gap-2">
@@ -10517,6 +10687,68 @@ ${baselineModulAjar}
                 </div>
               </div>
 
+              ${(() => {
+                const qs = Array.isArray(state.questions) ? state.questions : [];
+                const counts = { pg: 0, benar_salah: 0, pg_kompleks: 0, menjodohkan: 0, isian_singkat: 0, uraian: 0 };
+                for (const q of qs) {
+                  const rt = String(q?.type || '').trim();
+                  const t = rt === 'isian' ? 'isian_singkat' : rt;
+                  if (Object.prototype.hasOwnProperty.call(counts, t)) counts[t] += 1;
+                }
+                const inc = (f.includeTypes && typeof f.includeTypes === 'object') ? f.includeTypes : {};
+                const showTypes = Object.keys(counts).filter(k => counts[k] > 0 && inc[k] !== false);
+                if (showTypes.length === 0) {
+                  const anyTypes = Object.keys(counts).some(k => counts[k] > 0);
+                  if (!anyTypes) return ``;
+                  return `
+                    <div class="rounded-xl border bg-white dark:bg-surface-dark p-4">
+                      <div class="text-sm font-semibold text-red-700">Pilih minimal 1 bentuk soal di "Opsi Tambahan" untuk dijadikan Quiz.</div>
+                    </div>
+                  `;
+                }
+                const pts = (f.pointsByType && typeof f.pointsByType === 'object') ? f.pointsByType : {};
+                const get = (k) => {
+                  const n = Math.floor(Number(pts[k]));
+                  return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0;
+                };
+                const sum = showTypes.reduce((a, t) => a + get(t), 0);
+                const sumOk = sum === 100;
+                const labels = {
+                  pg: 'Pilihan Ganda',
+                  benar_salah: 'Benar/Salah',
+                  pg_kompleks: 'PG Kompleks',
+                  menjodohkan: 'Menjodohkan',
+                  isian_singkat: 'Isian Singkat',
+                  uraian: 'Uraian',
+                };
+                return `
+                  <div class="rounded-xl border bg-white dark:bg-surface-dark p-4">
+                    <div class="flex items-start justify-between gap-3">
+                      <div>
+                        <div class="text-base font-bold">Nilai per Bentuk Soal</div>
+                        <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5">Total bobot harus 100 (nilai maksimal paket).</div>
+                      </div>
+                      <div class="text-sm font-extrabold ${sumOk ? 'text-green-700' : 'text-red-600'}">${sum}/100</div>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-3">
+                      ${showTypes.map(t => `
+                        <div class="flex items-center justify-between gap-2 h-10 px-3 rounded-lg border bg-white dark:bg-surface-dark">
+                          <div class="text-xs font-semibold text-text-sub-light dark:text-text-sub-dark truncate">${safeText(labels[t] || t)} (${counts[t]})</div>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            class="w-16 h-8 rounded-md border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 text-center text-sm outline-none"
+                            value="${get(t)}"
+                            oninput="window.__sp.setQuizPointByType('${t}', Number(this.value))"
+                          >
+                        </div>
+                      `).join('')}
+                    </div>
+                  </div>
+                `;
+              })()}
+
               <details class="rounded-xl border bg-white dark:bg-surface-dark p-4 group overflow-hidden">
                 <summary class="list-none cursor-pointer flex items-center gap-2">
                   <div class="w-7 h-7 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-full flex items-center justify-center flex-shrink-0">
@@ -10532,6 +10764,41 @@ ${baselineModulAjar}
                   <span class="material-symbols-outlined text-[18px] text-text-sub-light dark:text-text-sub-dark group-open:rotate-180 transition-transform">expand_more</span>
                 </summary>
                 <div class="pt-3 space-y-3">
+                  ${(() => {
+                    const qs = Array.isArray(state.questions) ? state.questions : [];
+                    const counts = { pg: 0, benar_salah: 0, pg_kompleks: 0, menjodohkan: 0, isian_singkat: 0, uraian: 0 };
+                    for (const q of qs) {
+                      const rt = String(q?.type || '').trim();
+                      const t = rt === 'isian' ? 'isian_singkat' : rt;
+                      if (Object.prototype.hasOwnProperty.call(counts, t)) counts[t] += 1;
+                    }
+                    const types = Object.keys(counts).filter(k => counts[k] > 0);
+                    if (types.length === 0) return ``;
+                    const inc = (f.includeTypes && typeof f.includeTypes === 'object') ? f.includeTypes : {};
+                    const labels = {
+                      pg: 'Pilihan Ganda',
+                      benar_salah: 'Benar/Salah',
+                      pg_kompleks: 'PG Kompleks',
+                      menjodohkan: 'Menjodohkan',
+                      isian_singkat: 'Isian Singkat',
+                      uraian: 'Uraian',
+                    };
+                    return `
+                      <div class="rounded-lg border border-border-light dark:border-border-dark bg-background-light/40 dark:bg-background-dark/30 p-3">
+                        <div class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Bentuk Soal yang Dijadikan Quiz</div>
+                        <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-0.5">Centang tipe soal yang ingin dipublish ke link Quiz.</div>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                          ${types.map(t => `
+                            <label class="flex items-center gap-2 px-3 h-10 rounded-lg border bg-white dark:bg-surface-dark cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                              <input type="checkbox" ${(inc[t] === false) ? '' : 'checked'} onchange="window.__sp.setQuizIncludeType('${t}', this.checked)">
+                              <div class="text-xs font-semibold text-text-sub-light dark:text-text-sub-dark truncate">${safeText(labels[t] || t)} (${counts[t]})</div>
+                            </label>
+                          `).join('')}
+                        </div>
+                      </div>
+                    `;
+                  })()}
+
                   <label class="flex items-start gap-2.5 p-3 border ${f.showSolution ? 'border-primary bg-blue-50 dark:bg-blue-900/20' : 'border-gray-200 dark:border-gray-700'} rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                     <input type="checkbox" ${f.showSolution ? 'checked' : ''} onchange="window.__sp.setQuizPublish('showSolution', this.checked)" class="mt-0.5">
                     <div class="flex-1">
@@ -11784,6 +12051,109 @@ ${baselineModulAjar}
           localStorage.setItem(getQuizPublishPrefKey(mapel), JSON.stringify(payload));
         } catch {}
       };
+
+      function ensureQuizTypesAndPoints(forceRecompute = false) {
+        state.quizPublishForm = state.quizPublishForm || {};
+        const f = state.quizPublishForm;
+        const TYPES = ['pg', 'benar_salah', 'pg_kompleks', 'menjodohkan', 'isian_singkat', 'uraian'];
+
+        const countPointsTypes = (arr) => {
+          const base = { pg: 0, benar_salah: 0, pg_kompleks: 0, menjodohkan: 0, isian_singkat: 0, uraian: 0 };
+          for (const q of (Array.isArray(arr) ? arr : [])) {
+            const rt = String(q?.type || '').trim();
+            const t = rt === 'isian' ? 'isian_singkat' : rt;
+            if (Object.prototype.hasOwnProperty.call(base, t)) base[t] += 1;
+          }
+          return base;
+        };
+        const computeDefaultPointsByType = (counts) => {
+          const types = Object.keys(counts || {}).filter(k => Number(counts?.[k] || 0) > 0);
+          const out = { pg: 0, benar_salah: 0, pg_kompleks: 0, menjodohkan: 0, isian_singkat: 0, uraian: 0 };
+          if (types.length === 0) return out;
+          if (types.length === 1) { out[types[0]] = 100; return out; }
+
+          const hasU = types.includes('uraian');
+          const hasI = types.includes('isian_singkat');
+          const others = types.filter(t => t !== 'uraian' && t !== 'isian_singkat');
+          const alloc = { uraian: 0, isian_singkat: 0 };
+          if (others.length === 0) {
+            if (hasU && hasI) { out.uraian = 50; out.isian_singkat = 50; return out; }
+            if (hasU) { out.uraian = 100; return out; }
+            if (hasI) { out.isian_singkat = 100; return out; }
+          }
+          if (hasU && hasI) { alloc.uraian = 30; alloc.isian_singkat = 30; }
+          else if (hasU) { alloc.uraian = 40; }
+          else if (hasI) { alloc.isian_singkat = 40; }
+          out.uraian = alloc.uraian;
+          out.isian_singkat = alloc.isian_singkat;
+          let remaining = 100 - out.uraian - out.isian_singkat;
+          if (remaining < 0) remaining = 0;
+
+          const totalCount = others.reduce((a, t) => a + Number(counts?.[t] || 0), 0);
+          if (totalCount <= 0) {
+            const share = Math.floor(remaining / others.length);
+            let rest = remaining - share * others.length;
+            for (const t of others) {
+              out[t] = share + (rest > 0 ? 1 : 0);
+              if (rest > 0) rest--;
+            }
+            return out;
+          }
+          const raw = others.map(t => {
+            const c = Number(counts?.[t] || 0);
+            const v = (c / totalCount) * remaining;
+            return { t, v, f: Math.floor(v), r: v - Math.floor(v) };
+          });
+          let used = raw.reduce((a, x) => a + x.f, 0);
+          let rest = remaining - used;
+          raw.sort((a, b) => b.r - a.r);
+          for (let i = 0; i < raw.length; i++) {
+            out[raw[i].t] = raw[i].f + (rest > 0 ? 1 : 0);
+            if (rest > 0) rest--;
+          }
+          return out;
+        };
+
+        const countsAll = countPointsTypes(state.questions);
+        const allSig = TYPES.filter(k => countsAll[k] > 0).map(k => `${k}:${countsAll[k]}`).join('|');
+
+        const inc0 = (f.includeTypes && typeof f.includeTypes === 'object') ? f.includeTypes : {};
+        const inc = { ...inc0 };
+        for (const t of TYPES) {
+          if (countsAll[t] > 0 && !Object.prototype.hasOwnProperty.call(inc, t)) inc[t] = true;
+          if (countsAll[t] <= 0 && Object.prototype.hasOwnProperty.call(inc, t)) delete inc[t];
+        }
+        const anySelected = TYPES.some(t => countsAll[t] > 0 && inc[t] !== false);
+        if (!anySelected && allSig) {
+          for (const t of TYPES) {
+            if (countsAll[t] > 0) inc[t] = true;
+          }
+        }
+        f.includeTypes = inc;
+        f._typesSig = allSig;
+
+        const countsSel = { ...countsAll };
+        for (const t of TYPES) {
+          if (countsAll[t] > 0 && inc[t] === false) countsSel[t] = 0;
+        }
+        const selSig = TYPES.filter(k => countsSel[k] > 0).map(k => `${k}:${countsSel[k]}`).join('|');
+
+        if (f._pointsAuto == null) f._pointsAuto = true;
+        const haveAnyPoints = f.pointsByType && typeof f.pointsByType === 'object' && Object.keys(f.pointsByType).length > 0;
+        if (forceRecompute || !haveAnyPoints || (f._pointsAuto && f._pointsSig !== selSig)) {
+          f.pointsByType = computeDefaultPointsByType(countsSel);
+          f._pointsSig = selSig;
+        }
+        const pb = (f.pointsByType && typeof f.pointsByType === 'object') ? f.pointsByType : {};
+        const nextPb = { pg: 0, benar_salah: 0, pg_kompleks: 0, menjodohkan: 0, isian_singkat: 0, uraian: 0 };
+        for (const t of TYPES) {
+          const n = Math.floor(Number(pb[t]));
+          const v = Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0;
+          nextPb[t] = (countsAll[t] > 0 && inc[t] === false) ? 0 : v;
+        }
+        f.pointsByType = nextPb;
+      }
+
       const applyQuizPublishDefaultsForMapel = () => {
         const mapel = String(state.identity?.mataPelajaran || '').trim();
         state.quizPublishForm = state.quizPublishForm || {};
@@ -11806,6 +12176,7 @@ ${baselineModulAjar}
         if (f._slugAuto == null) f._slugAuto = !String(f.slug || '').trim();
         if (!String(f.slug || '').trim()) f._slugAuto = true;
         if (f._slugAuto) f.slug = getDefaultQuizSlug();
+        ensureQuizTypesAndPoints(false);
 
         state.quizShowPublishSuccess = false;
         state.quizLastLink = "";
@@ -11877,6 +12248,49 @@ ${baselineModulAjar}
           state.quizPublishForm.expire = `${next.date} ${hh}:${mm}`;
         }
         saveDebounced(false);
+      };
+      const setQuizPointByType = (type, value) => {
+        const t = String(type || '').trim();
+        if (!t) return;
+        state.quizPublishForm = state.quizPublishForm || {};
+        const cur = (state.quizPublishForm.pointsByType && typeof state.quizPublishForm.pointsByType === 'object')
+          ? state.quizPublishForm.pointsByType
+          : {};
+        const n0 = Math.floor(Number(value));
+        const n = Number.isFinite(n0) ? Math.min(100, Math.max(0, n0)) : 1;
+        state.quizPublishForm.pointsByType = { ...cur, [t]: n };
+        state.quizPublishForm._pointsAuto = false;
+        state.quizShowPublishSuccess = false;
+        saveDebounced(false);
+      };
+      const setQuizIncludeType = (type, checked) => {
+        const t0 = String(type || '').trim();
+        const t = t0 === 'isian' ? 'isian_singkat' : t0;
+        if (!t) return;
+        state.quizPublishForm = state.quizPublishForm || {};
+        const cur = (state.quizPublishForm.includeTypes && typeof state.quizPublishForm.includeTypes === 'object')
+          ? state.quizPublishForm.includeTypes
+          : {};
+        const next = { ...cur, [t]: !!checked };
+        const qs = Array.isArray(state.questions) ? state.questions : [];
+        const counts = { pg: 0, benar_salah: 0, pg_kompleks: 0, menjodohkan: 0, isian_singkat: 0, uraian: 0 };
+        for (const q of qs) {
+          const rt = String(q?.type || '').trim();
+          const tt = rt === 'isian' ? 'isian_singkat' : rt;
+          if (Object.prototype.hasOwnProperty.call(counts, tt)) counts[tt] += 1;
+        }
+        const anyAfter = Object.keys(counts).some(k => counts[k] > 0 && next[k] !== false);
+        if (!anyAfter) {
+          alert('Pilih minimal 1 bentuk soal untuk dijadikan Quiz.');
+          return;
+        }
+        state.quizPublishForm.includeTypes = next;
+        state.quizPublishForm._pointsAuto = true;
+        state.quizPublishForm._pointsSig = '';
+        ensureQuizTypesAndPoints(true);
+        state.quizShowPublishSuccess = false;
+        saveDebounced(false);
+        render();
       };
       const setQuizExpireDatetime = (val) => {
         state.quizPublishForm = state.quizPublishForm || {};
@@ -12058,6 +12472,15 @@ ${baselineModulAjar}
           if (t === 'isian') return 'isian_singkat';
           return t;
         };
+        const normalizePointsByType = (raw) => {
+          const base = { pg: 0, benar_salah: 0, pg_kompleks: 0, menjodohkan: 0, isian_singkat: 0, uraian: 0 };
+          const obj = (raw && typeof raw === 'object') ? raw : {};
+          for (const k of Object.keys(base)) {
+            const n = Math.floor(Number(obj[k]));
+            if (Number.isFinite(n)) base[k] = Math.min(100, Math.max(0, n));
+          }
+          return base;
+        };
         const countByType = (arr) => {
           const out = {};
           for (const q of (Array.isArray(arr) ? arr : [])) {
@@ -12066,7 +12489,17 @@ ${baselineModulAjar}
           }
           return out;
         };
-        const allowedTypes = new Set(['pg', 'benar_salah', 'pg_kompleks', 'isian_singkat', 'isian']);
+        const includeTypesObj = (state.quizPublishForm?.includeTypes && typeof state.quizPublishForm.includeTypes === 'object')
+          ? state.quizPublishForm.includeTypes
+          : null;
+        const selectedTypes = includeTypesObj
+          ? new Set(Object.keys(includeTypesObj).filter(k => includeTypesObj[k] !== false))
+          : null;
+        if (selectedTypes && selectedTypes.size === 0) {
+          alert('Pilih minimal 1 bentuk soal untuk dijadikan Quiz.');
+          return;
+        }
+        const allowedTypes = new Set(['pg', 'benar_salah', 'pg_kompleks', 'isian_singkat', 'isian', 'menjodohkan', 'uraian']);
         const quizItems = items
           .filter(q => q && allowedTypes.has(String(q.type || '').trim()))
           .map(q => {
@@ -12076,27 +12509,80 @@ ${baselineModulAjar}
             if (t === 'benar_salah') {
               return { ...base, options: ['Benar', 'Salah'] };
             }
+            if (t === 'menjodohkan') {
+              const left = Array.isArray(base.options) ? base.options : [];
+              const ansArr = Array.isArray(base.answer) ? base.answer : null;
+              const ansIsNumeric = Array.isArray(ansArr) && ansArr.length > 0 && ansArr.every(v => Number.isFinite(Number(v)));
+              const right = ansIsNumeric
+                ? (Array.isArray(base.right_options) ? base.right_options : (Array.isArray(base.rightOptions) ? base.rightOptions : []))
+                : (Array.isArray(ansArr) ? ansArr : (Array.isArray(base.right_options) ? base.right_options : (Array.isArray(base.rightOptions) ? base.rightOptions : [])));
+              const n = Math.min(left.length, right.length);
+              const rawKey = ansIsNumeric
+                ? ansArr
+                : (Array.isArray(base._matchKey) ? base._matchKey : (Array.isArray(base.match_key) ? base.match_key : null));
+              const key = Array.isArray(rawKey) ? rawKey.map(v => Math.floor(Number(v))).filter(v => Number.isFinite(v) && v >= 0) : [];
+              const finalKey = (n >= 2 && key.length === n)
+                ? key
+                : (n >= 2 ? Array.from({ length: n }, (_, i) => i) : []);
+              return { ...base, right_options: right, _matchKey: finalKey };
+            }
             return base;
           })
           .filter(q => {
             const t = String(q.type || '').trim();
+            if (selectedTypes && !selectedTypes.has(t)) return false;
             if (t === 'pg' || t === 'pg_kompleks') {
               return Array.isArray(q.options) && q.options.length >= 3;
             }
             if (t === 'benar_salah') return true;
             if (t === 'isian_singkat') return true;
+            if (t === 'menjodohkan') {
+              const left = Array.isArray(q.options) ? q.options : [];
+              const right = Array.isArray(q.right_options) ? q.right_options : (Array.isArray(q.rightOptions) ? q.rightOptions : (Array.isArray(q.answer) ? q.answer : []));
+              const key = Array.isArray(q._matchKey) ? q._matchKey : (Array.isArray(q.match_key) ? q.match_key : (Array.isArray(q.answer) && q.answer.every(v => Number.isFinite(Number(v))) ? q.answer : []));
+              const n = Math.min(left.length, right.length);
+              return n >= 2 && key.length === n;
+            }
+            if (t === 'uraian') return true;
             return false;
           });
-        const allCounts = countByType(items);
+        const points_by_type = normalizePointsByType(state.quizPublishForm?.pointsByType);
         const pubCounts = countByType(quizItems);
+        const pubTypes = Object.keys(points_by_type).filter(k => Number(pubCounts[k] || 0) > 0);
+        const sumPoints = pubTypes.reduce((a, t) => a + Math.floor(Number(points_by_type?.[t] ?? 0)), 0);
+        if (pubTypes.length > 0 && sumPoints !== 100) {
+          alert(`Total bobot Nilai per Bentuk Soal harus 100.\nSaat ini: ${sumPoints}.\n\nSilakan atur bobotnya terlebih dahulu.`);
+          return;
+        }
+        const requireGSheet = quizItems.some(q => {
+          const t = String(q?.type || '').trim();
+          return t === 'isian_singkat' || t === 'uraian';
+        });
+        if (requireGSheet) {
+          try {
+            const res = await fetch('api/gsheet_settings_get.php', { credentials: 'same-origin' });
+            const js = await res.json().catch(() => null);
+            const itemsG = Array.isArray(js?.items) ? js.items : [];
+            const row = itemsG.find(x => String(x?.mapel || '').trim() === mapel);
+            const ok = row && Number(row.is_active || 0) === 1 && String(row.spreadsheet_id || '').trim();
+            if (!ok) {
+              alert('Isian Singkat & Uraian wajib terhubung ke Google Sheets terlebih dahulu.\nSilakan buka tab "Atur Penyimpanan (Google Sheets)" lalu hubungkan mapel ini.');
+              return;
+            }
+          } catch {
+            alert('Gagal mengecek koneksi Google Sheets. Coba lagi.');
+            return;
+          }
+        }
+        const allCounts = countByType(items);
         const excluded = Object.keys(allCounts)
           .map((k) => ({ type: k, count: Math.max(0, (allCounts[k] || 0) - (pubCounts[k] || 0)) }))
-          .filter(x => x.count > 0 && !['pg', 'benar_salah', 'pg_kompleks', 'isian_singkat'].includes(x.type))
+          .filter(x => x.count > 0 && !['pg', 'benar_salah', 'pg_kompleks', 'isian_singkat', 'menjodohkan', 'uraian'].includes(x.type))
           .sort((a, b) => b.count - a.count);
         if (excluded.length > 0) {
-          alert(`Sebagian soal tidak ikut dipublish karena tipe belum didukung: ${excluded.map(x => `${x.type}(${x.count})`).join(', ')}.\n\nPublish saat ini mendukung: PG, Benar/Salah, PG Kompleks, Isian Singkat.`);
+          alert(`Sebagian soal tidak ikut dipublish karena tipe belum didukung: ${excluded.map(x => `${x.type}(${x.count})`).join(', ')}.\n\nPublish saat ini mendukung: PG, Benar/Salah, PG Kompleks, Menjodohkan, Isian Singkat, Uraian.`);
         }
-        if (quizItems.length === 0) { alert("Hanya mendukung PG, Benar/Salah, PG Kompleks, dan Isian Singkat. Tidak ada soal yang bisa dipublish pada paket ini."); return; }
+        if (quizItems.length === 0) { alert("Hanya mendukung PG, Benar/Salah, PG Kompleks, Menjodohkan, Isian Singkat, dan Uraian. Tidak ada soal yang bisa dipublish pada paket ini."); return; }
         if (quizItems.length > 50) { alert(`Maksimal 50 soal untuk Quiz. Saat ini terdeteksi ${quizItems.length} soal.`); return; }
         const includeImages = state.quizPublishForm?.includeImages ?? false;
         const imageCount = includeImages ? quizItems.reduce((acc, q) => acc + (String(q.image || '').trim() ? 1 : 0), 0) : 0;
@@ -12153,6 +12639,15 @@ ${baselineModulAjar}
           if (t === 'pg_kompleks') return normalizeMultiAnswer(q.answer, opts.length);
           if (t === 'benar_salah') return normalizeAnswerIndex(q.answer, ['Benar', 'Salah']);
           if (t === 'isian_singkat') return normalizeShortAnswerKey(q.answer);
+          if (t === 'menjodohkan') {
+            const left = Array.isArray(q.options) ? q.options : [];
+            const right = Array.isArray(q.right_options) ? q.right_options : (Array.isArray(q.rightOptions) ? q.rightOptions : (Array.isArray(q.answer) ? q.answer : []));
+            const n = Math.min(left.length, right.length);
+            const rawKey = Array.isArray(q._matchKey) ? q._matchKey : (Array.isArray(q.match_key) ? q.match_key : (Array.isArray(q.answer) && q.answer.every(v => Number.isFinite(Number(v))) ? q.answer : []));
+            const key = Array.isArray(rawKey) ? rawKey.map(v => Math.floor(Number(v))).filter(v => Number.isFinite(v) && v >= 0) : [];
+            return (n >= 2 && key.length === n) ? key : (n >= 2 ? Array.from({ length: n }, (_, i) => i) : []);
+          }
+          if (t === 'uraian') return '';
           return normalizeAnswerIndex(Array.isArray(q.answer) ? q.answer[0] : q.answer, opts);
         });
         const slug = String(state.quizPublishForm?.slug || "").trim().toLowerCase().replace(/[^a-z0-9\-]+/g,'-').replace(/^-+|-+$/g,'');
@@ -12301,17 +12796,23 @@ ${baselineModulAjar}
             const rawType = String(q.type || '').trim() || 'pg';
             const t = rawType === 'isian' ? 'isian_singkat' : rawType;
             const opts = (t === 'benar_salah') ? ['Benar', 'Salah'] : (Array.isArray(q.options) ? q.options : []);
+            const right = (t === 'menjodohkan')
+              ? (Array.isArray(q.answer) ? q.answer : (Array.isArray(q.right_options) ? q.right_options : []))
+              : [];
             return {
               type: t,
               question: String(q.question||''),
               context: String(q.context || ''),
               options: opts.map(x=>String(x||'')),
+              ...(t === 'menjodohkan' ? { right_options: right.map(x => String(x || '')) } : {}),
               explain: String(q.explanation || q.pembahasan || q.rationale || ''),
               image: imgUrl ? String(imgUrl) : ''
             };
           }));
           params.set('payload_public', JSON.stringify(payloadWithExplain));
           params.set('answer_key', JSON.stringify(answer_key));
+          params.set('points_by_type', JSON.stringify(points_by_type));
+          params.set('points_mode', 'per_type_total');
           const jumlah = Math.floor(Number(state.quizPublishForm?.jumlah || 0));
           const maxAbsenRaw = roster.length > 0 ? roster.length : (Number.isFinite(jumlah) ? jumlah : 0);
           const maxAbsen = Math.min(50, Math.max(1, Math.floor(Number(maxAbsenRaw || 0))));
@@ -14142,9 +14643,24 @@ ${out}`;
       };
       const setBahanAjarTab = (tab) => {
         const t = String(tab || "").trim();
-        state.bahanAjarTab = (t === "info" || t === "gabung") ? t : "info";
+        const prev = String(state.bahanAjarTab || "").trim();
+        if (prev === "interaktif" && t !== "interaktif") {
+          try { window.__sp.stopBahanAjarInteraktif?.(); } catch {}
+        }
+        state.bahanAjarTab = (t === "info" || t === "gabung" || t === "interaktif") ? t : "info";
         saveDebounced(true);
         render();
+        if (t === "interaktif") {
+          setTimeout(() => { try { window.__sp.initBahanAjarInteraktif?.(); } catch {} }, 0);
+        }
+      };
+      const setBahanAjarAdvancedOpen = (open) => {
+        state.bahanAjarAdvancedOpen = !!open;
+        saveDebounced(true);
+      };
+      const setLkpdInteraktifAdvancedOpen = (open) => {
+        state.lkpdInteraktifAdvancedOpen = !!open;
+        saveDebounced(true);
       };
       const setLkpdInteraktifTab = (tab) => {
         const t = String(tab || "").trim();
@@ -14183,6 +14699,7 @@ ${out}`;
         const kelasNum = parseKelasNumber(B?.kelas);
         const kelas = String(kelasNum || B?.kelas || "").replace(/^Kelas\s+/i, "").trim();
         const mapel = String(B?.mataPelajaran || "").trim();
+        const bahasa = String(B?.bahasa || "").trim() || "Bahasa Indonesia";
         const topik = String(B?.topikUtama || "").trim();
         const subtopik = String(B?.subtopikSpesifik || "").trim();
         const mode = String(B?.modePembuatan || "").trim() || "cepat";
@@ -14197,6 +14714,7 @@ ${out}`;
           { label: "Jenjang", value: jenjang || "-" },
           { label: "Kelas", value: kelas || "-" },
           { label: "Mata pelajaran", value: mapel || "-" },
+          { label: "Bahasa", value: bahasa },
           { label: "Topik utama", value: topik || "-" },
           { label: "Subtopik spesifik", value: subtopik || "-" },
           { label: "Mode pembuatan", value: modeLabel },
@@ -14250,6 +14768,7 @@ ${out}`;
         const kelasNum = parseKelasNumber(X?.kelas);
         const kelas = String(kelasNum || X?.kelas || "").replace(/^Kelas\s+/i, "").trim();
         const mapel = String(X?.mataPelajaran || "").trim();
+        const bahasa = String(X?.bahasa || "").trim() || "Bahasa Indonesia";
         const topik = String(X?.topikUtama || "").trim();
         const subtopik = String(X?.subtopikSpesifik || "").trim();
         const mode = String(X?.modePembuatan || "").trim() || "cepat";
@@ -14264,6 +14783,7 @@ ${out}`;
           { label: "Jenjang", value: jenjang || "-" },
           { label: "Kelas", value: kelas || "-" },
           { label: "Mata pelajaran", value: mapel || "-" },
+          { label: "Bahasa", value: bahasa },
           { label: "Topik utama", value: topik || "-" },
           { label: "Subtopik spesifik", value: subtopik || "-" },
           { label: "Mode pembuatan", value: modeLabel },
@@ -14333,6 +14853,24 @@ ${out}`;
         elp.value = "";
         elp.click();
       };
+      const pickBahanAjarInteraktifImages = () => {
+        const elp = el("bahanAjarInteraktifImagesUpload");
+        if (!elp) return;
+        elp.value = "";
+        elp.click();
+      };
+      const pickBahanAjarInteraktifBgm = () => {
+        const elp = el("bahanAjarInteraktifBgmUpload");
+        if (!elp) return;
+        elp.value = "";
+        elp.click();
+      };
+      const pickBahanAjarInteraktifVo = () => {
+        const elp = el("bahanAjarInteraktifVoUpload");
+        if (!elp) return;
+        elp.value = "";
+        elp.click();
+      };
       const pickLkpdInteraktifModulPdf = () => {
         const elp = el("lkpdInteraktifModulPdfUpload");
         if (!elp) return;
@@ -14344,6 +14882,812 @@ ${out}`;
         if (!elp) return;
         elp.value = "";
         elp.click();
+      };
+      const baiRt = () => {
+        const g = globalThis;
+        const rt = g.__bahanAjarInteraktifRt || {};
+        if (!Array.isArray(rt.images)) rt.images = [];
+        if (!rt.bgm) rt.bgm = null;
+        if (!rt.vo) rt.vo = null;
+        if (!rt.videoUrl) rt.videoUrl = "";
+        if (!rt.sourceVideoUrl) rt.sourceVideoUrl = "";
+        if (typeof rt.imageWidth !== "number") rt.imageWidth = 0;
+        if (typeof rt.imageHeight !== "number") rt.imageHeight = 0;
+        if (typeof rt.selectedIndex !== "number") rt.selectedIndex = 0;
+        if (typeof rt.durationEdited !== "boolean") rt.durationEdited = false;
+        if (typeof rt.playing !== "boolean") rt.playing = false;
+        if (typeof rt.recording !== "boolean") rt.recording = false;
+        if (typeof rt.converting !== "boolean") rt.converting = false;
+        if (typeof rt.rafId !== "number") rt.rafId = 0;
+        if (typeof rt.startTime !== "number") rt.startTime = 0;
+        if (!rt.previewBgm) rt.previewBgm = null;
+        if (!rt.previewVo) rt.previewVo = null;
+        if (!rt.mediaRecorder) rt.mediaRecorder = null;
+        g.__bahanAjarInteraktifRt = rt;
+        return rt;
+      };
+      const baiCfg = () => {
+        state.bahanAjarInteraktif = state.bahanAjarInteraktif || { defaultImageDuration: 3, bgmVolume: 30, voVolume: 100 };
+        const c = state.bahanAjarInteraktif;
+        const dps = Number(c.defaultImageDuration || 3);
+        c.defaultImageDuration = Number.isFinite(dps) ? clamp(dps, 0.1, 300) : 3;
+        c.bgmVolume = clamp(Number(c.bgmVolume ?? 30), 0, 100);
+        c.voVolume = clamp(Number(c.voVolume ?? 100), 0, 100);
+        return c;
+      };
+      const baiAutoSetVolumes = () => {
+        const rt = baiRt();
+        const cfg = baiCfg();
+        const hasBgm = !!(rt.bgm && rt.bgm.url);
+        const hasVo = !!(rt.vo && rt.vo.url);
+        if (hasBgm && hasVo) {
+          cfg.bgmVolume = 10;
+          cfg.voVolume = 90;
+        } else if (hasBgm) {
+          cfg.bgmVolume = 100;
+          cfg.voVolume = 0;
+        } else if (hasVo) {
+          cfg.bgmVolume = 0;
+          cfg.voVolume = 100;
+        } else {
+          cfg.bgmVolume = 30;
+          cfg.voVolume = 100;
+        }
+        if (rt.previewBgm) rt.previewBgm.volume = cfg.bgmVolume / 100;
+        if (rt.previewVo) rt.previewVo.volume = cfg.voVolume / 100;
+        saveDebounced(true);
+      };
+      const baiLoadAudioDurationSec = (url) => new Promise((resolve) => {
+        try {
+          const a = document.createElement("audio");
+          a.preload = "metadata";
+          a.onloadedmetadata = () => {
+            const d = Number(a.duration || 0);
+            resolve(Number.isFinite(d) ? d : 0);
+          };
+          a.onerror = () => resolve(0);
+          a.src = String(url || "");
+        } catch {
+          resolve(0);
+        }
+      });
+      const baiEnsureMediaDurations = async () => {
+        const rt = baiRt();
+        if (rt.vo?.url && !(Number(rt.vo.durationSec) > 0)) {
+          const d = await baiLoadAudioDurationSec(rt.vo.url);
+          rt.vo.durationSec = d > 0 ? d : 0;
+        }
+        if (rt.bgm?.url && !(Number(rt.bgm.durationSec) > 0)) {
+          const d = await baiLoadAudioDurationSec(rt.bgm.url);
+          rt.bgm.durationSec = d > 0 ? d : 0;
+        }
+      };
+      const baiApplyDefaultDurations = () => {
+        const rt = baiRt();
+        const cfg = baiCfg();
+        const n = rt.images.length;
+        if (!n) return;
+        const voDur = Number(rt.vo?.durationSec || 0);
+        if (!rt.durationEdited && voDur > 0) {
+          const each = voDur / n;
+          rt.images.forEach((it) => { it.durationSec = each; });
+          return;
+        }
+        const def = clamp(Number(cfg.defaultImageDuration || 3), 0.1, 300);
+        rt.images.forEach((it) => {
+          const v = Number(it?.durationSec || 0);
+          if (!(Number.isFinite(v) && v > 0)) it.durationSec = def;
+        });
+      };
+      const baiGetTimeline = () => {
+        const rt = baiRt();
+        const cfg = baiCfg();
+        const voDur = Number(rt.vo?.durationSec || 0);
+        const def = clamp(Number(cfg.defaultImageDuration || 3), 0.1, 300);
+        const base = rt.images.map((it) => {
+          const v = Number(it?.durationSec || 0);
+          return (Number.isFinite(v) && v > 0) ? clamp(v, 0.1, 300) : def;
+        });
+        const sum = base.reduce((a, b) => a + b, 0);
+        const total = voDur > 0 ? voDur : sum;
+        const eff = (voDur > 0 && rt.images.length > 0)
+          ? base.map((d) => sum > 0 ? (d * (voDur / sum)) : (voDur / rt.images.length))
+          : base;
+        const ends = [];
+        let acc = 0;
+        for (const d of eff) {
+          acc += d;
+          ends.push(acc);
+        }
+        return { eff, ends, total };
+      };
+      const baiTotalDurationSec = () => {
+        const t = baiGetTimeline();
+        return Number(t.total || 0) || 0;
+      };
+      const baiEl = (id) => document.getElementById(id);
+      const baiSetCanvasSize = (w, h) => {
+        const canvas = baiEl("baiCanvas");
+        const wrap = baiEl("baiCanvasWrap");
+        const iw = Math.floor(Number(w) || 0);
+        const ih = Math.floor(Number(h) || 0);
+        if (!(iw > 0 && ih > 0)) return;
+        if (canvas) {
+          if (canvas.width !== iw) canvas.width = iw;
+          if (canvas.height !== ih) canvas.height = ih;
+        }
+        if (wrap) wrap.style.aspectRatio = `${iw} / ${ih}`;
+      };
+      const baiFmtTime = (seconds) => {
+        const s = Math.max(0, Number(seconds) || 0);
+        const m = String(Math.floor(s / 60)).padStart(2, "0");
+        const ss = String(Math.floor(s % 60)).padStart(2, "0");
+        return `${m}:${ss}`;
+      };
+      const baiCanvasCtx = () => {
+        const canvas = baiEl("baiCanvas");
+        if (!canvas) return null;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return null;
+        return { canvas, ctx };
+      };
+      const baiDrawPlaceholder = (text) => {
+        const cc = baiCanvasCtx();
+        if (!cc) return;
+        const { canvas, ctx } = cc;
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#9ca3af";
+        ctx.font = "28px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(String(text || "Area Preview Video"), canvas.width / 2, canvas.height / 2);
+      };
+      const baiDrawImageContain = (img) => {
+        const cc = baiCanvasCtx();
+        if (!cc) return;
+        const { canvas, ctx } = cc;
+        const iw = img?.naturalWidth || img?.width || 0;
+        const ih = img?.naturalHeight || img?.height || 0;
+        if (!iw || !ih) return;
+        const canvasAspect = canvas.width / canvas.height;
+        const imgAspect = iw / ih;
+        let drawWidth, drawHeight, startX, startY;
+        if (imgAspect > canvasAspect) {
+          drawWidth = canvas.width;
+          drawHeight = canvas.width / imgAspect;
+          startX = 0;
+          startY = (canvas.height - drawHeight) / 2;
+        } else {
+          drawHeight = canvas.height;
+          drawWidth = canvas.height * imgAspect;
+          startY = 0;
+          startX = (canvas.width - drawWidth) / 2;
+        }
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, startX, startY, drawWidth, drawHeight);
+      };
+      const baiSyncUi = () => {
+        const rt = baiRt();
+        const cfg = baiCfg();
+        const countEl = baiEl("baiImageCount");
+        if (countEl) countEl.textContent = String(rt.images.length);
+        const empty = baiEl("baiEmpty");
+        if (empty) empty.style.display = rt.images.length ? "none" : "block";
+        const clearBtn = baiEl("baiClearImages");
+        if (clearBtn) clearBtn.classList.toggle("hidden", !rt.images.length);
+        const bgmInfo = baiEl("baiBgmInfo");
+        if (bgmInfo) bgmInfo.classList.toggle("hidden", !rt.bgm);
+        const bgmName = baiEl("baiBgmName");
+        if (bgmName) bgmName.textContent = rt.bgm ? String(rt.bgm.name || "") : "";
+        const bgmPreset = baiEl("baiBgmPreset");
+        if (bgmPreset) {
+          const v = rt.bgm && !rt.bgm.isObjectUrl ? String(rt.bgm.url || "") : "";
+          if (bgmPreset.value !== v) bgmPreset.value = v;
+        }
+        const voInfo = baiEl("baiVoInfo");
+        if (voInfo) voInfo.classList.toggle("hidden", !rt.vo);
+        const voName = baiEl("baiVoName");
+        if (voName) voName.textContent = rt.vo ? String(rt.vo.name || "") : "";
+        const btnGen = baiEl("baiGenerateBtn");
+        if (btnGen) btnGen.disabled = rt.recording || rt.converting || !rt.images.length;
+        if (!rt.images.length) {
+          baiDrawPlaceholder("Area Preview Video");
+          const time = baiEl("baiTime");
+          if (time) time.textContent = "00:00 / 00:00";
+        } else if (!rt.playing && !rt.recording) {
+          const idx = clamp(Math.floor(Number(rt.selectedIndex) || 0), 0, rt.images.length - 1);
+          rt.selectedIndex = idx;
+          baiDrawImageContain(rt.images[idx]?.img);
+          const total = baiTotalDurationSec();
+          const time = baiEl("baiTime");
+          if (time) {
+            const tl = baiGetTimeline();
+            const start = idx > 0 ? Number(tl.ends[idx - 1] || 0) : 0;
+            time.textContent = `${baiFmtTime(start)} / ${baiFmtTime(total)}`;
+          }
+        }
+      };
+      const baiRenderImageList = () => {
+        const rt = baiRt();
+        const box = baiEl("baiImageList");
+        const empty = baiEl("baiEmpty");
+        if (!box) return;
+        Array.from(box.querySelectorAll("[data-bai-row='1']")).forEach((n) => n.remove());
+        if (empty) empty.style.display = rt.images.length ? "none" : "block";
+        rt.images.forEach((it, idx) => {
+          const sel = Math.floor(Number(rt.selectedIndex) || 0) === idx;
+          const d = document.createElement("div");
+          d.setAttribute("data-bai-row", "1");
+          d.className = `flex items-center gap-3 rounded-xl border border-border-light dark:border-border-dark ${sel ? "bg-primary/5" : "bg-white dark:bg-surface-dark"} p-3`;
+          const nm = String(it?.file?.name || it?.name || `Gambar ${idx + 1}`);
+          const dv = Number(it?.durationSec || 0);
+          const showDur = (Number.isFinite(dv) && dv > 0) ? String(Math.round(dv * 10) / 10) : "";
+          d.innerHTML = `
+            <button type="button" class="w-28 h-40 rounded-xl overflow-hidden border border-border-light dark:border-border-dark bg-gray-100 dark:bg-background-dark/30 shrink-0 relative group"
+              onclick="window.__sp.setBahanAjarInteraktifSelectedImage(${idx})" title="Klik untuk preview">
+              <img src="${safeAttr(it.url)}" class="w-full h-full object-cover" />
+              <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                <div class="text-white font-extrabold text-sm px-3 py-1 rounded-full bg-black/40">${idx + 1}</div>
+              </div>
+            </button>
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-bold truncate">${safeText(nm)}</div>
+              <div class="mt-2 flex items-center gap-2">
+                <div class="text-xs font-semibold text-text-sub-light dark:text-text-sub-dark">Durasi (detik)</div>
+                <input type="number" min="0.1" step="0.1" value="${safeAttr(showDur)}"
+                  class="h-9 w-24 rounded-lg border-border-light dark:border-border-dark bg-white dark:bg-surface-dark px-2 text-sm font-bold"
+                  oninput="window.__sp.setBahanAjarInteraktifImageDuration(${idx}, this.value)" />
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0">
+              <button class="${idx === 0 ? 'opacity-40 cursor-not-allowed' : 'hover:bg-background-light dark:hover:bg-background-dark'} size-9 rounded-lg border bg-white dark:bg-surface-dark flex items-center justify-center"
+                ${idx === 0 ? 'disabled' : `onclick="window.__sp.moveBahanAjarInteraktifImage(${idx},-1)"`} title="Naik">
+                <span class="material-symbols-outlined text-[18px]">arrow_upward</span>
+              </button>
+              <button class="${idx === (rt.images.length - 1) ? 'opacity-40 cursor-not-allowed' : 'hover:bg-background-light dark:hover:bg-background-dark'} size-9 rounded-lg border bg-white dark:bg-surface-dark flex items-center justify-center"
+                ${idx === (rt.images.length - 1) ? 'disabled' : `onclick="window.__sp.moveBahanAjarInteraktifImage(${idx},1)"`} title="Turun">
+                <span class="material-symbols-outlined text-[18px]">arrow_downward</span>
+              </button>
+              <button class="size-9 rounded-lg border bg-white dark:bg-surface-dark hover:bg-red-50 dark:hover:bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center"
+                onclick="window.__sp.removeBahanAjarInteraktifImage(${idx})" title="Hapus">
+                <span class="material-symbols-outlined text-[18px]">delete</span>
+              </button>
+            </div>
+          `;
+          box.appendChild(d);
+        });
+      };
+      const setBahanAjarInteraktifSelectedImage = (idx) => {
+        const rt = baiRt();
+        if (rt.playing || rt.recording) return;
+        const i = clamp(Math.floor(Number(idx) || 0), 0, rt.images.length - 1);
+        rt.selectedIndex = i;
+        baiSyncUi();
+        baiRenderImageList();
+      };
+      const moveBahanAjarInteraktifImage = (idx, delta) => {
+        const rt = baiRt();
+        if (rt.playing || rt.recording) return;
+        const i = Math.floor(Number(idx));
+        const d = Math.floor(Number(delta));
+        if (!Number.isFinite(i) || !Number.isFinite(d)) return;
+        const j = i + d;
+        if (i < 0 || j < 0 || i >= rt.images.length || j >= rt.images.length) return;
+        const tmp = rt.images[i];
+        rt.images[i] = rt.images[j];
+        rt.images[j] = tmp;
+        const sel = Math.floor(Number(rt.selectedIndex) || 0);
+        if (sel === i) rt.selectedIndex = j;
+        else if (sel === j) rt.selectedIndex = i;
+        baiApplyDefaultDurations();
+        baiRenderImageList();
+        baiSyncUi();
+      };
+      const removeBahanAjarInteraktifImage = (idx) => {
+        const rt = baiRt();
+        if (rt.playing || rt.recording) return;
+        const i = Math.floor(Number(idx));
+        if (!Number.isFinite(i) || i < 0 || i >= rt.images.length) return;
+        const it = rt.images[i];
+        rt.images.splice(i, 1);
+        try { if (it?.url) URL.revokeObjectURL(it.url); } catch {}
+        if (Number(rt.selectedIndex) >= rt.images.length) rt.selectedIndex = Math.max(0, rt.images.length - 1);
+        if (!rt.images.length) rt.durationEdited = false;
+        baiApplyDefaultDurations();
+        baiRenderImageList();
+        baiSyncUi();
+      };
+      const sortBahanAjarInteraktifImages = (mode) => {
+        const rt = baiRt();
+        if (rt.playing || rt.recording) return;
+        const selUrl = rt.images[Math.floor(Number(rt.selectedIndex) || 0)]?.url || "";
+        const m = String(mode || "").toLowerCase();
+        const dir = (m === "desc" || m === "z-a" || m === "za") ? -1 : 1;
+        rt.images.sort((a, b) => {
+          const an = String(a?.file?.name || a?.name || "").toLowerCase();
+          const bn = String(b?.file?.name || b?.name || "").toLowerCase();
+          if (an < bn) return -1 * dir;
+          if (an > bn) return 1 * dir;
+          return 0;
+        });
+        if (selUrl) {
+          const newIdx = rt.images.findIndex(x => String(x?.url || "") === String(selUrl));
+          if (newIdx >= 0) rt.selectedIndex = newIdx;
+        }
+        baiApplyDefaultDurations();
+        baiRenderImageList();
+        baiSyncUi();
+      };
+      const setBahanAjarInteraktifImageDuration = (idx, val) => {
+        const rt = baiRt();
+        const i = Math.floor(Number(idx));
+        if (!Number.isFinite(i) || i < 0 || i >= rt.images.length) return;
+        const n = Number(val);
+        if (!Number.isFinite(n)) return;
+        rt.images[i].durationSec = clamp(n, 0.1, 300);
+        rt.durationEdited = true;
+        baiSyncUi();
+      };
+      const setBahanAjarInteraktifBgmVolume = (val) => {
+        const cfg = baiCfg();
+        cfg.bgmVolume = clamp(Number(val ?? 30), 0, 100);
+        const rt = baiRt();
+        if (rt.previewBgm) rt.previewBgm.volume = cfg.bgmVolume / 100;
+        saveDebounced(true);
+        baiSyncUi();
+      };
+      const setBahanAjarInteraktifVoVolume = (val) => {
+        const cfg = baiCfg();
+        cfg.voVolume = clamp(Number(val ?? 100), 0, 100);
+        const rt = baiRt();
+        if (rt.previewVo) rt.previewVo.volume = cfg.voVolume / 100;
+        saveDebounced(true);
+        baiSyncUi();
+      };
+      const clearBahanAjarInteraktifImages = () => {
+        const rt = baiRt();
+        try { window.__sp.stopBahanAjarInteraktif?.(); } catch {}
+        rt.images.forEach((it) => { try { if (it?.url) URL.revokeObjectURL(it.url); } catch {} });
+        rt.images = [];
+        rt.durationEdited = false;
+        rt.imageWidth = 0;
+        rt.imageHeight = 0;
+        rt.selectedIndex = 0;
+        try { if (rt.videoUrl) URL.revokeObjectURL(rt.videoUrl); } catch {}
+        rt.videoUrl = "";
+        try { if (rt.sourceVideoUrl) URL.revokeObjectURL(rt.sourceVideoUrl); } catch {}
+        rt.sourceVideoUrl = "";
+        baiSetCanvasSize(720, 1280);
+        baiRenderImageList();
+        baiSyncUi();
+      };
+      const clearBahanAjarInteraktifBgm = () => {
+        const rt = baiRt();
+        if (rt.previewBgm) { try { rt.previewBgm.pause(); } catch {} }
+        rt.previewBgm = null;
+        try {
+          const u = String(rt.bgm?.url || "");
+          if ((rt.bgm?.isObjectUrl || u.startsWith("blob:")) && u) URL.revokeObjectURL(u);
+        } catch {}
+        rt.bgm = null;
+        baiAutoSetVolumes();
+        baiSyncUi();
+      };
+      const setBahanAjarInteraktifBgmPreset = (url) => {
+        const rt = baiRt();
+        if (rt.recording) return;
+        const u = String(url || "").trim();
+        if (!u) {
+          clearBahanAjarInteraktifBgm();
+          return;
+        }
+        try {
+          const old = String(rt.bgm?.url || "");
+          if ((rt.bgm?.isObjectUrl || old.startsWith("blob:")) && old) URL.revokeObjectURL(old);
+        } catch {}
+        const list = Array.isArray(BAI_BGM_PRESETS) ? BAI_BGM_PRESETS : [];
+        const found = list.find(x => String(x?.url || "") === u) || null;
+        const label = found ? String(found.label || "") : "";
+        const name = (label || u.split("/").pop() || "BGM").replace(/\.([a-z0-9]+)$/i, "");
+        rt.bgm = { file: null, url: u, name, durationSec: 0, isObjectUrl: false };
+        if (rt.previewBgm) { try { rt.previewBgm.pause(); } catch {} }
+        rt.previewBgm = null;
+        baiAutoSetVolumes();
+        baiEnsureMediaDurations().then(() => baiSyncUi());
+        baiSyncUi();
+      };
+      const clearBahanAjarInteraktifVo = () => {
+        const rt = baiRt();
+        if (rt.previewVo) { try { rt.previewVo.pause(); } catch {} }
+        rt.previewVo = null;
+        try { if (rt.vo?.url) URL.revokeObjectURL(rt.vo.url); } catch {}
+        rt.vo = null;
+        baiAutoSetVolumes();
+        baiSyncUi();
+      };
+      const stopBahanAjarInteraktif = () => {
+        const rt = baiRt();
+        rt.playing = false;
+        if (rt.rafId) cancelAnimationFrame(rt.rafId);
+        rt.rafId = 0;
+        if (rt.previewBgm) { try { rt.previewBgm.pause(); rt.previewBgm.currentTime = 0; } catch {} }
+        if (rt.previewVo) { try { rt.previewVo.pause(); rt.previewVo.currentTime = 0; } catch {} }
+        rt.previewBgm = null;
+        rt.previewVo = null;
+        baiSyncUi();
+      };
+      const closeBahanAjarInteraktifVideo = () => {
+        const rt = baiRt();
+        const cont = baiEl("baiVideoContainer");
+        const vid = baiEl("baiResultVideo");
+        if (vid) { try { vid.pause(); } catch {} }
+        if (cont) cont.classList.add("hidden");
+        if (vid) vid.currentTime = 0;
+        baiSyncUi();
+      };
+      const openBahanAjarInteraktifVideo = () => {
+        const rt = baiRt();
+        if (!rt.videoUrl) return;
+        const cont = baiEl("baiVideoContainer");
+        const vid = baiEl("baiResultVideo");
+        if (vid && vid.src !== rt.videoUrl) vid.src = rt.videoUrl;
+        if (cont) cont.classList.remove("hidden");
+        if (vid) vid.play().catch(() => {});
+        baiSyncUi();
+      };
+      const convertBahanAjarInteraktifToWhatsAppMp4 = async () => {
+        const rt = baiRt();
+        const srcUrl = String(rt.sourceVideoUrl || rt.videoUrl || "");
+        if (!srcUrl || rt.recording || rt.playing || rt.converting) return;
+        const overlay = baiEl("baiRecordingOverlay");
+        const title = baiEl("baiOverlayTitle");
+        const setBusy = (busy) => {
+          rt.converting = !!busy;
+          if (overlay) {
+            if (busy) { overlay.classList.remove("hidden"); overlay.classList.add("flex"); }
+            else { overlay.classList.add("hidden"); overlay.classList.remove("flex"); }
+          }
+          if (title) title.textContent = busy ? "Membuat Video (99%)..." : "Membuat Video (100%)...";
+          baiSyncUi();
+        };
+        setBusy(true);
+        try {
+          const resSrc = await fetch(srcUrl);
+          const srcBlob = await resSrc.blob();
+          const fd = new FormData();
+          const extGuess = (String(srcBlob.type || "").includes("mp4")) ? "mp4" : "webm";
+          fd.append("video", new File([srcBlob], `input.${extGuess}`, { type: srcBlob.type || "application/octet-stream" }));
+          const res = await fetch("api/bahan_ajar_interaktif_transcode.php", {
+            method: "POST",
+            body: fd,
+            credentials: "same-origin",
+          });
+          if (!res.ok) {
+            let msg = `Gagal convert (HTTP ${res.status}).`;
+            try {
+              const j = await res.json();
+              if (j && j.error) msg = `Gagal convert: ${j.error}`;
+              if (j && j.hint) msg += `\n${j.hint}`;
+              if (j && j.stderr) msg += `\n\n${String(j.stderr).slice(0, 800)}`;
+              if (j && j.ffmpeg_used) msg += `\nffmpeg_used: ${j.ffmpeg_used}`;
+              if (j && j.last_error) msg += `\nlast_error: ${String(j.last_error).slice(0, 300)}`;
+              if (j && j.disable_functions) msg += `\ndisable_functions: ${String(j.disable_functions).slice(0, 300)}`;
+              if (j && j.open_basedir) msg += `\nopen_basedir: ${String(j.open_basedir).slice(0, 300)}`;
+            } catch {}
+            if (rt.sourceVideoUrl && !rt.videoUrl) {
+              rt.videoUrl = rt.sourceVideoUrl;
+              baiSyncUi();
+            }
+            alert(msg);
+            return;
+          }
+          const mp4Blob = await res.blob();
+          if (!(mp4Blob && mp4Blob.size > 0)) {
+            if (rt.sourceVideoUrl && !rt.videoUrl) {
+              rt.videoUrl = rt.sourceVideoUrl;
+              baiSyncUi();
+            }
+            alert("Gagal convert: hasil kosong.");
+            return;
+          }
+          try { if (rt.videoUrl) URL.revokeObjectURL(rt.videoUrl); } catch {}
+          try { if (rt.sourceVideoUrl) URL.revokeObjectURL(rt.sourceVideoUrl); } catch {}
+          rt.sourceVideoUrl = "";
+          const url = URL.createObjectURL(mp4Blob);
+          rt.videoUrl = url;
+          const pad2 = (n) => String(n).padStart(2, "0");
+          const dt = new Date();
+          const yyyy = dt.getFullYear();
+          const mm = pad2(dt.getMonth() + 1);
+          const dd = pad2(dt.getDate());
+          const hh = pad2(dt.getHours());
+          const mi = pad2(dt.getMinutes());
+          const ss = pad2(dt.getSeconds());
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `bahan_ajar_${yyyy}-${mm}-${dd}.mp4`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          baiSyncUi();
+        } catch (e) {
+          if (rt.sourceVideoUrl && !rt.videoUrl) {
+            rt.videoUrl = rt.sourceVideoUrl;
+            baiSyncUi();
+          }
+          alert("Gagal convert: " + (e?.message || "Terjadi kesalahan."));
+        } finally {
+          setBusy(false);
+        }
+      };
+      const baiFrameAt = (elapsedMs) => {
+        const rt = baiRt();
+        if (!rt.images.length) return false;
+        const tl = baiGetTimeline();
+        const total = Number(tl.total || 0) || 0;
+        const sec = elapsedMs / 1000;
+        if (sec >= total) return false;
+        let idx = 0;
+        while (idx < tl.ends.length && sec >= tl.ends[idx]) idx += 1;
+        const it = rt.images[idx];
+        if (it?.img) baiDrawImageContain(it.img);
+        return true;
+      };
+      const toggleBahanAjarInteraktifPreview = () => {
+        const rt = baiRt();
+        const cfg = baiCfg();
+        if (!rt.images.length) return;
+        if (rt.playing) { stopBahanAjarInteraktif(); return; }
+        if (rt.recording) return;
+        rt.playing = true;
+        rt.startTime = performance.now();
+        if (rt.bgm?.url) {
+          rt.previewBgm = new Audio(rt.bgm.url);
+          rt.previewBgm.loop = true;
+          rt.previewBgm.volume = cfg.bgmVolume / 100;
+          rt.previewBgm.play().catch(() => {});
+        }
+        if (rt.vo?.url) {
+          rt.previewVo = new Audio(rt.vo.url);
+          rt.previewVo.volume = cfg.voVolume / 100;
+          rt.previewVo.play().catch(() => {});
+        }
+        const total = baiTotalDurationSec();
+        const tick = (now) => {
+          if (!rt.playing) return;
+          const elapsed = now - rt.startTime;
+          const ok = baiFrameAt(elapsed);
+          const curSec = Math.min(elapsed / 1000, total);
+          const time = baiEl("baiTime");
+          if (time) time.textContent = `${baiFmtTime(curSec)} / ${baiFmtTime(total)}`;
+          if (ok) rt.rafId = requestAnimationFrame(tick);
+          else stopBahanAjarInteraktif();
+        };
+        rt.rafId = requestAnimationFrame(tick);
+        baiSyncUi();
+      };
+      const generateBahanAjarInteraktifVideo = async () => {
+        const rt = baiRt();
+        const cfg = baiCfg();
+        if (!rt.images.length || rt.recording) return;
+        await baiEnsureMediaDurations();
+        if (rt.playing) stopBahanAjarInteraktif();
+        try { if (rt.videoUrl) URL.revokeObjectURL(rt.videoUrl); } catch {}
+        rt.videoUrl = "";
+        try { if (rt.sourceVideoUrl) URL.revokeObjectURL(rt.sourceVideoUrl); } catch {}
+        rt.sourceVideoUrl = "";
+        const cc = baiCanvasCtx();
+        if (!cc) return;
+        const fpsDefault = 30;
+        const stream = cc.canvas.captureStream(0);
+        const videoTrack0 = stream.getVideoTracks()[0] || null;
+        const requestFrame = (videoTrack0 && typeof videoTrack0.requestFrame === "function")
+          ? () => { try { videoTrack0.requestFrame(); } catch {} }
+          : null;
+        let audioCtx = null;
+        let dest = null;
+        let bgmAudio = null;
+        let voAudio = null;
+        if (rt.bgm?.url || rt.vo?.url) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          audioCtx = AC ? new AC() : null;
+          if (audioCtx) dest = audioCtx.createMediaStreamDestination();
+          if (audioCtx && dest) {
+            if (rt.bgm?.url) {
+              bgmAudio = new Audio(rt.bgm.url);
+              bgmAudio.loop = true;
+              const src = audioCtx.createMediaElementSource(bgmAudio);
+              const gain = audioCtx.createGain();
+              gain.gain.value = cfg.bgmVolume / 100;
+              src.connect(gain);
+              gain.connect(dest);
+              bgmAudio.play().catch(() => {});
+            }
+            if (rt.vo?.url) {
+              voAudio = new Audio(rt.vo.url);
+              const src = audioCtx.createMediaElementSource(voAudio);
+              const gain = audioCtx.createGain();
+              gain.gain.value = cfg.voVolume / 100;
+              src.connect(gain);
+              gain.connect(dest);
+              voAudio.play().catch(() => {});
+            }
+            const track = dest.stream.getAudioTracks()[0];
+            if (track) stream.addTrack(track);
+          }
+        }
+        const pickRecorderMimeType = () => {
+          try {
+            if (!(globalThis.MediaRecorder && typeof MediaRecorder.isTypeSupported === "function")) return "";
+            const candidates = [
+              'video/mp4; codecs="avc1.42E01E, mp4a.40.2"',
+              "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
+              "video/mp4;codecs=avc1,mp4a.40.2",
+              "video/mp4",
+              "video/webm; codecs=vp9,opus",
+              "video/webm; codecs=vp8,opus",
+              "video/webm",
+            ];
+            for (const c of candidates) {
+              if (MediaRecorder.isTypeSupported(c)) return c;
+            }
+            return "";
+          } catch {
+            return "";
+          }
+        };
+        const chunks = [];
+        const preferredMimeType = pickRecorderMimeType();
+        let rec = null;
+        try {
+          const opts = preferredMimeType ? { mimeType: preferredMimeType, videoBitsPerSecond: 2500000, audioBitsPerSecond: 128000 } : { videoBitsPerSecond: 2500000, audioBitsPerSecond: 128000 };
+          rec = new MediaRecorder(stream, opts);
+        } catch (e) {
+          alert("Browser tidak mendukung pembuatan video di perangkat ini.");
+          return;
+        }
+        const usedMimeType = String(rec.mimeType || preferredMimeType || "");
+        rt.mediaRecorder = rec;
+        rt.recording = true;
+        const overlay = baiEl("baiRecordingOverlay");
+        const title = baiEl("baiOverlayTitle");
+        if (overlay) { overlay.classList.remove("hidden"); overlay.classList.add("flex"); }
+        if (title) title.textContent = "Membuat Video (0%)...";
+        rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+        rec.onstop = () => {
+          rt.recording = false;
+          rt.mediaRecorder = null;
+          if (bgmAudio) { try { bgmAudio.pause(); } catch {} }
+          if (voAudio) { try { voAudio.pause(); } catch {} }
+          if (audioCtx) { try { audioCtx.close(); } catch {} }
+          const blob = new Blob(chunks, { type: usedMimeType || undefined });
+          const url = URL.createObjectURL(blob);
+          try { if (rt.sourceVideoUrl) URL.revokeObjectURL(rt.sourceVideoUrl); } catch {}
+          rt.sourceVideoUrl = url;
+          const vid = baiEl("baiResultVideo");
+          const cont = baiEl("baiVideoContainer");
+          if (vid) vid.src = "";
+          if (cont) cont.classList.add("hidden");
+          baiSyncUi();
+          setTimeout(() => {
+            try { globalThis.__sp?.convertBahanAjarInteraktifToWhatsAppMp4?.(); } catch {}
+          }, 50);
+        };
+        try {
+          baiFrameAt(0);
+          if (requestFrame) requestFrame();
+        } catch {}
+        rec.start();
+        rt.startTime = performance.now();
+        const total = baiTotalDurationSec();
+        const loop = (now) => {
+          if (!rt.recording) return;
+          const elapsed = now - rt.startTime;
+          const ok = baiFrameAt(elapsed);
+          if (requestFrame) requestFrame();
+          const curSec = Math.min(elapsed / 1000, total);
+          const pct = total > 0 ? (curSec / total) * 100 : 0;
+          if (title) title.textContent = `Membuat Video (${Math.min(98, Math.floor(pct))}%)...`;
+          const time = baiEl("baiTime");
+          if (time) time.textContent = `${baiFmtTime(curSec)} / ${baiFmtTime(total)}`;
+          if (ok) requestAnimationFrame(loop);
+          else rec.stop();
+        };
+        requestAnimationFrame(loop);
+        baiSyncUi();
+      };
+      const initBahanAjarInteraktif = () => {
+        baiCfg();
+        baiAutoSetVolumes();
+        baiSetCanvasSize(720, 1280);
+        baiApplyDefaultDurations();
+        baiSyncUi();
+        baiRenderImageList();
+      };
+      const handleBahanAjarInteraktifImagesSelected = async (evt) => {
+        const files = Array.from(evt.target?.files || []).filter(Boolean).slice(0, 200);
+        if (!files.length) return;
+        const invalid = files.find(f => !String(f.type || "").toLowerCase().startsWith("image/"));
+        if (invalid) { alert("Semua file harus berupa gambar."); return; }
+        const rt = baiRt();
+        const loadImage = (url) => new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = () => reject(new Error("Gagal memuat gambar."));
+          img.src = url;
+        });
+        const loaded = [];
+        let batchW = 0;
+        let batchH = 0;
+        for (const f of files) {
+          const url = URL.createObjectURL(f);
+          try {
+            const img = await loadImage(url);
+            const w = Math.floor(Number(img?.naturalWidth || img?.width || 0));
+            const h = Math.floor(Number(img?.naturalHeight || img?.height || 0));
+            if (!(w > 0 && h > 0)) throw new Error("Gagal membaca ukuran gambar.");
+            if (!(batchW > 0 && batchH > 0)) { batchW = w; batchH = h; }
+            if (w !== batchW || h !== batchH) {
+              throw new Error(`Ukuran gambar harus sama semua. Ditemukan beda: ${w}×${h} (seharusnya ${batchW}×${batchH}).`);
+            }
+            loaded.push({ file: f, url, img, durationSec: 0 });
+          } catch (e) {
+            try { URL.revokeObjectURL(url); } catch {}
+            loaded.forEach((it) => { try { if (it?.url) URL.revokeObjectURL(it.url); } catch {} });
+            const msg = String(e?.message || "");
+            alert(msg || "Ukuran gambar tidak valid. Upload dibatalkan.");
+            return;
+          }
+        }
+        const expectW = Math.floor(Number(rt.imageWidth || 0));
+        const expectH = Math.floor(Number(rt.imageHeight || 0));
+        if ((expectW > 0 && expectH > 0) && (batchW !== expectW || batchH !== expectH)) {
+          loaded.forEach((it) => { try { if (it?.url) URL.revokeObjectURL(it.url); } catch {} });
+          alert(`Semua gambar harus punya ukuran yang sama dengan gambar sebelumnya: ${expectW}×${expectH}. Upload dibatalkan.`);
+          return;
+        }
+        if (!(rt.imageWidth > 0 && rt.imageHeight > 0)) {
+          rt.imageWidth = batchW;
+          rt.imageHeight = batchH;
+          baiSetCanvasSize(batchW, batchH);
+        }
+        rt.images.push(...loaded);
+        await baiEnsureMediaDurations();
+        baiApplyDefaultDurations();
+        baiRenderImageList();
+        baiSyncUi();
+      };
+      const handleBahanAjarInteraktifBgmSelected = (evt) => {
+        const f = evt.target?.files?.[0];
+        if (!f) return;
+        if (!String(f.type || "").toLowerCase().startsWith("audio/")) { alert("File BGM harus berupa audio."); return; }
+        const rt = baiRt();
+        try {
+          const old = String(rt.bgm?.url || "");
+          if ((rt.bgm?.isObjectUrl || old.startsWith("blob:")) && old) URL.revokeObjectURL(old);
+        } catch {}
+        const url = URL.createObjectURL(f);
+        rt.bgm = { file: f, url, name: String(f.name || ""), durationSec: 0, isObjectUrl: true };
+        baiAutoSetVolumes();
+        baiEnsureMediaDurations().then(() => baiSyncUi());
+        baiSyncUi();
+      };
+      const handleBahanAjarInteraktifVoSelected = (evt) => {
+        const f = evt.target?.files?.[0];
+        if (!f) return;
+        if (!String(f.type || "").toLowerCase().startsWith("audio/")) { alert("File VO harus berupa audio."); return; }
+        const rt = baiRt();
+        try { if (rt.vo?.url) URL.revokeObjectURL(rt.vo.url); } catch {}
+        const url = URL.createObjectURL(f);
+        rt.vo = { file: f, url, name: String(f.name || ""), durationSec: 0 };
+        rt.durationEdited = false;
+        baiAutoSetVolumes();
+        baiEnsureMediaDurations().then(() => {
+          baiApplyDefaultDurations();
+          baiRenderImageList();
+          baiSyncUi();
+        });
       };
       const ensurePdfLib = async () => {
         if (window.PDFLib && window.PDFLib.PDFDocument) return;
@@ -16721,6 +18065,8 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         setQuizPage,
         setQuizShareTab,
         setQuizPublish,
+        setQuizPointByType,
+        setQuizIncludeType,
         setQuizExpirePart,
         setQuizExpireDatetime,
         publishQuiz,
@@ -16820,7 +18166,9 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         exportRPPPdf,
         setLkpdSource,
         setBahanAjarTab,
+        setBahanAjarAdvancedOpen,
         setLkpdInteraktifTab,
+        setLkpdInteraktifAdvancedOpen,
         setBahanAjarSource,
         setLkpdInteraktifSource,
         copyFromModulAjarToBahanAjar,
@@ -16836,6 +18184,27 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         pickTopikPdf,
         pickBahanAjarModulPdf,
         pickBahanAjarImages,
+        pickBahanAjarInteraktifImages,
+        pickBahanAjarInteraktifBgm,
+        pickBahanAjarInteraktifVo,
+        sortBahanAjarInteraktifImages,
+        setBahanAjarInteraktifBgmPreset,
+        setBahanAjarInteraktifSelectedImage,
+        moveBahanAjarInteraktifImage,
+        removeBahanAjarInteraktifImage,
+        setBahanAjarInteraktifImageDuration,
+        setBahanAjarInteraktifBgmVolume,
+        setBahanAjarInteraktifVoVolume,
+        toggleBahanAjarInteraktifPreview,
+        generateBahanAjarInteraktifVideo,
+        convertBahanAjarInteraktifToWhatsAppMp4,
+        clearBahanAjarInteraktifImages,
+        clearBahanAjarInteraktifBgm,
+        clearBahanAjarInteraktifVo,
+        openBahanAjarInteraktifVideo,
+        closeBahanAjarInteraktifVideo,
+        initBahanAjarInteraktif,
+        stopBahanAjarInteraktif,
         pickLkpdInteraktifModulPdf,
         pickLkpdInteraktifImages,
         gabungkanBahanAjarKeModulAjar,
@@ -16994,6 +18363,12 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
       if (baPdf) baPdf.addEventListener("change", handleBahanAjarModulPdfSelected);
       const baImgs = el("bahanAjarImagesUpload");
       if (baImgs) baImgs.addEventListener("change", handleBahanAjarImagesSelected);
+      const baiImgs = el("bahanAjarInteraktifImagesUpload");
+      if (baiImgs) baiImgs.addEventListener("change", handleBahanAjarInteraktifImagesSelected);
+      const baiBgm = el("bahanAjarInteraktifBgmUpload");
+      if (baiBgm) baiBgm.addEventListener("change", handleBahanAjarInteraktifBgmSelected);
+      const baiVo = el("bahanAjarInteraktifVoUpload");
+      if (baiVo) baiVo.addEventListener("change", handleBahanAjarInteraktifVoSelected);
       const liPdf = el("lkpdInteraktifModulPdfUpload");
       if (liPdf) liPdf.addEventListener("change", handleLkpdInteraktifModulPdfSelected);
       const liImgs = el("lkpdInteraktifImagesUpload");

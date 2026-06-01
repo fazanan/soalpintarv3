@@ -67,31 +67,31 @@ function __sp_sheet_name($name, $fallback) {
   else $n = substr($n, 0, 100);
   return $n;
 }
-function __sp_try_gsheet_autosync(mysqli $mysqli, int $publishedId, int $absen, string $nama, int $score, int $total, string $createdAt, array $answersOrdered): void {
+function __sp_try_gsheet_autosync(mysqli $mysqli, int $publishedId, int $absen, string $nama, int $score, int $total, string $createdAt, array $answersOrdered): array {
   try {
     $stmtQ = @$mysqli->prepare("SELECT user_id, mapel, kelas, slug FROM published_quizzes WHERE id=? LIMIT 1");
-    if (!$stmtQ) return;
+    if (!$stmtQ) return ['ok'=>false,'error'=>'stmt_quiz_fail'];
     $stmtQ->bind_param('i', $publishedId);
     $stmtQ->execute();
     $stmtQ->bind_result($ownerId, $mapel, $kelas, $slug);
-    if (!$stmtQ->fetch()) { $stmtQ->close(); return; }
+    if (!$stmtQ->fetch()) { $stmtQ->close(); return ['ok'=>false,'error'=>'quiz_not_found']; }
     $stmtQ->close();
     $ownerId = (int)$ownerId;
     $mapel = (string)$mapel;
     $kelas = (string)$kelas;
     $slug = (string)$slug;
-    if ($ownerId <= 0 || trim($mapel) === '') return;
+    if ($ownerId <= 0 || trim($mapel) === '') return ['ok'=>false,'error'=>'quiz_corrupt'];
 
     $stmtS = @$mysqli->prepare("SELECT spreadsheet_id, is_active, auto_sync, include_detail FROM gsheet_settings WHERE user_id=? AND mapel=? LIMIT 1");
-    if (!$stmtS) return;
+    if (!$stmtS) return ['ok'=>false,'error'=>'stmt_gsheet_fail'];
     $stmtS->bind_param('is', $ownerId, $mapel);
     $stmtS->execute();
     $stmtS->bind_result($spreadsheetId, $isActive, $autoSync, $includeDetail);
-    if (!$stmtS->fetch()) { $stmtS->close(); return; }
+    if (!$stmtS->fetch()) { $stmtS->close(); return ['ok'=>false,'error'=>'gsheet_not_configured']; }
     $stmtS->close();
-    if ((int)$isActive !== 1) return;
+    if ((int)$isActive !== 1) return ['ok'=>false,'error'=>'gsheet_inactive'];
     $spreadsheetId = trim((string)$spreadsheetId);
-    if ($spreadsheetId === '') return;
+    if ($spreadsheetId === '') return ['ok'=>false,'error'=>'gsheet_id_empty'];
 
     $createdAt = trim((string)$createdAt);
     if ($createdAt === '') $createdAt = date('Y-m-d H:i:s');
@@ -99,13 +99,13 @@ function __sp_try_gsheet_autosync(mysqli $mysqli, int $publishedId, int $absen, 
 
     require_once __DIR__ . '/gsheet_service.php';
     $tok = gsheet_get_access_token();
-    if (!($tok['ok'] ?? false)) return;
+    if (!($tok['ok'] ?? false)) return ['ok'=>false,'error'=>'gsheet_token_failed','message'=>(string)($tok['message'] ?? '')];
     $accessToken = (string)($tok['access_token'] ?? '');
-    if ($accessToken === '') return;
+    if ($accessToken === '') return ['ok'=>false,'error'=>'gsheet_token_empty'];
 
     $upsert = function(string $sheetName, string $absenColLetter, array $header, array $rowValues) use ($spreadsheetId, $accessToken, $absen) {
       $ens = gsheet_ensure_sheet($spreadsheetId, $sheetName, $accessToken);
-      if (!($ens['ok'] ?? false)) return;
+      if (!($ens['ok'] ?? false)) return ['ok'=>false,'error'=>'ensure_sheet_fail','sheet'=>$sheetName,'message'=>(string)($ens['message'] ?? '')];
       gsheet_write_row($spreadsheetId, $sheetName, 1, $header, $accessToken);
       $find = gsheet_find_row_in_column($spreadsheetId, $sheetName, $absenColLetter, (string)$absen, $accessToken, 2, 5000);
       $rowNum = (int)($find['row'] ?? 0);
@@ -114,14 +114,17 @@ function __sp_try_gsheet_autosync(mysqli $mysqli, int $publishedId, int $absen, 
       } else {
         gsheet_append_row($spreadsheetId, $sheetName, $rowValues, $accessToken);
       }
+      return ['ok'=>true];
     };
 
     $sheetName = __sp_sheet_name($kelas, 'Kelas');
-    $upsert($sheetName, 'D', ['Waktu Submit', 'Quiz ID', 'Slug', 'No Absen', 'Nama', 'Skor', 'Total', 'Nilai (%)'], [$createdAt, $publishedId, trim($slug), $absen, $nama, $score, $total, $pct]);
+    $r = $upsert($sheetName, 'D', ['Waktu Submit', 'Quiz ID', 'Slug', 'No Absen', 'Nama', 'Skor', 'Total', 'Nilai (%)'], [$createdAt, $publishedId, trim($slug), $absen, $nama, $score, $total, $pct]);
+    if (!($r['ok'] ?? false)) return $r + ['step'=>'kelas_sheet'];
 
     $slugTrim = trim($slug);
     $hasilSheet = __sp_sheet_name('Hasil ' . ($slugTrim !== '' ? $slugTrim : (string)$publishedId), 'Hasil');
-    $upsert($hasilSheet, 'D', ['Waktu Submit', 'Quiz ID', 'Slug', 'No Absen', 'Nama', 'Skor', 'Total', 'Nilai (%)'], [$createdAt, $publishedId, $slugTrim, $absen, $nama, $score, $total, $pct]);
+    $r = $upsert($hasilSheet, 'D', ['Waktu Submit', 'Quiz ID', 'Slug', 'No Absen', 'Nama', 'Skor', 'Total', 'Nilai (%)'], [$createdAt, $publishedId, $slugTrim, $absen, $nama, $score, $total, $pct]);
+    if (!($r['ok'] ?? false)) return $r + ['step'=>'hasil_sheet'];
 
     $detailSheet = __sp_sheet_name('Jawaban ' . ($slugTrim !== '' ? $slugTrim : (string)$publishedId), 'Jawaban');
     $header = ['Waktu Submit', 'Quiz ID', 'Slug', 'No Absen', 'Nama', 'Skor', 'Total', 'Nilai (%)', 'Jawaban JSON'];
@@ -135,9 +138,11 @@ function __sp_try_gsheet_autosync(mysqli $mysqli, int $publishedId, int $absen, 
     if ((int)$includeDetail === 1) {
       foreach ($answersOrdered as $v) $row[] = (string)$v;
     }
-    $upsert($detailSheet, 'D', $header, $row);
+    $r = $upsert($detailSheet, 'D', $header, $row);
+    if (!($r['ok'] ?? false)) return $r + ['step'=>'jawaban_sheet'];
+    return ['ok'=>true];
   } catch (Throwable $e) {
-    return;
+    return ['ok'=>false,'error'=>'exception','message'=>$e->getMessage()];
   }
 }
 $raw = file_get_contents('php://input');
@@ -220,58 +225,285 @@ if (is_array($decoded)) {
   if (isset($decoded['items']) && is_array($decoded['items'])) $items = $decoded['items'];
   else $items = $decoded;
 }
-$score = 0;
-$len = min(count($answerKey), count($answers), count($orderMap));
-for ($i=0; $i<$len; $i++) {
-  $pos = $rev[$i] ?? null;
-  if ($pos === null) continue;
-  $ansRaw = $answers[$pos] ?? null;
-  $correctRaw = $answerKey[$i] ?? null;
+$requireGSheet = false;
+$nScan = min(count($items), count($answerKey));
+for ($i = 0; $i < $nScan; $i++) {
   $q = is_array($items[$i] ?? null) ? $items[$i] : [];
-  $type = strtolower(trim((string)($q['type'] ?? '')));
-  if ($type === 'isian') $type = 'isian_singkat';
-  if ($type === '') $type = is_array($correctRaw) ? 'pg_kompleks' : 'pg';
-  if ($type === 'isian_singkat') {
-    $ansText = '';
-    if (is_array($ansRaw)) $ansText = (string)($ansRaw[0] ?? '');
-    else $ansText = (string)($ansRaw ?? '');
-    $ansNorm = __sp_norm_short_text($ansText);
-    if ($ansNorm !== '') {
-      $keys = __sp_short_key_list($correctRaw);
-      if (in_array($ansNorm, $keys, true)) $score++;
+  $t = strtolower(trim((string)($q['type'] ?? '')));
+  if ($t === 'isian') $t = 'isian_singkat';
+  if ($t === 'isian_singkat' || $t === 'uraian') { $requireGSheet = true; break; }
+}
+$gsheetOk = false;
+if ($requireGSheet) {
+  $stmtG = @$mysqli->prepare("SELECT spreadsheet_id, is_active FROM gsheet_settings WHERE user_id=? AND mapel=? LIMIT 1");
+  if (!$stmtG) {
+    http_response_code(503);
+    echo json_encode(['ok'=>false,'error'=>'gsheet_unavailable']);
+    exit;
+  }
+  $stmtG->bind_param('is', $ownerId, $mapel);
+  $stmtG->execute();
+  $stmtG->bind_result($gsheetId, $gsheetActive);
+  $has = $stmtG->fetch();
+  $stmtG->close();
+  $gsheetOk = $has && (int)$gsheetActive === 1 && trim((string)$gsheetId) !== '';
+  if (!$gsheetOk) {
+    http_response_code(503);
+    echo json_encode(['ok'=>false,'error'=>'gsheet_required','message'=>'Isian singkat & uraian wajib terhubung ke Google Sheets.']);
+    exit;
+  }
+} else {
+  try {
+    $stmtG = @$mysqli->prepare("SELECT spreadsheet_id, is_active FROM gsheet_settings WHERE user_id=? AND mapel=? LIMIT 1");
+    if ($stmtG) {
+      $stmtG->bind_param('is', $ownerId, $mapel);
+      $stmtG->execute();
+      $stmtG->bind_result($gsheetId, $gsheetActive);
+      $has = $stmtG->fetch();
+      $stmtG->close();
+      $gsheetOk = $has && (int)$gsheetActive === 1 && trim((string)$gsheetId) !== '';
     }
-  } else if ($type === 'pg_kompleks') {
-    $corr = [];
-    $corrRawArr = is_array($correctRaw) ? $correctRaw : [$correctRaw];
-    foreach ($corrRawArr as $v) {
-      if (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+$/', trim($v)))) $corr[] = (int)$v;
-    }
-    $corr = array_values(array_unique($corr));
-    sort($corr);
-    $ans = [];
-    if (is_array($ansRaw)) {
-      foreach ($ansRaw as $v) {
-        if (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+$/', trim($v)))) $ans[] = (int)$v;
-      }
-    } else if (is_int($ansRaw) || is_float($ansRaw) || (is_string($ansRaw) && preg_match('/^-?\d+$/', trim($ansRaw)))) {
-      $ans[] = (int)$ansRaw;
-    }
-    $ans = array_values(array_unique($ans));
-    sort($ans);
-    if ($ans === $corr) $score++;
-  } else {
-    $ansIdx = -1;
-    if (is_array($ansRaw)) {
-      if (count($ansRaw) > 0) $ansIdx = (int)($ansRaw[0] ?? -1);
-    } else if ($ansRaw !== null) {
-      $ansIdx = (int)$ansRaw;
-    }
-    $correct = -1;
-    if (is_int($correctRaw) || is_float($correctRaw) || (is_string($correctRaw) && preg_match('/^-?\d+$/', trim($correctRaw)))) $correct = (int)$correctRaw;
-    if ($ansIdx === $correct) $score++;
+  } catch (Throwable $e) {
+    $gsheetOk = false;
   }
 }
-$totalFinal = $total ?: $len;
+$pointsByType = [];
+if (is_array($decoded) && isset($decoded['settings']['points_by_type']) && is_array($decoded['settings']['points_by_type'])) {
+  $pointsByType = $decoded['settings']['points_by_type'];
+}
+$pointsMode = '';
+if (is_array($decoded) && isset($decoded['settings']['points_mode'])) $pointsMode = strtolower(trim((string)$decoded['settings']['points_mode']));
+if ($pointsMode !== 'per_type_total' && $pointsMode !== 'per_question') $pointsMode = 'per_question';
+$getPts = function(string $type) use ($pointsByType): int {
+  $t = strtolower(trim($type));
+  if ($t === 'isian') $t = 'isian_singkat';
+  $v = $pointsByType[$t] ?? 1;
+  $n = (int)$v;
+  if ($n < 0) $n = 0;
+  if ($n > 100) $n = 100;
+  return $n <= 0 ? 0 : $n;
+};
+$score = 0;
+$len = min(count($answerKey), count($answers), count($orderMap));
+$totalFinal = 0;
+if ($pointsMode === 'per_type_total') {
+  $counts = [];
+  $corrects = [];
+  $typesByIdx = [];
+  for ($i = 0; $i < min(count($items), count($answerKey)); $i++) {
+    $q = is_array($items[$i] ?? null) ? $items[$i] : [];
+    $t = strtolower(trim((string)($q['type'] ?? '')));
+    if ($t === 'isian') $t = 'isian_singkat';
+    if ($t === '') $t = is_array($answerKey[$i] ?? null) ? 'pg_kompleks' : 'pg';
+    $typesByIdx[$i] = $t;
+    if (!isset($counts[$t])) $counts[$t] = 0;
+    if (!isset($corrects[$t])) $corrects[$t] = 0;
+    $counts[$t]++;
+  }
+  $getWeight = function(string $type) use ($pointsByType, $counts): int {
+    $t = strtolower(trim($type));
+    if ($t === 'isian') $t = 'isian_singkat';
+    $v = $pointsByType[$t] ?? null;
+    if ($v === null) return (int)($counts[$t] ?? 0);
+    $n = (int)$v;
+    if ($n < 0) $n = 0;
+    if ($n > 100) $n = 100;
+    return $n;
+  };
+  for ($i = 0; $i < $len; $i++) {
+    $pos = $rev[$i] ?? null;
+    if ($pos === null) continue;
+    $ansRaw = $answers[$pos] ?? null;
+    $correctRaw = $answerKey[$i] ?? null;
+    $q = is_array($items[$i] ?? null) ? $items[$i] : [];
+    $type = (string)($typesByIdx[$i] ?? '');
+    if ($type === '') $type = is_array($correctRaw) ? 'pg_kompleks' : 'pg';
+    if ($type === 'uraian') continue;
+    $ok = false;
+    if ($type === 'isian_singkat') {
+      $ansText = '';
+      if (is_array($ansRaw)) $ansText = (string)($ansRaw[0] ?? '');
+      else $ansText = (string)($ansRaw ?? '');
+      $ansNorm = __sp_norm_short_text($ansText);
+      if ($ansNorm !== '') {
+        $keys = __sp_short_key_list($correctRaw);
+        $ok = in_array($ansNorm, $keys, true);
+      }
+    } else if ($type === 'menjodohkan') {
+      $corr = [];
+      if (is_array($correctRaw)) {
+        foreach ($correctRaw as $v) $corr[] = (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+$/', trim($v)))) ? (int)$v : -1;
+      }
+      $ans = [];
+      if (is_array($ansRaw)) {
+        foreach ($ansRaw as $v) $ans[] = (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+$/', trim($v)))) ? (int)$v : -1;
+      } else if ($ansRaw !== null) {
+        $ans[] = (is_int($ansRaw) || is_float($ansRaw) || (is_string($ansRaw) && preg_match('/^-?\d+$/', trim($ansRaw)))) ? (int)$ansRaw : -1;
+      }
+      $right = [];
+      if (is_array($q)) {
+        if (isset($q['right_options']) && is_array($q['right_options'])) $right = $q['right_options'];
+        else if (isset($q['rightOptions']) && is_array($q['rightOptions'])) $right = $q['rightOptions'];
+        else if (isset($q['answer']) && is_array($q['answer'])) $right = $q['answer'];
+      }
+      $n = min(count(is_array($q['options'] ?? null) ? $q['options'] : []), count($right));
+      $corr = array_slice($corr, 0, $n);
+      $ans = array_slice($ans, 0, $n);
+      $ok = $n >= 2;
+      for ($k = 0; $k < $n; $k++) {
+        $a = $ans[$k] ?? -999;
+        $c = $corr[$k] ?? -999;
+        if ((int)$a !== (int)$c) { $ok = false; break; }
+      }
+      if (count($corr) !== $n) $ok = false;
+    } else if ($type === 'pg_kompleks') {
+      $corr = [];
+      $corrRawArr = is_array($correctRaw) ? $correctRaw : [$correctRaw];
+      foreach ($corrRawArr as $v) {
+        if (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+$/', trim($v)))) $corr[] = (int)$v;
+      }
+      $corr = array_values(array_unique($corr));
+      sort($corr);
+      $ans = [];
+      if (is_array($ansRaw)) {
+        foreach ($ansRaw as $v) {
+          if (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+$/', trim($v)))) $ans[] = (int)$v;
+        }
+      } else if (is_int($ansRaw) || is_float($ansRaw) || (is_string($ansRaw) && preg_match('/^-?\d+$/', trim($ansRaw)))) {
+        $ans[] = (int)$ansRaw;
+      }
+      $ans = array_values(array_unique($ans));
+      sort($ans);
+      $ok = false;
+      if (!empty($ans) && !empty($corr)) {
+        $set = array_fill_keys($corr, 1);
+        $ok = true;
+        foreach ($ans as $v) {
+          if (!isset($set[(int)$v])) { $ok = false; break; }
+        }
+      }
+    } else {
+      $ansIdx = -1;
+      if (is_array($ansRaw)) {
+        if (count($ansRaw) > 0) $ansIdx = (int)($ansRaw[0] ?? -1);
+      } else if ($ansRaw !== null) {
+        $ansIdx = (int)$ansRaw;
+      }
+      $correct = -1;
+      if (is_int($correctRaw) || is_float($correctRaw) || (is_string($correctRaw) && preg_match('/^-?\d+$/', trim($correctRaw)))) $correct = (int)$correctRaw;
+      $ok = ($ansIdx === $correct);
+    }
+    if ($ok) $corrects[$type] = (int)($corrects[$type] ?? 0) + 1;
+  }
+  $typesPresent = array_keys($counts);
+  foreach ($typesPresent as $t) {
+    $w = (int)$getWeight($t);
+    $totalFinal += $w;
+    if ($t === 'uraian') continue;
+    $cnt = (int)($counts[$t] ?? 0);
+    if ($cnt <= 0 || $w <= 0) continue;
+    $c = (int)($corrects[$t] ?? 0);
+    $score += (int)round(($c / $cnt) * $w);
+  }
+} else {
+  for ($i=0; $i<$len; $i++) {
+    $pos = $rev[$i] ?? null;
+    if ($pos === null) continue;
+    $ansRaw = $answers[$pos] ?? null;
+    $correctRaw = $answerKey[$i] ?? null;
+    $q = is_array($items[$i] ?? null) ? $items[$i] : [];
+    $type = strtolower(trim((string)($q['type'] ?? '')));
+    if ($type === 'isian') $type = 'isian_singkat';
+    if ($type === '') $type = is_array($correctRaw) ? 'pg_kompleks' : 'pg';
+    $pts = $getPts($type);
+    if ($type === 'uraian') {
+      continue;
+    }
+    if ($type === 'isian_singkat') {
+      $ansText = '';
+      if (is_array($ansRaw)) $ansText = (string)($ansRaw[0] ?? '');
+      else $ansText = (string)($ansRaw ?? '');
+      $ansNorm = __sp_norm_short_text($ansText);
+      if ($ansNorm !== '') {
+        $keys = __sp_short_key_list($correctRaw);
+        if (in_array($ansNorm, $keys, true)) $score += $pts;
+      }
+    } else if ($type === 'menjodohkan') {
+      $corr = [];
+      if (is_array($correctRaw)) {
+        foreach ($correctRaw as $v) $corr[] = (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+$/', trim($v)))) ? (int)$v : -1;
+      }
+      $ans = [];
+      if (is_array($ansRaw)) {
+        foreach ($ansRaw as $v) $ans[] = (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+$/', trim($v)))) ? (int)$v : -1;
+      } else if ($ansRaw !== null) {
+        $ans[] = (is_int($ansRaw) || is_float($ansRaw) || (is_string($ansRaw) && preg_match('/^-?\d+$/', trim($ansRaw)))) ? (int)$ansRaw : -1;
+      }
+      $right = [];
+      if (is_array($q)) {
+        if (isset($q['right_options']) && is_array($q['right_options'])) $right = $q['right_options'];
+        else if (isset($q['rightOptions']) && is_array($q['rightOptions'])) $right = $q['rightOptions'];
+        else if (isset($q['answer']) && is_array($q['answer'])) $right = $q['answer'];
+      }
+      $n = min(count(is_array($q['options'] ?? null) ? $q['options'] : []), count($right));
+      $corr = array_slice($corr, 0, $n);
+      $ans = array_slice($ans, 0, $n);
+      $ok = true;
+      for ($k = 0; $k < $n; $k++) {
+        $a = $ans[$k] ?? -999;
+        $c = $corr[$k] ?? -999;
+        if ((int)$a !== (int)$c) { $ok = false; break; }
+      }
+      if ($n >= 2 && $ok) $score += $pts;
+    } else if ($type === 'pg_kompleks') {
+      $corr = [];
+      $corrRawArr = is_array($correctRaw) ? $correctRaw : [$correctRaw];
+      foreach ($corrRawArr as $v) {
+        if (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+$/', trim($v)))) $corr[] = (int)$v;
+      }
+      $corr = array_values(array_unique($corr));
+      sort($corr);
+      $ans = [];
+      if (is_array($ansRaw)) {
+        foreach ($ansRaw as $v) {
+          if (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+$/', trim($v)))) $ans[] = (int)$v;
+        }
+      } else if (is_int($ansRaw) || is_float($ansRaw) || (is_string($ansRaw) && preg_match('/^-?\d+$/', trim($ansRaw)))) {
+        $ans[] = (int)$ansRaw;
+      }
+      $ans = array_values(array_unique($ans));
+      sort($ans);
+    $ok = false;
+    if (!empty($ans) && !empty($corr)) {
+      $set = array_fill_keys($corr, 1);
+      $ok = true;
+      foreach ($ans as $v) {
+        if (!isset($set[(int)$v])) { $ok = false; break; }
+      }
+    }
+    if ($ok) $score += $pts;
+    } else {
+      $ansIdx = -1;
+      if (is_array($ansRaw)) {
+        if (count($ansRaw) > 0) $ansIdx = (int)($ansRaw[0] ?? -1);
+      } else if ($ansRaw !== null) {
+        $ansIdx = (int)$ansRaw;
+      }
+      $correct = -1;
+      if (is_int($correctRaw) || is_float($correctRaw) || (is_string($correctRaw) && preg_match('/^-?\d+$/', trim($correctRaw)))) $correct = (int)$correctRaw;
+      if ($ansIdx === $correct) $score += $pts;
+    }
+  }
+  $totalPoints = 0;
+  for ($i = 0; $i < min(count($items), count($answerKey)); $i++) {
+    $q = is_array($items[$i] ?? null) ? $items[$i] : [];
+    $t = strtolower(trim((string)($q['type'] ?? '')));
+    if ($t === 'isian') $t = 'isian_singkat';
+    if ($t === '') $t = is_array($answerKey[$i] ?? null) ? 'pg_kompleks' : 'pg';
+    $totalPoints += $getPts($t);
+  }
+  $totalFinal = $totalPoints;
+}
 $answersOrdered = [];
 for ($i = 0; $i < $len; $i++) {
   $pos = $rev[$i] ?? null;
@@ -293,6 +525,27 @@ for ($i = 0; $i < $len; $i++) {
       if (strlen($txt) > 250) $txt = substr($txt, 0, 250);
     }
     $answersOrdered[] = $txt;
+  } else if ($type === 'uraian') {
+    $txt = '';
+    if (is_array($ansRaw)) $txt = (string)($ansRaw[0] ?? '');
+    else $txt = (string)($ansRaw ?? '');
+    $txt = trim($txt);
+    $txt = preg_replace('/\s+/', ' ', (string)$txt);
+    if (function_exists('mb_strlen') && function_exists('mb_substr')) {
+      if (mb_strlen($txt, 'UTF-8') > 800) $txt = mb_substr($txt, 0, 800, 'UTF-8');
+    } else {
+      if (strlen($txt) > 800) $txt = substr($txt, 0, 800);
+    }
+    $answersOrdered[] = $txt;
+  } else if ($type === 'menjodohkan') {
+    $arr = is_array($ansRaw) ? $ansRaw : [$ansRaw];
+    $letters = [];
+    foreach ($arr as $v) {
+      $idx = (is_int($v) || is_float($v) || (is_string($v) && preg_match('/^-?\d+$/', trim($v)))) ? (int)$v : -1;
+      if ($idx >= 0 && $idx < 26) $letters[] = chr(65 + $idx);
+      else $letters[] = '';
+    }
+    $answersOrdered[] = implode(',', array_map(fn($x) => $x === '' ? '-' : $x, $letters));
   } else if ($type === 'pg_kompleks') {
     $vals = [];
     if (is_array($ansRaw)) {
@@ -341,18 +594,14 @@ try {
   }
 } catch (Throwable $e) {
 }
-$resp = ['ok'=>true,'status'=>'saved','score'=>$score,'total'=>$totalFinal];
-$outJson = json_encode($resp, JSON_UNESCAPED_UNICODE);
-if (!is_string($outJson)) $outJson = '{"ok":true}';
-header('Connection: close');
-header('Content-Length: ' . strlen($outJson));
-echo $outJson;
-if (function_exists('fastcgi_finish_request')) {
-  @fastcgi_finish_request();
-} else {
-  while (ob_get_level() > 0) { @ob_end_flush(); }
-  @flush();
+if ($gsheetOk) {
+  if (function_exists('set_time_limit')) { @set_time_limit(60); }
+  if (function_exists('ini_set')) { @ini_set('max_execution_time', '60'); }
+  $sync = __sp_try_gsheet_autosync($mysqli, $pubId, $absen, $nama, $score, $totalFinal, $createdAt, $answersOrdered);
+  if (!($sync['ok'] ?? false)) {
+    http_response_code(503);
+    echo json_encode(['ok'=>false,'error'=>'gsheet_sync_failed','details'=>$sync], JSON_UNESCAPED_UNICODE);
+    exit;
+  }
 }
-@ignore_user_abort(true);
-@set_time_limit(15);
-__sp_try_gsheet_autosync($mysqli, $pubId, $absen, $nama, $score, $totalFinal, $createdAt, $answersOrdered);
+echo json_encode(['ok'=>true,'status'=>'saved','score'=>$score,'total'=>$totalFinal], JSON_UNESCAPED_UNICODE);

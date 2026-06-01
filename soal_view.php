@@ -130,11 +130,15 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><?php echo htmlspecialchars($mapel ?: 'Soal'); ?></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
   <style>
     .brand-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:9999px;border:1px solid #e7edf3;background:#fff}
     .brand-dot{width:10px;height:10px;border-radius:6px;background:#137fec}
     .brand-text{font-weight:800;letter-spacing:.2px}
+    .score-hand{font-family:'Kalam','Segoe Print','Bradley Hand','Comic Sans MS',cursive}
   </style>
 </head>
 <body class="bg-gray-50">
@@ -224,6 +228,8 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
     let studentName = <?php echo json_encode($studentName, JSON_UNESCAPED_UNICODE); ?>;
     const showSolution = <?php echo (int)$showSolution; ?> === 1;
     const answerKey = <?php echo json_encode($answerKeySettings, JSON_UNESCAPED_UNICODE); ?>;
+    const pointsByType = <?php echo json_encode((is_array($decoded) && isset($decoded['settings']['points_by_type']) && is_array($decoded['settings']['points_by_type'])) ? $decoded['settings']['points_by_type'] : [], JSON_UNESCAPED_UNICODE); ?>;
+    const pointsMode = <?php echo json_encode((is_array($decoded) && isset($decoded['settings']['points_mode'])) ? (string)$decoded['settings']['points_mode'] : 'per_question', JSON_UNESCAPED_UNICODE); ?>;
     const isReview = <?php echo $isReview ? 'true' : 'false'; ?>;
     (function(){
       const el = document.getElementById('dtNow');
@@ -243,6 +249,16 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
     let soalTypeTab = 'pg';
     const studentAnswers = {};
     let reviewPct = null;
+    let reviewScore = null;
+    let reviewTotal = null;
+    let manualGrades = {};
+    let manualDirty = false;
+    const getPts = (type) => {
+      const t0 = String(type || '').trim();
+      const t = (t0 === 'isian') ? 'isian_singkat' : t0;
+      const n = Math.floor(Number(pointsByType?.[t]));
+      return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 1;
+    };
     function renderReviewScoreBox() {
       const box = document.getElementById('reviewScoreBox');
       if (!box) return;
@@ -253,7 +269,7 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       box.innerHTML = `
         <div class="w-24 h-24 rounded-xl border-2 ${c} flex flex-col overflow-hidden bg-white">
           <div class="flex-1 flex items-center justify-center">
-            <div class="text-3xl font-extrabold leading-none">${pct}</div>
+            <div class="score-hand text-4xl leading-none">${pct}</div>
           </div>
           <div class="h-7 border-t border-black/10 flex items-center justify-center text-xs font-extrabold tracking-wide text-gray-700">
             NILAI
@@ -261,6 +277,53 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         </div>
       `;
     }
+    let manualSaveStatus = '';
+    const isSubjectiveType = (t) => t === 'isian_singkat' || t === 'uraian';
+    const onManualGradeChange = (origIdx, maxPts, v) => {
+      if (!isReview) return;
+      const idx = Number(origIdx);
+      if (!Number.isFinite(idx) || idx < 0) return;
+      const max = Math.max(0, Math.floor(Number(maxPts)));
+      const n0 = Math.floor(Number(v));
+      const n = Number.isFinite(n0) ? Math.min(max, Math.max(0, n0)) : 0;
+      manualGrades = { ...(manualGrades || {}), [String(idx)]: n };
+      manualDirty = true;
+      manualSaveStatus = 'Perubahan belum disimpan';
+      render();
+    };
+    const saveManualGrades = async () => {
+      if (!isReview) return;
+      manualSaveStatus = 'Menyimpan...';
+      render();
+      try {
+        const res = await fetch(`api/published_quiz_results.php?slug=${encodeURIComponent(String(slug||''))}&mode=grade`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ absen: Number(absen||0), grades: manualGrades || {} }),
+        });
+        const js = await res.json().catch(() => null);
+        if (!res.ok || !js || js.ok !== true) {
+          const msg = js?.message || js?.error || 'Gagal menyimpan nilai';
+          manualSaveStatus = String(msg);
+          render();
+          return;
+        }
+        reviewScore = Number(js.score ?? reviewScore);
+        reviewTotal = Number(js.total ?? reviewTotal);
+        if (Number.isFinite(reviewScore) && Number.isFinite(reviewTotal) && reviewTotal > 0) reviewPct = (reviewScore / reviewTotal) * 100;
+        manualGrades = (js.grades && typeof js.grades === 'object') ? js.grades : (manualGrades || {});
+        manualDirty = false;
+        manualSaveStatus = 'Tersimpan';
+        renderReviewScoreBox();
+        render();
+      } catch (e) {
+        manualSaveStatus = 'Gagal menyimpan nilai';
+        render();
+      }
+    };
+    window.onManualGradeChange = onManualGradeChange;
+    window.saveManualGrades = saveManualGrades;
     function escapeHtml(s) {
       return String(s ?? '')
         .replaceAll('&', '&amp;')
@@ -286,11 +349,13 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
     function normalizeQType(q) {
       const t = String(q?.type || '').trim();
       if (t === 'isian_singkat' || t === 'isian') return 'isian_singkat';
+      if (t === 'menjodohkan') return 'menjodohkan';
+      if (t === 'uraian') return 'uraian';
       if (t === 'benar_salah' || t === 'pg_kompleks' || t === 'pg') return t;
       return 'pg';
     }
     function buildOrderData(questions, seed) {
-      const typeOrder = ['pg', 'benar_salah', 'pg_kompleks', 'isian_singkat'];
+      const typeOrder = ['pg', 'benar_salah', 'pg_kompleks', 'menjodohkan', 'isian_singkat', 'uraian'];
       const groups = {};
       for (const t of typeOrder) groups[t] = [];
       const others = [];
@@ -335,6 +400,18 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       if (!Number.isFinite(p) || p < 0) return;
       studentAnswers[p] = String(value ?? '');
     }
+    function onMatchChange(pos, leftIndex, rightIndex) {
+      const p = Number(pos);
+      const li = Number(leftIndex);
+      const ri = Number(rightIndex);
+      if (!Number.isFinite(p) || p < 0) return;
+      if (!Number.isFinite(li) || li < 0) return;
+      const cur = Array.isArray(studentAnswers[p]) ? studentAnswers[p] : [];
+      const next = cur.slice();
+      while (next.length <= li) next.push(-1);
+      next[li] = Number.isFinite(ri) ? Math.floor(ri) : -1;
+      studentAnswers[p] = next;
+    }
     function normalizeShortText(s) {
       let v = String(s ?? '');
       v = v.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
@@ -365,6 +442,192 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       const keys = shortKeyList(keyRaw);
       return keys.includes(ans);
     }
+    function computeReviewBreakdown(questions, orderData) {
+      const mode = String(pointsMode || '').trim();
+      const earned = {};
+      const total = {};
+      const ensure = (t) => {
+        if (!Object.prototype.hasOwnProperty.call(earned, t)) earned[t] = 0;
+        if (!Object.prototype.hasOwnProperty.call(total, t)) total[t] = 0;
+      };
+      const eqNumArray = (a, b) => {
+        const aa = Array.isArray(a) ? a.map(n => Number(n)).filter(n => Number.isFinite(n) && n >= 0).sort((x, y) => x - y) : [];
+        const bb = Array.isArray(b) ? b.map(n => Number(n)).filter(n => Number.isFinite(n) && n >= 0).sort((x, y) => x - y) : [];
+        if (aa.length !== bb.length) return false;
+        for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) return false;
+        return true;
+      };
+      const getWeight = (t, counts) => {
+        const key = String(t || '').trim();
+        const n = Math.floor(Number(pointsByType?.[key]));
+        if (Number.isFinite(n)) return Math.min(100, Math.max(0, n));
+        const c = Math.floor(Number(counts?.[key] || 0));
+        return Number.isFinite(c) ? Math.max(0, c) : 0;
+      };
+      if (mode === 'per_type_total') {
+        const counts = {};
+        const corrects = {};
+        const typesByIdx = {};
+        for (let origIdx = 0; origIdx < questions.length; origIdx++) {
+          const t = normalizeQType(questions[origIdx] || {});
+          typesByIdx[origIdx] = t;
+          counts[t] = (counts[t] || 0) + 1;
+          corrects[t] = corrects[t] || 0;
+        }
+        for (let origIdx = 0; origIdx < questions.length; origIdx++) {
+          const q = questions[origIdx] || {};
+          const type = String(typesByIdx[origIdx] || normalizeQType(q));
+          const pos = Number(orderData.posByOrig[origIdx] ?? -1);
+          const picked = Number.isFinite(pos) && pos >= 0 ? studentAnswers[pos] : undefined;
+          if (type === 'uraian') continue;
+          if (type === 'isian_singkat') {
+            if (Object.prototype.hasOwnProperty.call(manualGrades || {}, String(origIdx))) continue;
+            const ok = isShortCorrect(String(picked ?? ''), answerKey[origIdx]);
+            if (ok) corrects[type] = (corrects[type] || 0) + 1;
+            continue;
+          }
+          if (type === 'menjodohkan') {
+            const key = Array.isArray(answerKey[origIdx]) ? answerKey[origIdx].map(n => Number(n)) : [];
+            const ans = Array.isArray(picked) ? picked.map(n => Number(n)) : [];
+            const n = Math.min(key.length, ans.length);
+            let ok = n >= 2 && key.length === n;
+            for (let i = 0; i < n; i++) {
+              if (Number(key[i]) !== Number(ans[i])) { ok = false; break; }
+            }
+            if (ok) corrects[type] = (corrects[type] || 0) + 1;
+            continue;
+          }
+          if (type === 'pg_kompleks') {
+            const corr = Array.isArray(answerKey[origIdx]) ? answerKey[origIdx] : [];
+            const p = Array.isArray(picked) ? picked.map(n => Number(n)).filter(n => Number.isFinite(n) && n >= 0) : [];
+            const c = Array.isArray(corr) ? corr.map(n => Number(n)).filter(n => Number.isFinite(n) && n >= 0) : [];
+            const set = new Set(c);
+            const ok = p.length > 0 && c.length > 0 && p.every(x => set.has(x));
+            if (ok) corrects[type] = (corrects[type] || 0) + 1;
+            continue;
+          }
+          const ansIdx = Number.isFinite(Number(picked)) ? Math.floor(Number(picked)) : -1;
+          const corrIdx = Number.isFinite(Number(answerKey[origIdx])) ? Math.floor(Number(answerKey[origIdx])) : -1;
+          if (ansIdx >= 0 && ansIdx === corrIdx) corrects[type] = (corrects[type] || 0) + 1;
+        }
+        for (const t of Object.keys(counts)) {
+          ensure(t);
+          const w = getWeight(t, counts);
+          total[t] = w;
+          if (t === 'uraian') {
+            let sum = 0;
+            for (let origIdx = 0; origIdx < questions.length; origIdx++) {
+              if (String(typesByIdx[origIdx]) !== 'uraian') continue;
+              const g = Number(manualGrades?.[String(origIdx)]);
+              if (Number.isFinite(g)) sum += g;
+            }
+            earned[t] = Math.min(w, Math.max(0, Math.round(sum)));
+            continue;
+          }
+          if (t === 'isian_singkat') {
+            const anyManual = Object.keys(manualGrades || {}).some(k => {
+              const i = Number(k);
+              return Number.isFinite(i) && String(typesByIdx[i]) === 'isian_singkat';
+            });
+            if (anyManual) {
+              let sum = 0;
+              for (let origIdx = 0; origIdx < questions.length; origIdx++) {
+                if (String(typesByIdx[origIdx]) !== 'isian_singkat') continue;
+                const g = Number(manualGrades?.[String(origIdx)]);
+                if (Number.isFinite(g)) sum += g;
+              }
+              earned[t] = Math.min(w, Math.max(0, Math.round(sum)));
+            } else {
+              const cnt = Number(counts[t] || 0);
+              const c = Number(corrects[t] || 0);
+              earned[t] = (cnt > 0 && w > 0) ? Math.round((c / cnt) * w) : 0;
+            }
+            continue;
+          }
+          const cnt = Number(counts[t] || 0);
+          const c = Number(corrects[t] || 0);
+          earned[t] = (cnt > 0 && w > 0) ? Math.round((c / cnt) * w) : 0;
+        }
+        return { earned, total };
+      }
+      for (let origIdx = 0; origIdx < questions.length; origIdx++) {
+        const q = questions[origIdx] || {};
+        const type = normalizeQType(q);
+        const pts = getPts(type);
+        ensure(type);
+        total[type] += pts;
+        const pos = Number(orderData.posByOrig[origIdx] ?? -1);
+        const picked = Number.isFinite(pos) && pos >= 0 ? studentAnswers[pos] : undefined;
+        if (type === 'uraian') {
+          const g = Number(manualGrades?.[String(origIdx)]);
+          earned[type] += Number.isFinite(g) ? Math.min(pts, Math.max(0, g)) : 0;
+          continue;
+        }
+        if (type === 'isian_singkat') {
+          if (Object.prototype.hasOwnProperty.call(manualGrades || {}, String(origIdx))) {
+            const g = Number(manualGrades?.[String(origIdx)]);
+            earned[type] += Number.isFinite(g) ? Math.min(pts, Math.max(0, g)) : 0;
+          } else {
+            const ok = isShortCorrect(String(picked ?? ''), answerKey[origIdx]);
+            earned[type] += ok ? pts : 0;
+          }
+          continue;
+        }
+        if (type === 'menjodohkan') {
+          const key = Array.isArray(answerKey[origIdx]) ? answerKey[origIdx].map(n => Number(n)) : [];
+          const ans = Array.isArray(picked) ? picked.map(n => Number(n)) : [];
+          const n = Math.min(key.length, ans.length);
+          let ok = n >= 2 && key.length === n;
+          for (let i = 0; i < n; i++) {
+            if (Number(key[i]) !== Number(ans[i])) { ok = false; break; }
+          }
+          earned[type] += ok ? pts : 0;
+          continue;
+        }
+        if (type === 'pg_kompleks') {
+          const corr = Array.isArray(answerKey[origIdx]) ? answerKey[origIdx] : [];
+          const p = Array.isArray(picked) ? picked.map(n => Number(n)).filter(n => Number.isFinite(n) && n >= 0) : [];
+          const c = Array.isArray(corr) ? corr.map(n => Number(n)).filter(n => Number.isFinite(n) && n >= 0) : [];
+          const set = new Set(c);
+          const ok = p.length > 0 && c.length > 0 && p.every(x => set.has(x));
+          earned[type] += ok ? pts : 0;
+          continue;
+        }
+        const ansIdx = Number.isFinite(Number(picked)) ? Math.floor(Number(picked)) : -1;
+        const corrIdx = Number.isFinite(Number(answerKey[origIdx])) ? Math.floor(Number(answerKey[origIdx])) : -1;
+        earned[type] += (ansIdx >= 0 && ansIdx === corrIdx) ? pts : 0;
+      }
+      return { earned, total };
+    }
+    function renderReviewBreakdown(questions, orderData) {
+      if (!isReview) return '';
+      const labels = { pg: 'Pilihan Ganda', benar_salah: 'Benar/Salah', pg_kompleks: 'PG Kompleks', menjodohkan: 'Menjodohkan', isian_singkat: 'Isian Singkat', uraian: 'Uraian' };
+      const b = computeReviewBreakdown(questions, orderData);
+      const types = orderData.typeOrder.filter(t => (b.total?.[t] ?? 0) > 0);
+      if (!types.length) return '';
+      const items = types.map(t => {
+        const e = Number(b.earned?.[t] ?? 0);
+        const tot = Number(b.total?.[t] ?? 0);
+        const pct = tot > 0 ? Math.round((e / tot) * 100) : 0;
+        const ok = pct >= 60;
+        const c = ok ? 'text-green-600 border-green-500 bg-green-50' : 'text-red-600 border-red-500 bg-red-50';
+        return `
+          <div class="rounded-xl border-2 ${c} px-3 py-2">
+            <div class="text-[11px] font-extrabold tracking-wide text-gray-700 truncate">${escapeHtml(labels[t] || t)}</div>
+            <div class="flex items-end justify-between gap-2 mt-1">
+              <div class="score-hand text-3xl leading-none">${pct}</div>
+              <div class="text-[11px] font-extrabold text-gray-800">${e}/${tot}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      return `
+        <div class="mb-4 rounded-xl border bg-gray-50 p-3">
+          <div class="text-sm font-bold mb-2">Nilai per Bentuk Soal</div>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-2">${items}</div>
+        </div>
+      `;
+    }
     function renderTabs() {
       const container = document.getElementById('root');
       if (!isReview && (!absen || absen <= 0 || !studentName || String(studentName).trim() === '')) {
@@ -376,10 +639,26 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         return;
       }
       const hasSolutionTab = showSolution && submitted;
+      const hasManual = isReview && Array.isArray(payload) && payload.some(q => {
+        const rt = String(q?.type || '').trim();
+        return rt === 'isian' || rt === 'isian_singkat' || rt === 'uraian';
+      });
       const tabs = `
-        <div class="flex items-center gap-2 border-b mb-4">
-          <button class="px-3 py-2 text-sm font-semibold ${activeTab==='soal'?'text-blue-600 border-b-2 border-blue-600':''}" onclick="activeTab='soal'; renderTabs()">Soal</button>
-          ${hasSolutionTab ? `<button class="px-3 py-2 text-sm font-semibold ${activeTab==='solusi'?'text-blue-600 border-b-2 border-blue-600':''}" onclick="activeTab='solusi'; renderTabs()">Jawaban & Pembahasan</button>` : ``}
+        <div class="flex items-center justify-between gap-2 border-b mb-4">
+          <div class="flex items-center gap-2">
+            <button class="px-3 py-2 text-sm font-semibold ${activeTab==='soal'?'text-blue-600 border-b-2 border-blue-600':''}" onclick="activeTab='soal'; renderTabs()">Soal</button>
+            ${hasSolutionTab ? `<button class="px-3 py-2 text-sm font-semibold ${activeTab==='solusi'?'text-blue-600 border-b-2 border-blue-600':''}" onclick="activeTab='solusi'; renderTabs()">Jawaban & Pembahasan</button>` : ``}
+          </div>
+          ${hasManual ? `
+            <div class="flex items-center gap-2">
+              <div class="text-xs text-gray-600">${escapeHtml(manualSaveStatus || '')}</div>
+              <button
+                class="h-9 px-3 rounded-lg font-semibold ${manualDirty ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-100 text-green-700'}"
+                onclick="saveManualGrades()"
+                ${manualDirty ? '' : 'disabled'}
+              >Simpan Nilai</button>
+            </div>
+          ` : ``}
         </div>
       `;
       let body = '';
@@ -397,8 +676,24 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       const availableTypes = orderData.typeOrder.filter(t => Array.isArray(orderData.groups[t]) && orderData.groups[t].length > 0);
       const activeTypes = availableTypes.length ? availableTypes : ['pg'];
       if (!activeTypes.includes(soalTypeTab)) soalTypeTab = activeTypes[0];
-      const tabLabel = { pg: 'Pilihan Ganda', benar_salah: 'Benar/Salah', pg_kompleks: 'PG Kompleks', isian_singkat: 'Isian Singkat' };
-      const tabSubtitle = { pg: 'Pilihlah salah satu jawaban yang paling tepat!', benar_salah: 'Pilihlah jawaban Benar atau Salah!', pg_kompleks: 'Pilih jawaban yang benar (bisa lebih dari satu)!', isian_singkat: 'Jawablah dengan singkat dan tepat!' };
+      const tabLabel = { pg: 'Pilihan Ganda', benar_salah: 'Benar/Salah', pg_kompleks: 'PG Kompleks', menjodohkan: 'Menjodohkan', isian_singkat: 'Isian Singkat', uraian: 'Uraian' };
+      const tabSubtitle = { pg: 'Pilihlah salah satu jawaban yang paling tepat!', benar_salah: 'Pilihlah jawaban Benar atau Salah!', pg_kompleks: 'Pilih jawaban yang benar (bisa lebih dari satu)!', menjodohkan: 'Jodohkanlah pernyataan pada lajur kiri dengan jawaban pada lajur kanan!', isian_singkat: 'Jawablah dengan singkat dan tepat!', uraian: 'Tuliskan jawaban dengan jelas!' };
+      const breakdown = isReview ? computeReviewBreakdown(questions, orderData) : null;
+      const currentScoreBox = (() => {
+        if (!isReview || !breakdown) return '';
+        const e = Number(breakdown.earned?.[soalTypeTab] ?? 0);
+        const tot = Number(breakdown.total?.[soalTypeTab] ?? 0);
+        if (!(tot > 0)) return '';
+        const pct = Math.max(0, Math.min(100, Math.round((e / tot) * 100)));
+        const ok = pct >= 60;
+        const c = ok ? 'text-green-600' : 'text-red-600';
+        const points = Math.max(0, Math.round(e));
+        return `
+          <div class="flex items-center gap-2">
+            <div class="score-hand text-4xl leading-none ${c}">${points}</div>
+          </div>
+        `;
+      })();
       const getCorrectSet = (type, key) => {
         if (type === 'pg_kompleks') {
           const arr = Array.isArray(key) ? key : [];
@@ -413,13 +708,16 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         return Number.isFinite(n) && n >= 0 ? new Set([Math.floor(n)]) : new Set();
       };
       const tabs = `
-        <div class="flex flex-wrap items-center gap-2 mb-4">
-          ${activeTypes.map(t => `
-            <button
-              class="h-9 px-3 rounded-full border text-sm font-semibold ${soalTypeTab===t?'bg-blue-600 border-blue-600 text-white':'bg-white hover:bg-gray-50'}"
-              onclick="soalTypeTab='${t}'; renderTabs();"
-            >${escapeHtml(tabLabel[t] || t)}</button>
-          `).join('')}
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div class="flex flex-wrap items-center gap-2">
+            ${activeTypes.map(t => `
+              <button
+                class="h-9 px-3 rounded-full border text-sm font-semibold ${soalTypeTab===t?'bg-blue-600 border-blue-600 text-white':'bg-white hover:bg-gray-50'}"
+                onclick="soalTypeTab='${t}'; renderTabs();"
+              >${escapeHtml(tabLabel[t] || t)}</button>
+            `).join('')}
+          </div>
+          ${currentScoreBox}
         </div>
       `;
       const group = Array.isArray(orderData.groups[soalTypeTab]) ? orderData.groups[soalTypeTab] : [];
@@ -435,6 +733,93 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
       const cards = group.map((origIdx, localIdx) => {
         const q = questions[origIdx] || {};
         const type = normalizeQType(q);
+        if (type === 'menjodohkan') {
+          const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+          const ctxHtml = ctxRaw ? `<div class="mb-3 p-3 rounded-xl border bg-gray-50 text-sm leading-relaxed">${renderMathText(ctxRaw).replaceAll('\n','<br>')}</div>` : ``;
+          const pos = Number(orderData.posByOrig[origIdx] ?? -1);
+          const left = Array.isArray(q.options) ? q.options : [];
+          const right = Array.isArray(q.right_options) ? q.right_options : (Array.isArray(q.rightOptions) ? q.rightOptions : (Array.isArray(q.answer) ? q.answer : []));
+          const n = Math.min(left.length, right.length);
+          const key = Array.isArray(answerKey[origIdx]) ? answerKey[origIdx] : [];
+          const pickedRaw = studentAnswers[pos];
+          const picked = Array.isArray(pickedRaw) ? pickedRaw : [];
+          const letter = (idx) => (Number.isFinite(Number(idx)) && Number(idx) >= 0) ? String.fromCharCode(65 + Number(idx)) : '-';
+          const rows = Array.from({ length: n }, (_, li) => {
+            const cur = Number.isFinite(Number(picked[li])) ? Number(picked[li]) : -1;
+            const corr = Number.isFinite(Number(key[li])) ? Number(key[li]) : -1;
+            const showMark = isReview && cur >= 0;
+            const ok = showMark ? (cur === corr) : false;
+            return `
+              <div class="flex items-start gap-3">
+                <div class="w-7 text-sm font-bold pt-2">${li + 1}.</div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm leading-relaxed">${renderMathText(String(left[li] || ''))}</div>
+                  ${isReview && corr >= 0 ? `<div class="text-xs font-semibold text-gray-600 mt-1">(Kunci: ${escapeHtml(letter(corr))})</div>` : ``}
+                </div>
+                <div class="w-[12.5rem] flex items-center gap-2">
+                  <select class="h-10 w-full rounded-lg border border-gray-300 px-3 text-sm bg-white" ${isReview ? 'disabled' : `onchange="onMatchChange(${pos},${li},this.value)"`}>
+                    <option value="-1" ${cur < 0 ? 'selected' : ''}>Pilih...</option>
+                    ${right.slice(0, n).map((t, ri) => `
+                      <option value="${ri}" ${ri === cur ? 'selected' : ''}>${escapeHtml(letter(ri))}. ${escapeHtml(String(t || ''))}</option>
+                    `).join('')}
+                  </select>
+                  ${showMark ? (ok
+                    ? `<span class="text-green-600 font-extrabold text-3xl leading-none" aria-label="Benar">✓</span>`
+                    : `<span class="text-red-600 font-extrabold text-3xl leading-none" aria-label="Salah">✕</span>`
+                  ) : ``}
+                </div>
+              </div>
+            `;
+          }).join('');
+          return `
+            <div class="mb-6">
+              <div class="flex gap-4">
+                <span class="font-bold text-lg min-w-[1.5rem]">${localIdx + 1}.</span>
+                <div class="flex-1">
+                  ${ctxHtml}
+                  <p class="mb-3 text-justify leading-relaxed">${renderMathText(String(q.question || ''))}</p>
+                  ${q.image ? `<img src="${String(q.image)}" class="w-64 h-64 object-contain rounded-lg mb-3 border shadow-sm">` : ``}
+                  <div class="space-y-3">${rows}</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+        if (type === 'uraian') {
+          const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+          const ctxHtml = ctxRaw ? `<div class="mb-3 p-3 rounded-xl border bg-gray-50 text-sm leading-relaxed">${renderMathText(ctxRaw).replaceAll('\n','<br>')}</div>` : ``;
+          const pos = Number(orderData.posByOrig[origIdx] ?? -1);
+          const picked = studentAnswers[pos];
+          const pickedText = typeof picked === 'string' ? picked : (picked === null || picked === undefined ? '' : String(picked));
+          const pts = getPts('uraian');
+          const curGrade = Number(manualGrades?.[String(origIdx)]);
+          const gradeVal = Number.isFinite(curGrade) ? curGrade : 0;
+          return `
+            <div class="mb-6">
+              <div class="flex gap-4">
+                <span class="font-bold text-lg min-w-[1.5rem]">${localIdx + 1}.</span>
+                <div class="flex-1">
+                  ${ctxHtml}
+                  <p class="mb-3 text-justify leading-relaxed">${renderMathText(String(q.question || ''))}</p>
+                  ${q.image ? `<img src="${String(q.image)}" class="w-64 h-64 object-contain rounded-lg mb-3 border shadow-sm">` : ``}
+                  ${isReview ? `
+                    <div class="flex items-center gap-2 mb-2">
+                      <div class="text-xs font-semibold text-gray-700">Nilai</div>
+                      <input type="number" min="0" max="${pts}" value="${gradeVal}" class="w-20 h-9 rounded-md border border-gray-300 px-2 text-center text-sm" oninput="onManualGradeChange(${origIdx},${pts},this.value)">
+                      <div class="text-xs text-gray-600">/ ${pts}</div>
+                      <div class="text-xs font-semibold text-gray-600">Tidak dinilai otomatis.</div>
+                    </div>
+                  ` : ``}
+                  <textarea
+                    class="min-h-[140px] w-full rounded-lg border border-gray-300 px-4 py-3 text-sm"
+                    placeholder="Tulis jawaban di sini..."
+                    ${isReview ? 'disabled' : `oninput="onShortAnswerChange(${pos},this.value)"`}
+                  >${escapeHtml(pickedText)}</textarea>
+                </div>
+              </div>
+            </div>
+          `;
+        }
         if (type === 'isian_singkat') {
           const ctxRaw = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
           const ctxHtml = ctxRaw ? `<div class="mb-3 p-3 rounded-xl border bg-gray-50 text-sm leading-relaxed">${renderMathText(ctxRaw).replaceAll('\n','<br>')}</div>` : ``;
@@ -445,6 +830,9 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
           const keyDisplay = Array.isArray(keyRaw) ? keyRaw.map(x => String(x ?? '').trim()).filter(Boolean).join(' / ') : String(keyRaw ?? '').trim();
           const showMark = isReview && String(pickedText || '').trim() !== '';
           const ok = showMark ? isShortCorrect(pickedText, keyRaw) : false;
+          const pts = getPts('isian_singkat');
+          const curGrade = Number(manualGrades?.[String(origIdx)]);
+          const gradeVal = Number.isFinite(curGrade) ? curGrade : (ok ? pts : 0);
           return `
             <div class="mb-6">
               <div class="flex gap-4">
@@ -465,6 +853,12 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
                       ? `<span class="text-green-600 font-extrabold text-3xl leading-none" aria-label="Benar">✓</span>`
                       : `<span class="text-red-600 font-extrabold text-3xl leading-none" aria-label="Salah">✕</span>`
                     ) : ``}
+                    ${isReview ? `
+                      <div class="flex items-center gap-1">
+                        <input type="number" min="0" max="${pts}" value="${gradeVal}" class="w-20 h-10 rounded-md border border-gray-300 px-2 text-center text-sm" oninput="onManualGradeChange(${origIdx},${pts},this.value)">
+                        <div class="text-xs text-gray-600">/ ${pts}</div>
+                      </div>
+                    ` : ``}
                   </div>
                   ${isReview && keyDisplay ? `<div class="mt-2 text-xs font-semibold text-gray-600">(Kunci) ${escapeHtml(keyDisplay)}</div>` : ``}
                 </div>
@@ -566,7 +960,20 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         const key = answerKey[i];
         let kunciText = '-';
         let correctText = '';
-        if (type === 'isian_singkat') {
+        if (type === 'menjodohkan') {
+          const right = Array.isArray(q.right_options) ? q.right_options : (Array.isArray(q.rightOptions) ? q.rightOptions : (Array.isArray(q.answer) ? q.answer : []));
+          const n = Math.min(opts.length, right.length);
+          const arr = Array.isArray(key) ? key : [];
+          const letter = (idx) => (Number.isFinite(Number(idx)) && Number(idx) >= 0) ? String.fromCharCode(65 + Number(idx)) : '-';
+          const parts = Array.from({ length: n }, (_, li) => {
+            const ri = arr[li];
+            const lt = String(opts[li] || '');
+            const rt = Number.isFinite(Number(ri)) ? String(right[Number(ri)] || '') : '';
+            return `${li + 1}→${letter(ri)}${rt ? ` (${rt})` : ''}${lt ? ` : ${lt}` : ''}`;
+          });
+          kunciText = parts.length ? parts.join(' ; ') : '-';
+          correctText = '';
+        } else if (type === 'isian_singkat') {
           const arr = Array.isArray(key) ? key.map(x => String(x ?? '').trim()).filter(Boolean) : (String(key ?? '').trim() ? [String(key ?? '').trim()] : []);
           kunciText = arr.length ? arr.join(' / ') : '-';
           correctText = '';
@@ -616,6 +1023,20 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
           if (type === 'isian_singkat') {
             const v = studentAnswers[p];
             answers.push(String(v ?? '').trim());
+          } else if (type === 'uraian') {
+            const v = studentAnswers[p];
+            answers.push(String(v ?? '').trim());
+          } else if (type === 'menjodohkan') {
+            const left = Array.isArray(q.options) ? q.options : [];
+            const right = Array.isArray(q.right_options) ? q.right_options : (Array.isArray(q.rightOptions) ? q.rightOptions : (Array.isArray(q.answer) ? q.answer : []));
+            const n = Math.min(left.length, right.length);
+            const cur = Array.isArray(studentAnswers[p]) ? studentAnswers[p] : [];
+            const out = Array.from({ length: n }, (_, li) => {
+              const x = cur[li];
+              const ri = Number.isFinite(Number(x)) ? Math.floor(Number(x)) : -1;
+              return ri;
+            });
+            answers.push(out);
           } else if (type === 'pg_kompleks') {
             const arr = Array.isArray(studentAnswers[p]) ? studentAnswers[p] : [];
             const out = arr.map(n => Number(n)).filter(n => Number.isFinite(n) && n >= 0).sort((a, b) => a - b);
@@ -729,8 +1150,13 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
         }
         const sc = Number(js?.student?.score || 0);
         const tt = Number(js?.student?.total || 0);
-        reviewPct = tt > 0 ? Math.round((sc / tt) * 100) : 0;
+        reviewScore = sc;
+        reviewTotal = tt;
+        reviewPct = tt > 0 ? (sc / tt) * 100 : 0;
         renderReviewScoreBox();
+        manualGrades = (js?.manual_grades && typeof js.manual_grades === 'object') ? js.manual_grades : {};
+        manualDirty = false;
+        manualSaveStatus = manualGrades && Object.keys(manualGrades).length ? 'Tersimpan' : '';
         const nm = String(js?.student?.nama || '').trim();
         if (!studentName && nm) studentName = nm;
         setIdentity(absen, studentName);
@@ -762,13 +1188,36 @@ if ($n > 0 && $maxAbsen > 0 && ($n < 1 || $n > $maxAbsen)) {
           const parts = v.split(/[,\s;\/|]+/).map(x => x.trim()).filter(Boolean);
           return parts.map(x => toIdx('pg', x)).filter(n => n >= 0);
         };
+        const toMatchList = (val) => {
+          if (Array.isArray(val)) {
+            return val.map(x => (Number.isFinite(Number(x)) ? Math.floor(Number(x)) : -1));
+          }
+          const v = String(val || '').trim();
+          if (!v) return [];
+          const parts = v.split(/[,\s;\/|]+/).map(x => x.trim()).filter(Boolean);
+          return parts.map(x => {
+            const m = x.toUpperCase().match(/^[A-Z]$/);
+            if (m) return m[0].charCodeAt(0) - 65;
+            const n = Number(x);
+            return Number.isFinite(n) ? Math.floor(n) : -1;
+          });
+        };
         for (let origIdx = 0; origIdx < questions.length; origIdx++) {
           const q = questions[origIdx] || {};
           const type = normalizeQType(q);
           const pos = Number(orderData.posByOrig[origIdx] ?? -1);
           if (!Number.isFinite(pos) || pos < 0) continue;
           const raw = answers[origIdx];
-          if (type === 'isian_singkat') {
+          if (type === 'menjodohkan') {
+            const left = Array.isArray(q.options) ? q.options : [];
+            const right = Array.isArray(q.right_options) ? q.right_options : (Array.isArray(q.rightOptions) ? q.rightOptions : (Array.isArray(q.answer) ? q.answer : []));
+            const n = Math.min(left.length, right.length);
+            const arr = toMatchList(raw);
+            const out = Array.from({ length: n }, (_, li) => (Number.isFinite(Number(arr[li])) ? Number(arr[li]) : -1));
+            studentAnswers[pos] = out;
+          } else if (type === 'uraian') {
+            studentAnswers[pos] = String(raw ?? '');
+          } else if (type === 'isian_singkat') {
             studentAnswers[pos] = String(raw ?? '');
           } else if (type === 'pg_kompleks') {
             const arr = Array.from(new Set(toIdxList(type, raw))).sort((a, b) => a - b);
