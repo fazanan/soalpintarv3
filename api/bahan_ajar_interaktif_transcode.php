@@ -29,16 +29,45 @@ if (!function_exists('proc_open') || !is_callable('proc_open')) {
 if (!isset($_FILES['video']) || !is_array($_FILES['video'])) {
   http_response_code(400);
   header('Content-Type: application/json; charset=utf-8');
-  echo json_encode(['ok' => false, 'error' => 'missing_video']);
+  echo json_encode([
+    'ok' => false,
+    'error' => 'missing_video',
+    'content_length' => (int)($_SERVER['CONTENT_LENGTH'] ?? 0),
+    'upload_max_filesize' => (string)(ini_get('upload_max_filesize') ?: ''),
+    'post_max_size' => (string)(ini_get('post_max_size') ?: ''),
+    'max_file_uploads' => (string)(ini_get('max_file_uploads') ?: ''),
+    'file_uploads' => (string)(ini_get('file_uploads') ?: ''),
+    'hint' => 'File video tidak masuk ke PHP. Umumnya karena post_max_size / upload_max_filesize terlalu kecil atau request diblok oleh proxy.',
+  ], JSON_UNESCAPED_UNICODE);
   exit;
 }
 
 $f = $_FILES['video'];
 $err = (int)($f['error'] ?? UPLOAD_ERR_NO_FILE);
 if ($err !== UPLOAD_ERR_OK) {
+  $codeMsg = match ($err) {
+    UPLOAD_ERR_INI_SIZE => 'Ukuran file melebihi upload_max_filesize di php.ini.',
+    UPLOAD_ERR_FORM_SIZE => 'Ukuran file melebihi batas MAX_FILE_SIZE (form).',
+    UPLOAD_ERR_PARTIAL => 'Upload terputus (partial). Coba ulang.',
+    UPLOAD_ERR_NO_FILE => 'Tidak ada file yang terupload.',
+    UPLOAD_ERR_NO_TMP_DIR => 'Folder temporary PHP tidak ada (upload_tmp_dir).',
+    UPLOAD_ERR_CANT_WRITE => 'Gagal menulis file ke disk (permission/storage penuh).',
+    UPLOAD_ERR_EXTENSION => 'Upload dihentikan oleh ekstensi PHP.',
+    default => 'Upload gagal (kode tidak dikenal).',
+  };
   http_response_code(400);
   header('Content-Type: application/json; charset=utf-8');
-  echo json_encode(['ok' => false, 'error' => 'upload_error', 'code' => $err]);
+  echo json_encode([
+    'ok' => false,
+    'error' => 'upload_error',
+    'code' => $err,
+    'code_message' => $codeMsg,
+    'content_length' => (int)($_SERVER['CONTENT_LENGTH'] ?? 0),
+    'upload_max_filesize' => (string)(ini_get('upload_max_filesize') ?: ''),
+    'post_max_size' => (string)(ini_get('post_max_size') ?: ''),
+    'upload_tmp_dir' => (string)(ini_get('upload_tmp_dir') ?: ''),
+    'hint' => 'Naikkan upload_max_filesize dan post_max_size di PHP-FPM, lalu restart php-fpm. Pastikan juga storage/tmp cukup dan permission benar.',
+  ], JSON_UNESCAPED_UNICODE);
   exit;
 }
 
@@ -98,6 +127,10 @@ if (PHP_OS_FAMILY === 'Windows') {
   $ffmpegCandidates[] = 'C:\\ffmpeg\\bin\\ffmpeg.exe';
   $ffmpegCandidates[] = 'C:\\ffmpeg\\ffmpeg.exe';
   $ffmpegCandidates[] = 'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe';
+} else {
+  $ffmpegCandidates[] = '/usr/bin/ffmpeg';
+  $ffmpegCandidates[] = '/usr/local/bin/ffmpeg';
+  $ffmpegCandidates[] = '/snap/bin/ffmpeg';
 }
 $ffmpegCandidates[] = 'ffmpeg';
 
@@ -105,23 +138,22 @@ $ffmpeg = '';
 foreach ($ffmpegCandidates as $cand) {
   $cand = trim((string)$cand);
   if ($cand === '') continue;
-  if ($cand !== 'ffmpeg' && is_file($cand)) { $ffmpeg = $cand; break; }
+  if ($cand !== 'ffmpeg' && is_file($cand) && is_executable($cand)) { $ffmpeg = $cand; break; }
 }
 if ($ffmpeg === '') $ffmpeg = $envFfmpeg;
 if ($ffmpeg === '') {
-  if (PHP_OS_FAMILY === 'Windows') {
-    @unlink($tmpIn);
-    http_response_code(500);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-      'ok' => false,
-      'error' => 'ffmpeg_not_found',
-      'hint' => 'Letakkan ffmpeg.exe di folder project: storage/ffmpeg/bin/ffmpeg.exe (beserta semua DLL di folder bin). Atau set environment variable FFMPEG_PATH ke full path ffmpeg.exe.',
-      'ffmpeg_candidates' => $ffmpegCandidates,
-    ], JSON_UNESCAPED_UNICODE);
-    exit;
-  }
-  $ffmpeg = 'ffmpeg';
+  @unlink($tmpIn);
+  http_response_code(500);
+  header('Content-Type: application/json; charset=utf-8');
+  echo json_encode([
+    'ok' => false,
+    'error' => 'ffmpeg_not_found',
+    'hint' => (PHP_OS_FAMILY === 'Windows')
+      ? 'Letakkan ffmpeg.exe di folder project: storage/ffmpeg/bin/ffmpeg.exe (beserta semua DLL di folder bin). Atau set environment variable FFMPEG_PATH ke full path ffmpeg.exe.'
+      : 'Install ffmpeg di server (Ubuntu): sudo apt update && sudo apt install -y ffmpeg. Atau set environment variable FFMPEG_PATH ke full path ffmpeg (contoh: /usr/bin/ffmpeg).',
+    'ffmpeg_candidates' => $ffmpegCandidates,
+  ], JSON_UNESCAPED_UNICODE);
+  exit;
 }
 
 $filter = 'scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2:black,fps=30';
@@ -168,6 +200,7 @@ if (!is_resource($proc)) {
   header('Content-Type: application/json; charset=utf-8');
   $disable = (string)(ini_get('disable_functions') ?: '');
   $openBasedir = (string)(ini_get('open_basedir') ?: '');
+  $pathEnv = (string)(getenv('PATH') ?: '');
   echo json_encode([
     'ok' => false,
     'error' => 'proc_open_failed',
@@ -176,6 +209,7 @@ if (!is_resource($proc)) {
     'disable_functions' => $disable,
     'open_basedir' => $openBasedir,
     'last_error' => is_array($last) ? ($last['message'] ?? '') : '',
+    'path_head' => mb_substr($pathEnv, 0, 3000),
     'hint' => 'Jika ini Windows, pastikan ffmpeg.exe dipanggil via full path dan folder bin berisi semua DLL. Jika pakai hosting/shared hosting, kemungkinan proc_open diblok.',
   ]);
   exit;

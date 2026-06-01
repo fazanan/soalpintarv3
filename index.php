@@ -5230,10 +5230,16 @@ session_write_close();
                   <div class="rounded-xl border border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/30 p-4 space-y-3">
                     <div class="flex items-center justify-between gap-3">
                       <div class="text-sm font-semibold">Voice Over (VO)</div>
-                      <button class="h-9 px-3 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold"
-                        onclick="window.__sp.pickBahanAjarInteraktifVo()">
-                        Upload
-                      </button>
+                      <div class="flex items-center gap-2">
+                        <button class="h-9 px-3 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold"
+                          onclick="window.open('https://gemini.google.com/share/ae562377ed2c','_blank','noopener,noreferrer')">
+                          Buat VO
+                        </button>
+                        <button class="h-9 px-3 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold"
+                          onclick="window.__sp.pickBahanAjarInteraktifVo()">
+                          Upload
+                        </button>
+                      </div>
                     </div>
                     <div id="baiVoInfo" class="hidden flex-col gap-2">
                       <div class="flex items-center justify-between gap-3 rounded-lg border bg-white dark:bg-surface-dark px-3 py-2">
