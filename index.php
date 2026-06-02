@@ -537,6 +537,9 @@ session_write_close();
           </div>
           <div id="profileRequiredError" class="hidden rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"></div>
           <form id="profileRequiredForm" class="space-y-4">
+            <div class="flex items-center justify-end">
+              <button id="profileSaveBtn" class="inline-flex items-center justify-center h-11 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold shadow-sm transition-colors">Simpan & Lanjutkan</button>
+            </div>
             <div>
               <label class="block text-sm font-semibold mb-1">Nama</label>
               <input id="profileNama" name="nama" type="text" class="w-full rounded-lg border h-11 px-3" placeholder="Nama lengkap" required>
@@ -562,9 +565,6 @@ session_write_close();
               <label class="block text-sm font-semibold mb-1">No HP</label>
               <input id="profileNoHp" name="no_hp" type="text" class="w-full rounded-lg border h-11 px-3" placeholder="Contoh: 08xxxx / 62xxxx" required>
               <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-1">Data ini membantu validasi akun dan layanan bantuan jika diperlukan.</div>
-            </div>
-            <div class="flex items-center justify-end pt-2">
-              <button id="profileSaveBtn" class="inline-flex items-center justify-center h-11 px-4 rounded-lg bg-primary hover:bg-blue-600 text-white text-sm font-bold shadow-sm transition-colors">Simpan & Lanjutkan</button>
             </div>
           </form>
         </div>
@@ -5434,11 +5434,6 @@ session_write_close();
                     <span class="material-symbols-outlined text-[18px]">smart_toy</span>
                     LKPD Komik
                   </button>
-                  <button class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold"
-                    onclick="window.open('https://chatgpt.com/g/g-6a1c0d8225388191bb1496c9b2bcafb5-eduslide-ppt-by-gurupintar/c/6a1c490c-f8d0-83ec-8df3-578b44758426','_blank','noopener')">
-                    <span class="material-symbols-outlined text-[18px]">slideshow</span>
-                    LKPD Formal (ppt)
-                  </button>
                 </div>
               </div>
               <textarea class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm min-h-[180px]"
@@ -6117,22 +6112,79 @@ session_write_close();
           `}
         `;
 
-        if (M.isGenerating) return `
-          <div class="flex flex-col items-center justify-center p-10 md:p-20 gap-4 max-w-2xl mx-auto">
-            <div class="size-12 rounded-full bg-primary/10 text-primary flex items-center justify-center">
-              <span class="material-symbols-outlined animate-spin">progress_activity</span>
-            </div>
-            <div class="text-center">
-              <div class="font-bold text-lg">Menyusun Modul Ajar...</div>
-              <div class="text-sm text-text-sub-light mt-1">AI sedang membuat modul lengkap. Semakin banyak JP/pertemuan dan semakin detail tabel, waktu proses akan semakin lama.</div>
-            </div>
-            <div class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 max-w-md w-full">
-              <div class="flex items-start gap-3 p-4">
-                <span class="material-symbols-outlined text-amber-500 mt-0.5">warning</span>
-                <div class="text-sm text-amber-700 dark:text-amber-200">Jangan tutup halaman ini. Pastikan layar tidak mati.</div>
+        if (M.isGenerating) {
+          const prog = M.progress || {};
+          const pct = Math.min(100, Math.max(0, Number(prog.pct || 0) || 0));
+          const stepId = String(prog.stepId || "prep");
+          const summary = String(prog.label || "Mohon tunggu beberapa saat");
+          const steps = [
+            { id: "prep", label: "Menyiapkan data input" },
+            { id: "cp", label: "Mengambil referensi kurikulum" },
+            { id: "ai", label: "Menghasilkan modul (AI)" },
+            { id: "format", label: "Merapikan format & validasi" },
+            { id: "preview", label: "Menyusun preview" },
+          ];
+          const idxActive = Math.max(0, steps.findIndex(s => s.id === stepId));
+          const detailHtml = steps.map((s, idx) => {
+            const isDone = idx < idxActive || (idx === idxActive && pct >= 99 && s.id !== "preview");
+            const isActive = idx === idxActive && !isDone;
+            const icon = isDone
+              ? `<span class="material-symbols-outlined text-green-600 text-[20px]">check_circle</span>`
+              : isActive
+                ? `<span class="material-symbols-outlined text-primary text-[20px] animate-spin">progress_activity</span>`
+                : `<span class="material-symbols-outlined text-gray-400 text-[20px]">radio_button_unchecked</span>`;
+            const right = isDone
+              ? `<div class="text-xs font-bold text-green-700">Selesai</div>`
+              : isActive
+                ? `<div class="text-xs font-bold text-primary">${Math.round(pct)}%</div>`
+                : `<div class="text-xs font-bold text-text-sub-light dark:text-text-sub-dark">Menunggu</div>`;
+            return `
+              <div class="${isDone ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-900/30' : isActive ? 'bg-primary/5 border-primary/20' : 'bg-white dark:bg-surface-dark border-border-light dark:border-border-dark'} rounded-lg border p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex items-start gap-3 min-w-0">
+                    <div class="mt-0.5">${icon}</div>
+                    <div class="min-w-0">
+                      <div class="text-sm font-extrabold truncate">${safeText(s.label)}</div>
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${isActive ? safeText(summary) : ''}</div>
+                    </div>
+                  </div>
+                  <div class="shrink-0">${right}</div>
+                </div>
+                ${!isDone ? `
+                  <div class="mt-3 w-full h-1.5 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
+                    <div class="h-1.5 ${isActive ? 'bg-primary' : 'bg-gray-400'}" style="width:${isActive ? Math.min(100, Math.max(2, pct)) : 5}%"></div>
+                  </div>` : ``}
+              </div>
+            `;
+          }).join("");
+          return `
+            <div class="no-print bg-surface-light dark:bg-surface-dark rounded-xl border border-border-light dark:border-border-dark shadow-sm max-w-3xl mx-auto">
+              <div class="p-6 space-y-5">
+                <div class="flex items-start gap-4">
+                  <div class="size-10 rounded-full bg-primary/10 text-primary flex items-center justify-center">
+                    <span class="material-symbols-outlined animate-spin">progress_activity</span>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="font-bold">Sedang membuat Modul Ajar...</div>
+                    <div id="maGenSummary" class="text-sm text-text-sub-light dark:text-text-sub-dark mt-1">${safeText(summary)}</div>
+                  </div>
+                  <div id="maGenPercent" class="text-2xl font-extrabold text-primary">${Math.round(pct)}%</div>
+                </div>
+                <div class="w-full h-2 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
+                  <div id="maGenBar" class="h-2 bg-primary rounded-full" style="width:${Math.round(pct)}%"></div>
+                </div>
+                <div class="text-xs font-extrabold text-text-sub-light dark:text-text-sub-dark">DETAIL PROSES</div>
+                <div id="maGenDetail" class="space-y-2">${detailHtml}</div>
+                <div class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
+                  <div class="flex items-start gap-3 p-4">
+                    <span class="material-symbols-outlined text-amber-500 mt-0.5">warning</span>
+                    <div class="text-sm text-amber-700 dark:text-amber-200">Jangan tutup halaman ini. Pastikan layar perangkat tidak mati selama proses berlangsung.</div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>`;
+          `;
+        }
 
         const body = tab === 'detail'
           ? (step2Html + mobileNav('detail'))
@@ -7102,6 +7154,69 @@ session_write_close();
         const req = [M.namaGuru,M.institusi,M.jenjang,M.mapel,M.judulModul,M.jumlahPertemuan,M.durasi,M.modelPembelajaran];
         const errEl = () => document.getElementById('maError');
         const showErr = (msg) => { const e=errEl(); if(e){e.textContent='⚠️ '+msg; e.classList.remove('hidden');} };
+        const MA_PROGRESS_STEPS = [
+          { id: "prep", label: "Menyiapkan data input" },
+          { id: "cp", label: "Mengambil referensi kurikulum" },
+          { id: "ai", label: "Menghasilkan modul (AI)" },
+          { id: "format", label: "Merapikan format & validasi" },
+          { id: "preview", label: "Menyusun preview" },
+        ];
+        const maUpdateProgressDom = () => {
+          const p = (state.modulAjar || {}).progress || {};
+          const pct = Math.min(100, Math.max(0, Number(p.pct || 0) || 0));
+          const stepId = String(p.stepId || "prep");
+          const summary = String(p.label || "Mohon tunggu beberapa saat");
+          const elPct = document.getElementById("maGenPercent");
+          if (elPct) elPct.textContent = `${Math.round(pct)}%`;
+          const elBar = document.getElementById("maGenBar");
+          if (elBar) elBar.style.width = `${Math.round(pct)}%`;
+          const elSum = document.getElementById("maGenSummary");
+          if (elSum) elSum.textContent = summary;
+          const elDetail = document.getElementById("maGenDetail");
+          if (!elDetail) return;
+          const idxActive = Math.max(0, MA_PROGRESS_STEPS.findIndex(s => s.id === stepId));
+          elDetail.innerHTML = MA_PROGRESS_STEPS.map((s, idx) => {
+            const isDone = idx < idxActive || (idx === idxActive && pct >= 99 && s.id !== "preview");
+            const isActive = idx === idxActive && !isDone;
+            const icon = isDone
+              ? `<span class="material-symbols-outlined text-green-600 text-[20px]">check_circle</span>`
+              : isActive
+                ? `<span class="material-symbols-outlined text-primary text-[20px] animate-spin">progress_activity</span>`
+                : `<span class="material-symbols-outlined text-gray-400 text-[20px]">radio_button_unchecked</span>`;
+            const right = isDone
+              ? `<div class="text-xs font-bold text-green-700">Selesai</div>`
+              : isActive
+                ? `<div class="text-xs font-bold text-primary">${Math.round(pct)}%</div>`
+                : `<div class="text-xs font-bold text-text-sub-light dark:text-text-sub-dark">Menunggu</div>`;
+            return `
+              <div class="${isDone ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-900/30' : isActive ? 'bg-primary/5 border-primary/20' : 'bg-white dark:bg-surface-dark border-border-light dark:border-border-dark'} rounded-lg border p-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex items-start gap-3 min-w-0">
+                    <div class="mt-0.5">${icon}</div>
+                    <div class="min-w-0">
+                      <div class="text-sm font-extrabold truncate">${safeText(s.label)}</div>
+                      <div class="text-xs text-text-sub-light dark:text-text-sub-dark">${isActive ? safeText(summary) : ''}</div>
+                    </div>
+                  </div>
+                  <div class="shrink-0">${right}</div>
+                </div>
+                ${!isDone ? `
+                  <div class="mt-3 w-full h-1.5 rounded-full bg-gray-200 dark:bg-gray-800 overflow-hidden">
+                    <div class="h-1.5 ${isActive ? 'bg-primary' : 'bg-gray-400'}" style="width:${isActive ? Math.min(100, Math.max(2, pct)) : 5}%"></div>
+                  </div>` : ``}
+              </div>
+            `;
+          }).join("");
+        };
+        const maSetProgress = (stepId, pct, label) => {
+          state.modulAjar = state.modulAjar || {};
+          state.modulAjar.progress = {
+            pct: Math.min(100, Math.max(0, Number(pct || 0) || 0)),
+            stepId: String(stepId || "prep"),
+            label: String(label || "").trim() || "Mohon tunggu beberapa saat",
+          };
+          maUpdateProgressDom();
+        };
 
         const failMA = (tab, msg, key) => {
           state.modulAjarTab = tab;
@@ -7140,6 +7255,7 @@ session_write_close();
         state.modulAjar.kegiatanRefinedOnce = false;
         state.modulAjar.hasil = '';
         state.modulAjar.lastGeneratedModel = model;
+        maSetProgress("prep", 3, "Menyiapkan data input...");
         render();
 
         const kurikulumLabel = String(M.kurikulum || 'Kurikulum Merdeka').trim();
@@ -7397,6 +7513,7 @@ ${!isKBC ? '\n5) Hapus semua bagian/penyebutan KBC jika ada pada baseline.' : ''
         let cp046PagesText = "";
         if (!isK13 && String(M.fase || '').trim()) {
           try {
+            maSetProgress("cp", 12, "Mengambil referensi CP/ATP (kurikulum)...");
             const ctrlCp = new AbortController();
             const timerCp = setTimeout(()=>ctrlCp.abort(), 45000);
             const respCp = await fetch("api/cp046_rpp_context.php", {
@@ -7415,6 +7532,7 @@ ${!isKBC ? '\n5) Hapus semua bagian/penyebutan KBC jika ada pada baseline.' : ''
             }
           } catch {}
         }
+        maSetProgress("prep", 20, "Menyiapkan instruksi dan struktur modul...");
 
         const usr = `${revisionLead}
 
@@ -7545,28 +7663,43 @@ ${baselineModulAjar}
           const timeoutMs = Math.min(600000, 150000 + pertemuan * 60000);
           const timer = setTimeout(()=>ctrl.abort(), timeoutMs);
           const postBody = (maxTokens) => JSON.stringify({ type:"modul_ajar", messages:[{role:"system",content:sys},{role:"user",content:usr}], model:OPENAI_MODEL, max_tokens: maxTokens });
-          let resp = await fetch("api/openai_proxy.php", {
-            method: "POST",
-            headers: {"Content-Type":"application/json"},
-            credentials: "same-origin",
-            body: postBody(12000),
-            signal: ctrl.signal,
-          });
-          if (!resp.ok && (resp.status === 502 || resp.status === 503 || resp.status === 504)) {
-            try { await new Promise(r => setTimeout(r, 1200)); } catch {}
+          maSetProgress("ai", 25, "Menghasilkan modul (AI)...");
+          const progStart = Date.now();
+          const progTimer = setInterval(() => {
+            const elapsed = Date.now() - progStart;
+            const t = Math.min(1, elapsed / Math.max(1, timeoutMs * 0.85));
+            const eased = 1 - Math.pow(1 - t, 2);
+            const next = 25 + eased * (85 - 25);
+            maSetProgress("ai", Math.min(85, next), "Menghasilkan modul (AI)...");
+          }, 800);
+          let resp;
+          try {
             resp = await fetch("api/openai_proxy.php", {
               method: "POST",
               headers: {"Content-Type":"application/json"},
               credentials: "same-origin",
-              body: postBody(8000),
+              body: postBody(12000),
               signal: ctrl.signal,
             });
+            if (!resp.ok && (resp.status === 502 || resp.status === 503 || resp.status === 504)) {
+              try { await new Promise(r => setTimeout(r, 1200)); } catch {}
+              resp = await fetch("api/openai_proxy.php", {
+                method: "POST",
+                headers: {"Content-Type":"application/json"},
+                credentials: "same-origin",
+                body: postBody(8000),
+                signal: ctrl.signal,
+              });
+            }
+          } finally {
+            clearInterval(progTimer);
           }
           clearTimeout(timer);
           if (!resp.ok) throw new Error(`Proxy ${resp.status}: ${await resp.text()}`);
           const data = await resp.json();
           const text = data?.content || data?.choices?.[0]?.message?.content || '';
           if (!text) throw new Error("Respons API kosong.");
+          maSetProgress("format", 90, "Merapikan format & validasi isi...");
           const stripKbcFromModulAjar = (raw) => {
             const src = String(raw || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             const lines = src.split('\n');
@@ -7651,10 +7784,15 @@ ${baselineModulAjar}
             return `${src.trim()}\n\n### 7. Daftar Pustaka\n${refLine}\n`;
           };
           const finalText2 = ensureCp046InDaftarPustaka(finalText, cp046PagesText);
+          maSetProgress("preview", 97, "Menyusun preview dokumen...");
           state.modulAjar.hasil = finalText2;
           state.modulAjar.isGenerating = false;
+          maSetProgress("preview", 100, "Selesai.");
           saveDebounced(true);
           render();
+          setTimeout(() => {
+            try { if (state.modulAjar) delete state.modulAjar.progress; } catch {}
+          }, 300);
           // Catat token & biaya + kurangi limit seperti generate soal
           try {
             const usageIn = Number(data?.usage?.prompt_tokens ?? data?.usage?.input_tokens ?? data?._usage?.in ?? 0);
@@ -7693,6 +7831,7 @@ ${baselineModulAjar}
           } catch {}
         } catch(e) {
           state.modulAjar.isGenerating = false;
+          try { delete state.modulAjar.progress; } catch {}
           render();
           const msg = (e && (e.name === 'AbortError' || /aborted/i.test(String(e.message || ''))))
             ? 'Proses terlalu lama (timeout). Semakin banyak JP/pertemuan dan semakin detail tabel, waktu proses makin lama. Silakan coba lagi dan tunggu sampai selesai.'
@@ -9468,13 +9607,23 @@ ${baselineModulAjar}
                     </div>
                   </div>
                   <div class="flex flex-col gap-2">
-                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Perintah Khusus</label>
-                    <input
-                      class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm"
+                    <div class="flex items-center justify-between gap-3">
+                      <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Perintah Khusus</label>
+                      <select
+                        class="h-9 rounded-lg border-border-light dark:border-border-dark bg-white dark:bg-surface-dark px-3 text-xs font-bold"
+                        onchange="window.__sp.applySpecialInstructionTemplate(this.value); this.value='';"
+                      >
+                        <option value="">Template…</option>
+                        <option value="force_language">Semua soal wajib bahasa tertentu</option>
+                        <option value="story_context">Perbanyak soal cerita/konteks</option>
+                      </select>
+                    </div>
+                    <textarea
+                      rows="3"
+                      class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm min-h-[78px] max-h-[110px]"
                       data-path="specialInstruction"
-                      placeholder='Contoh: "Perbanyak soal cerita" atau "Gunakan Bahasa Jawa ngoko"'
-                      value="${safeAttr(state.specialInstruction ?? "")}"
-                    />
+                      placeholder='Contoh: "Perbanyak soal cerita"\natau "Gunakan Bahasa Jawa ngoko"'
+                    >${safeText(state.specialInstruction ?? "")}</textarea>
                   </div>
                 </div>
 
@@ -13309,6 +13458,56 @@ ${baselineModulAjar}
           updateGenProgress();
           const konteksOn = !!sec.soalKonteks;
           const konteksSoalCount = konteksOn ? Math.min(3, totalSec) : 0;
+          const special = String(state.specialInstruction || "").trim();
+          const specialLower = special.toLowerCase();
+          const wantsArabicHarakat = /harokat|harakat|tasykil|tashkil|tashkeel|syakal|diakritik/.test(specialLower);
+          const requestedLangLabel = (() => {
+            const clean = (s) => String(s || "").replace(/\s+/g, " ").trim();
+            if (wantsArabicHarakat) return "Bahasa Arab dengan harakat/tasykīl lengkap";
+            if (/\bbahasa\s+inggris\b|\bin\s+english\b|\benglish\s+only\b/.test(specialLower)) return "Bahasa Inggris";
+            if (/\bbahasa\s+indonesia\b|\bin\s+indonesian\b|\bindonesian\s+only\b/.test(specialLower)) return "Bahasa Indonesia";
+            if (/\bbahasa\s+arab\b|\bin\s+arabic\b|\barabic\s+only\b/.test(specialLower)) return "Bahasa Arab";
+            const m = special.match(/\bbahasa\s+([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\s\-']{1,40})/i);
+            if (m) return `Bahasa ${clean(m[1])}`;
+            return "";
+          })();
+          const extractExplicitContext = () => {
+            const s = String(special || "").trim();
+            if (!s) return "";
+            const hasQs = /\bqs\./i.test(s);
+            const hasArabic = /[\u0600-\u06FF]/.test(s);
+            const hasQuranWord = /(al[-\s]?qur|alqur|quran|al[-\s]?qur'an|qur'?an)/i.test(s);
+            if (!(hasQs || hasArabic || hasQuranWord)) return "";
+            let arab = "";
+            const arabLines = s.split(/\r?\n/).map(x => x.trim()).filter(Boolean).filter(x => /[\u0600-\u06FF]/.test(x));
+            if (arabLines.length) arab = arabLines.join(" ");
+            let ref = "";
+            const refM = s.match(/\(.*?\bQS\.[^)]+\)/i) || s.match(/\bQS\.[^\]\)\n]+/i);
+            if (refM) ref = String(refM[0] || "").trim();
+            let terjemah = "";
+            const tM = s.match(/terjemah[^:]*:\s*([^\n\r]+)/i);
+            if (tM) {
+              const t = String(tM[1] || "").trim();
+              if (t && !/\btempel\b/i.test(t)) terjemah = t;
+            }
+            if (!arab && !ref && !terjemah) return "";
+            const p1 = [arab, ref].filter(Boolean).join(" ").trim();
+            const p2 = terjemah ? `Terjemah: ${terjemah}` : (ref ? `Rujukan: ${ref.replace(/^\(/, "").replace(/\)$/, "")}` : "");
+            const out = [p1, p2].filter(Boolean).join("\n\n").trim();
+            return out;
+          };
+          const explicitContext = extractExplicitContext();
+          const minCtxFromSpecial = (() => {
+            if (!special) return 0;
+            if (!/(ayat|al[-\s]?qur|alqur|quran|qs\.)/i.test(special)) return 0;
+            const m = special.match(/\b(?:buat\s+)?(?:minimal|setidaknya)\s*(\d{1,2})\s*soal\b/i);
+            const n = m ? Number(m[1]) : 0;
+            return Number.isFinite(n) ? clamp(n, 0, 50) : 0;
+          })();
+          const konteksOnEff = konteksOn || !!explicitContext;
+          const konteksSoalCountEff = konteksOnEff
+            ? Math.min(totalSec, Math.max(konteksSoalCount, minCtxFromSpecial || 0, explicitContext ? 3 : 0))
+            : 0;
           const trimContextComplete = (text, maxLen) => {
             let s = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
             if (!maxLen || s.length <= maxLen) return s;
@@ -13346,7 +13545,7 @@ ${baselineModulAjar}
           const applyContextPolicy = (q) => {
             if (!q) return q;
             let ctx = String(q.context || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-            if (!konteksOn || !ctx) return { ...q, context: '' };
+            if (!konteksOnEff || !ctx) return { ...q, context: '' };
             if (!/\n\s*\n/.test(ctx)) {
               const m = ctx.match(/^(.{40,}?[.!?])\s+/);
               if (m) ctx = ctx.replace(m[0], `${m[1]}\n\n`);
@@ -13359,7 +13558,7 @@ ${baselineModulAjar}
             const slice = state.questions.slice(startIdx, endIdx);
             const found = slice.find(x => x && String(x.context || '').trim());
             const base = found ? String(found.context || '') : '';
-            if (!konteksOn || !base.trim() || konteksSoalCount <= 0) {
+            if (!konteksOnEff || !base.trim() || konteksSoalCountEff <= 0) {
               for (let i = startIdx; i < endIdx; i++) state.questions[i] = { ...(state.questions[i] || {}), context: '' };
               return;
             }
@@ -13400,7 +13599,7 @@ ${baselineModulAjar}
               if (text.includes('berdasarkan') || text.includes('konteks') || text.includes('bacaan')) score += 1;
               scoreByIdx.set(i, score > 0 ? score : -2);
             }
-            const k = Math.max(0, Math.min(konteksSoalCount, qIdxList.length));
+            const k = Math.max(0, Math.min(konteksSoalCountEff, qIdxList.length));
             const chosen = new Set();
             if (k > 0) {
               if (k >= qIdxList.length) {
@@ -13472,9 +13671,6 @@ ${baselineModulAjar}
 - Utamakan konteks nyata, analisis, dan penerapan konsep (hindari definisi 1 kalimat yang terlalu dasar).`
               : ``);
 
-          const special = String(state.specialInstruction || "").trim();
-          const specialLower = special.toLowerCase();
-          const wantsArabicHarakat = /harokat|harakat|tasykil|tashkil|tashkeel|syakal|diakritik/.test(specialLower);
           const adminPromptRaw = (IS_ADMIN && !!state.adminGeneratePromptEnabled) ? String(state.adminGeneratePrompt || '').trim() : '';
           const adminPromptRules = adminPromptRaw
             ? `\nPROMPT WAJIB DARI ADMIN (PRIORITAS TERTINGGI):
@@ -13482,6 +13678,11 @@ ${baselineModulAjar}
 ${adminPromptRaw}
 >>>
 - Jika prompt admin bertentangan dengan instruksi lain, prioritaskan prompt admin.\n`
+            : ``;
+          const languageRules = requestedLangLabel
+            ? `\nBAHASA OUTPUT (WAJIB):
+- Semua teks output WAJIB dalam ${requestedLangLabel} untuk: stimulus/context, question, options/pairs, dan explanation.
+- Jangan gunakan bahasa lain di field-field tersebut.\n`
             : ``;
           const arabicHarakatRules = wantsArabicHarakat
             ? `\nINSTRUKSI BAHASA ARAB BERHARAKAT (WAJIB):
@@ -13493,9 +13694,9 @@ ${adminPromptRaw}
           const specialRules = special
             ? `\nATURAN TAMBAHAN DARI GURU (WAJIB DIPATUHI):\n${special}\n- Jika aturan ini bertentangan dengan instruksi lain, prioritaskan aturan tambahan dari guru.\n`
             : ``;
-          const contextRules = konteksOn
+          const contextRules = konteksOnEff
             ? `\nMODE SOAL BERKONTEKS: AKTIF
-- Buat tepat 1 stimulus/bacaan (field "context") yang sama untuk ${konteksSoalCount} soal. Soal lainnya field "context" kosong.
+- Buat tepat 1 stimulus/bacaan (field "context") yang sama untuk ${konteksSoalCountEff} soal. Soal lainnya field "context" kosong.
 - Field "context" WAJIB minimal 2 paragraf (dipisahkan 1 baris kosong) dan memuat data/situasi nyata yang digunakan pada soal.
 - Panjang "context" disarankan 450–1100 karakter (jangan melebihi 1100).
 - Field "context" harus rapi: paragraf terakhir selesai (kalimat lengkap) dan tidak terpotong di tengah kata.
@@ -13806,6 +14007,7 @@ Jika soal membutuhkan gambar/diagram:
 3. Prioritas 3: Jika sangat kompleks, kosongkan ascii/svg dan isi "imagePrompt" untuk digenerate AI Image.
 4. Isi "imagePrompt" dalam Bahasa Inggris. Jika soal berbahasa selain Indonesia, pahami artinya lalu tulis deskripsi gambarnya dalam Bahasa Inggris.
 5. Jangan menaruh teks/tulisan/label di dalam gambar (hindari kata-kata yang harus terbaca di gambar).
+${languageRules}
 ${contextRules}
 ${specialRules}
 ${arabicHarakatRules}
@@ -13830,7 +14032,7 @@ ATURAN STIMULUS (WAJIB):
 2. Memuat data/situasi nyata yang bisa dipakai sebagai dasar pertanyaan (angka/nama/objek/tempat/variabel).
 ${hasHots ? `- Untuk target C4–C6: masukkan minimal 4 data/fakta/variabel yang dapat dibandingkan/diinterpretasi agar soal bisa bertingkat (mis. angka, kondisi, kebijakan, sebab-akibat, atau aturan).` : ``}
 3. Panjang 450–1100 karakter (jangan melebihi 1100).
-4. ${wantsArabicHarakat ? 'Gunakan Bahasa Arab dengan harakat/tasykīl lengkap.' : 'Gunakan Bahasa Indonesia.'}
+4. ${requestedLangLabel ? `Gunakan ${requestedLangLabel}.` : 'Gunakan Bahasa Indonesia.'}
 5. Jangan membuat soal, hanya stimulus.
 - Pastikan paragraf terakhir selesai (kalimat lengkap) dan teks tidak terpotong di tengah kata. Akhiri stimulus dengan tanda titik.
 ${wantsArabicHarakat ? '\n6. Jangan menghapus harakat/diakritik pada kata Arab.' : ''}
@@ -13861,6 +14063,7 @@ OUTPUT JSON:
 
 ATURAN (WAJIB):
 - Jangan menambah fakta baru, jangan mengubah inti informasi.
+- Pertahankan bahasa stimulus (${requestedLangLabel || 'Bahasa Indonesia'}). Jangan terjemahkan ke bahasa lain.
 - Pastikan minimal 2 paragraf (pisah 1 baris kosong).
 - Panjang 450–1100 karakter.
 - Paragraf terakhir harus selesai (kalimat lengkap) dan tidak terpotong di tengah kata.
@@ -13969,12 +14172,12 @@ OUTPUT JSON:
             }
           };
 
-          if (!konteksOn || konteksSoalCount <= 0) {
+          if (!konteksOnEff || konteksSoalCountEff <= 0) {
             await generateQuestions(promptBase, totalSec, '');
             applySingleContextForSection(sectionStartIdx, state.questions.length);
           } else {
-            const stimulusText = await generateStimulusOnce();
-            const stimCount = stimulusText ? konteksSoalCount : 0;
+            const stimulusText = explicitContext ? applyContextPolicy({ context: explicitContext }).context : await generateStimulusOnce();
+            const stimCount = stimulusText ? konteksSoalCountEff : 0;
             const nonStimCount = totalSec - stimCount;
 
             const promptStimulusQuestions = promptBase
@@ -14308,7 +14511,7 @@ Materi: ${q.materi || '-'}
 ${contextBlock}
 ${adminPromptRules}
 Instruksi:
-1. ${wantsArabicHarakat ? 'Gunakan Bahasa Arab dengan harakat/tasykīl lengkap.' : 'Gunakan Bahasa Indonesia.'}
+1. ${requestedLangLabel ? `Gunakan ${requestedLangLabel}.` : 'Gunakan Bahasa Indonesia.'}
 2. Target kognitif: ${bloomGuide}
 3. Tingkat kesulitan target: ${targetDifficulty}. Buat benar-benar sesuai (${bloomCode}).
 4. Gunakan ide/topik yang sama, tapi buat soal BARU yang tidak identik dengan soal sebelumnya.
@@ -14673,6 +14876,32 @@ ${out}`;
         state.lkpdInteraktifTab = (t === "info" || t === "gabung") ? t : "info";
         saveDebounced(true);
         render();
+      };
+      const applySpecialInstructionTemplate = (key) => {
+        const k = String(key || "").trim();
+        if (!k) return;
+        const templates = {
+          force_language: [
+            "Semua soal & jawaban wajib dalam Bahasa [isi bahasa].",
+            "Jika ada stimulus/context, wajib juga bahasa yang sama.",
+            "Jangan gunakan bahasa lain di question/options/explanation/context.",
+          ].join("\n"),
+          story_context: [
+            "Perbanyak soal cerita/konteks kehidupan nyata.",
+            "Gunakan data/skenario sederhana agar siswa bisa menganalisis.",
+          ].join("\n"),
+        };
+        const tpl = String(templates[k] || "").trim();
+        if (!tpl) return;
+        state.specialInstruction = tpl;
+        saveDebounced(true);
+        render();
+        setTimeout(() => {
+          const ta = document.querySelector('textarea[data-path="specialInstruction"]');
+          if (!ta) return;
+          ta.focus();
+          try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch {}
+        }, 0);
       };
       const setBahanAjarSource = (v) => {
         state.bahanAjar = state.bahanAjar || {};
@@ -18175,6 +18404,7 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         setBahanAjarAdvancedOpen,
         setLkpdInteraktifTab,
         setLkpdInteraktifAdvancedOpen,
+        applySpecialInstructionTemplate,
         setBahanAjarSource,
         setLkpdInteraktifSource,
         copyFromModulAjarToBahanAjar,
