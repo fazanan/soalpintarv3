@@ -663,6 +663,7 @@ session_write_close();
           "Tahsin / Tahfizh",
           "Akidah Akhlak",
           "Fikih",
+          "Kaidah & Usul Fiqih",
           "Sejarah Kebudayaan Islam (SKI)",
           "Bahasa Arab",
           "Pendidikan Pancasila",
@@ -700,6 +701,7 @@ session_write_close();
           "Tahsin / Tahfizh",
           "Akidah Akhlak",
           "Fikih",
+          "Kaidah & Usul Fiqih",
           "Sejarah Kebudayaan Islam (SKI)",
           "Bahasa Arab",
           "Pendidikan Pancasila",
@@ -739,6 +741,7 @@ session_write_close();
           "Tahsin / Tahfizh",
           "Akidah Akhlak",
           "Fikih",
+          "Kaidah & Usul Fiqih",
           "Sejarah Kebudayaan Islam (SKI)",
           "Bahasa Arab",
           "Pendidikan Pancasila",
@@ -784,6 +787,7 @@ session_write_close();
           "Tahsin / Tahfizh",
           "Bahasa Arab",
           "Sejarah Kebudayaan Islam (SKI)",
+          "Kaidah & Usul Fiqih",
           "Pendidikan Pancasila",
           "Bahasa Indonesia",
           "Bahasa Indramayu",
@@ -5825,6 +5829,13 @@ session_write_close();
         {v:"Kesehatan",          ic:"favorite"},
         {v:"Komunikasi",         ic:"forum"},
       ];
+      const MA_PANCA_CINTA_TOPIK = [
+        "Cinta Allah dan Rasul-Nya",
+        "Cinta Ilmu",
+        "Cinta Lingkungan",
+        "Cinta Diri dan Sesama Manusia",
+        "Cinta Tanah Air",
+      ];
 
       const renderModulAjar = () => {
         const M = state.modulAjar || {};
@@ -5843,6 +5854,21 @@ session_write_close();
         if (M.pendekatan && !pendekatanOpts.includes(M.pendekatan)) pendekatanOpts.unshift(M.pendekatan);
         const kurikulumOpts = ['Kurikulum Merdeka','Kurikulum 2013 (K13)'];
         if (M.kurikulum && !kurikulumOpts.includes(M.kurikulum)) kurikulumOpts.unshift(M.kurikulum);
+        const pendekatanLabel = String(M.pendekatan || 'Standar').trim() || 'Standar';
+        const showPancaCinta = /\bKBC\b/i.test(pendekatanLabel) || /berbasis\s*cinta/i.test(pendekatanLabel);
+        const pancaSelectedArr = Array.isArray(M.pancaCintaTopik)
+          ? M.pancaCintaTopik
+          : (String(M.pancaCintaTopik || '').trim() ? [String(M.pancaCintaTopik || '').trim()] : []);
+        const pancaChecks = MA_PANCA_CINTA_TOPIK.map((t) => {
+          const on = pancaSelectedArr.includes(t);
+          return `<label class="flex items-center gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors select-none
+            ${on ? 'border-primary bg-primary/5 dark:bg-primary/10' : 'border-border-light dark:border-border-dark bg-white dark:bg-surface-dark hover:border-primary/40'}">
+            <input type="checkbox" class="accent-primary shrink-0" ${on?'checked':''}
+              onchange="window.__sp.toggleMAPancaCinta('${safeText(t)}',this.checked)">
+            <span class="material-symbols-outlined text-[16px] ${on?'text-primary':'text-text-sub-light'}">favorite</span>
+            <span class="text-sm font-medium leading-snug">${safeText(t)}</span>
+          </label>`;
+        }).join('');
 
         const mkSel = (lbl, key, val, opts) => `
           <div class="flex flex-col gap-2">
@@ -6043,6 +6069,16 @@ session_write_close();
                 </div>
                 <div id="maDimensiWrap" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">${dimChecks}</div>
               </div>
+              ${showPancaCinta ? `
+                <div>
+                  <div class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark mb-2">
+                    Topik Panca Cinta
+                    <span class="font-normal italic ml-1 text-xs">(boleh pilih lebih dari satu)</span>
+                  </div>
+                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">${pancaChecks}</div>
+                  <div class="text-xs text-text-sub-light dark:text-text-sub-dark mt-2">Muncul hanya jika Pendekatan adalah KBC atau Deep Learning + KBC.</div>
+                </div>
+              ` : ``}
               <div class="rounded-lg border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-4">
                 <label class="flex items-start gap-3 cursor-pointer select-none">
                   <input type="checkbox" class="mt-1 accent-primary" ${M.supervisi ? 'checked' : ''} onchange="window.__sp.setMA('supervisi',this.checked,true)" />
@@ -7266,6 +7302,13 @@ session_write_close();
         const isDandK = isDL && isKBC;
         const isCTL = /\bCTL\b/i.test(pendekatanLabel) || /contextual\s+teaching\s+and\s+learning/i.test(pendekatanLabel);
         const isDLCTL = isDL && isCTL && !isKBC;
+        const pancaCintaTopikArr = Array.isArray(M.pancaCintaTopik)
+          ? M.pancaCintaTopik.map(x => String(x || '').trim()).filter(Boolean)
+          : (String(M.pancaCintaTopik || '').trim() ? [String(M.pancaCintaTopik || '').trim()] : []);
+        const pancaCintaTopik = pancaCintaTopikArr.join('; ');
+        const pancaCintaRule = (isKBC && pancaCintaTopikArr.length)
+          ? `\n- Topik Panca Cinta yang dipilih: ${pancaCintaTopikArr.map(x => `"${x}"`).join(', ')}. Wajib terlihat terintegrasi pada pertanyaan pemantik, kegiatan pembelajaran, asesmen, dan refleksi.`
+          : ``;
 
         const noKbcCleanupRule = !isKBC
           ? `CATATAN PENTING (TANPA KBC):
@@ -7286,6 +7329,7 @@ session_write_close();
 - Di SETIAP pertemuan sisipkan minimal 1 aktivitas KBC yang konkret dan tertulis jelas (etika komunikasi/empati/gotong royong/kepedulian lingkungan/refleksi syukur/niat belajar).
 - Pertanyaan pemantik: open-ended dan mengandung dimensi nilai tanpa menggurui.
 - Asesmen: rubrik gabungan (kognitif + proses + karakter/KBC), skala 1–4, indikator dapat diamati.
+${pancaCintaRule}
 ${noCtlCleanupRule}`
           : isDLCTL
             ? `ARAH PENDEKATAN (DEEP LEARNING + CTL):
@@ -7312,6 +7356,7 @@ ${noCtlCleanupRule}`
 - Di SETIAP pertemuan sisipkan minimal 1 aktivitas KBC yang konkret dan tertulis jelas.
 - Asesmen: tambah observasi sikap/kolaborasi + refleksi nilai (tetap skala 1–4, indikator dapat diamati).
 - Hindari bahasa menggurui; tetap formal namun hangat.
+${pancaCintaRule}
 ${noCtlCleanupRule}`
               : isCTL
                 ? `ARAH PENDEKATAN (CTL / CONTEXTUAL TEACHING AND LEARNING):
@@ -7552,6 +7597,7 @@ Durasi/Pertemuan  : ${M.durasi} menit
 Model Pembelajaran: ${M.modelPembelajaran}
 Jumlah Siswa      : ${M.jumlahSiswa||'30'} siswa
 Dimensi Profil    : ${M.dimensi.join(', ')}
+${isKBC ? `Topik Panca Cinta : ${pancaCintaTopik || '-'}` : ``}
 Mode Supervisi    : ${modeSupervisiLabel}
 =================
 
@@ -7568,7 +7614,7 @@ Hasilkan Modul Ajar dengan SEMUA bagian berikut secara LENGKAP dan DETAIL:
 ### "${M.judulModul}"
 
 ## A. INFORMASI UMUM
-Tabel 2 kolom (Komponen | Keterangan): Nama Penyusun, Institusi, Tahun, Jenjang, Kelas, Fase, Alokasi Waktu, Kompetensi Awal (2-3 kalimat), Dimensi Profil Lulusan (tiap dimensi 1-2 kalimat kontekstual), Sarana dan Prasarana, Target Peserta Didik, Model Pembelajaran.
+Tabel 2 kolom (Komponen | Keterangan): Nama Penyusun, Institusi, Tahun, Jenjang, Kelas, Fase, Alokasi Waktu, Kompetensi Awal (2-3 kalimat), Dimensi Profil Lulusan (tiap dimensi 1-2 kalimat kontekstual)${isKBC ? `, Topik Panca Cinta (1 baris tepat di bawah Dimensi Profil Lulusan: "${pancaCintaTopik || '-'}")` : ``}, Sarana dan Prasarana, Target Peserta Didik, Model Pembelajaran.
 ${isKBC ? `
 Tambahkan komponen khusus KBC:
 - "Unsur KBC" (jelaskan singkat 4–6 nilai/unsur yang dipakai pada modul ini, misalnya: cinta kepada Tuhan YME, cinta diri, cinta sesama, cinta lingkungan, cinta bangsa; sesuaikan dengan materi dan konteks kelas).
@@ -7710,6 +7756,7 @@ ${baselineModulAjar}
               if (!t) { out.push(line); continue; }
               if (/\bKBC\b/i.test(t)) continue;
               if (/berbasis\s+cinta/i.test(t)) continue;
+              if (/panca\s*cinta/i.test(t)) continue;
               if (/unsur\s+kbc/i.test(t)) continue;
               if (/implementasi\s+kbc/i.test(t)) continue;
               out.push(line);
@@ -18499,6 +18546,17 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
           if (!Array.isArray(state.modulAjar.dimensi)) state.modulAjar.dimensi = [];
           if (checked) { if (!state.modulAjar.dimensi.includes(val)) state.modulAjar.dimensi.push(val); }
           else { state.modulAjar.dimensi = state.modulAjar.dimensi.filter(d=>d!==val); }
+          if (state.modulAjarError) state.modulAjarError = null;
+          saveDebounced(false);
+          render();
+        },
+        toggleMAPancaCinta: (val, checked) => {
+          if (!state.modulAjar) state.modulAjar = {};
+          let cur = state.modulAjar.pancaCintaTopik;
+          let arr = Array.isArray(cur) ? cur.slice() : (String(cur || '').trim() ? [String(cur || '').trim()] : []);
+          if (checked) { if (!arr.includes(val)) arr.push(val); }
+          else { arr = arr.filter(x => x !== val); }
+          state.modulAjar.pancaCintaTopik = arr;
           if (state.modulAjarError) state.modulAjarError = null;
           saveDebounced(false);
           render();
