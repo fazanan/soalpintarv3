@@ -350,26 +350,13 @@ if (!$exists) {
   $types = 'sssii';
   $vals = [$email, $hash, $role, $initLimit, $limitGambar];
   
-  if (column_exists($mysqli, 'users', 'no_hp')) {
-    $cols[] = 'no_hp'; $types .= 's'; $vals[] = $noHp;
-  }
-  if (column_exists($mysqli, 'users', 'access_bahan_ajar_komik')) {
-    $cols[] = 'access_bahan_ajar_komik'; $types .= 'i'; $vals[] = $abak;
-  }
-  if (column_exists($mysqli, 'users', 'access_bahan_ajar_slide')) {
-    $cols[] = 'access_bahan_ajar_slide'; $types .= 'i'; $vals[] = $abas;
-  }
-  if (column_exists($mysqli, 'users', 'access_lkpd_interaktif')) {
-    $cols[] = 'access_lkpd_interaktif'; $types .= 'i'; $vals[] = $ali;
-  }
-  
-  $ph = implode(',', array_fill(0, count($cols), '?'));
-  $stmt = $mysqli->prepare("INSERT INTO users (" . implode(',', $cols) . ") VALUES ($ph)");
+  $hasNoHp = column_exists($mysqli, 'users', 'no_hp');
+  $stmt = $hasNoHp
+    ? $mysqli->prepare("INSERT INTO users (username, no_hp, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?, ?)")
+    : $mysqli->prepare("INSERT INTO users (username, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?)");
   if ($stmt) {
-    $bind = [];
-    $bind[] = $types;
-    foreach ($vals as $i => $v) $bind[] = &$vals[$i];
-    call_user_func_array([$stmt, 'bind_param'], $bind);
+    if ($hasNoHp) $stmt->bind_param('ssssii', $email, $noHp, $hash, $role, $initLimit, $limitGambar);
+    else $stmt->bind_param('sssii', $email, $hash, $role, $initLimit, $limitGambar);
     if ($stmt->execute()) $createdUserId = (int)$stmt->insert_id;
     $stmt->close();
   }
@@ -404,6 +391,57 @@ if ($stmt) {
   $stmt->bind_result($uidTmp);
   if ($stmt->fetch()) $uidFinal = (int)$uidTmp;
   $stmt->close();
+}
+
+if ($uidFinal !== null && ($isEducomicBasic || $isEducomicPro)) {
+  $upCols = [];
+  $upTypes = '';
+  $upVals = [];
+  
+  $isNewUser = ($createdUserId !== null);
+  
+  if (column_exists($mysqli, 'users', 'access_bahan_ajar_komik')) {
+    $upCols[] = 'access_bahan_ajar_komik=?'; $upTypes .= 'i'; $upVals[] = 1;
+  }
+  if (column_exists($mysqli, 'users', 'access_bahan_ajar_slide') && $isEducomicPro) {
+    $upCols[] = 'access_bahan_ajar_slide=?'; $upTypes .= 'i'; $upVals[] = 1;
+  }
+  if (column_exists($mysqli, 'users', 'access_lkpd_interaktif') && $isEducomicPro) {
+    $upCols[] = 'access_lkpd_interaktif=?'; $upTypes .= 'i'; $upVals[] = 1;
+  }
+  
+  if ($isNewUser) {
+    if (column_exists($mysqli, 'users', 'access_buat_soal')) {
+      $upCols[] = 'access_buat_soal=?'; $upTypes .= 'i'; $upVals[] = 0;
+    }
+    if (column_exists($mysqli, 'users', 'access_modul_ajar')) {
+      $upCols[] = 'access_modul_ajar=?'; $upTypes .= 'i'; $upVals[] = 0;
+    }
+    if (column_exists($mysqli, 'users', 'access_rpp')) {
+      $upCols[] = 'access_rpp=?'; $upTypes .= 'i'; $upVals[] = 0;
+    }
+    if (column_exists($mysqli, 'users', 'access_quiz')) {
+      $upCols[] = 'access_quiz=?'; $upTypes .= 'i'; $upVals[] = 0;
+    }
+    if (column_exists($mysqli, 'users', 'access_rekap_nilai')) {
+      $upCols[] = 'access_rekap_nilai=?'; $upTypes .= 'i'; $upVals[] = 0;
+    }
+  }
+  
+  if (!empty($upCols)) {
+    $upTypes .= 'i';
+    $upVals[] = $uidFinal;
+    $sql = "UPDATE users SET " . implode(', ', $upCols) . " WHERE id=?";
+    $stmt = $mysqli->prepare($sql);
+    if ($stmt) {
+      $bind = [];
+      $bind[] = $upTypes;
+      foreach ($upVals as $i => $v) $bind[] = &$upVals[$i];
+      call_user_func_array([$stmt, 'bind_param'], $bind);
+      $stmt->execute();
+      $stmt->close();
+    }
+  }
 }
 
 $orderId = isset($data['order_id']) ? (string)$data['order_id'] : '';
