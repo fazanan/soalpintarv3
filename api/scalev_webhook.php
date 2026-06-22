@@ -234,7 +234,7 @@ $mysqli->query("CREATE TABLE IF NOT EXISTS scalev_webhook_events (
   UNIQUE KEY uniq_unique_id (unique_id),
   INDEX idx_event_received (event, received_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-$mysqli->query("ALTER TABLE scalev_webhook_events ADD COLUMN products_text TEXT NULL");
+try { $mysqli->query("ALTER TABLE scalev_webhook_events ADD COLUMN products_text TEXT NULL"); } catch (Exception $e) {}
 
 $mysqli->query("CREATE TABLE IF NOT EXISTS whapify_notifications (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
