@@ -44,7 +44,7 @@ $hasNoHpCol = false;
 $hasAccessBahanAjarCol = false;
 try {
   $hasNoHpCol = has_column_api_check($mysqli, 'users', 'no_hp');
-  $hasAccessBahanAjarCol = has_column_api_check($mysqli, 'users', 'access_bahan_ajar');
+  $hasAccessBahanAjarCol = has_column_api_check($mysqli, 'users', 'access_bahan_ajar_komik');
 } catch (mysqli_sql_exception $e) {
   $hasNoHpCol = false;
   $hasAccessBahanAjarCol = false;
@@ -54,7 +54,7 @@ $uid = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
 $row = null;
 
 if ($uid > 0) {
-  $exprAccess = $hasAccessBahanAjarCol ? 'access_bahan_ajar' : '1';
+  $exprAccess = $hasAccessBahanAjarCol ? 'access_bahan_ajar_komik' : '1';
   $stmt = $mysqli->prepare("SELECT id, username, role, ($exprAccess) AS access_bahan_ajar FROM users WHERE id=? LIMIT 1");
   $stmt->bind_param('i', $uid);
   $stmt->execute();
@@ -91,7 +91,7 @@ if ($uid > 0) {
     $candPhones = array_slice($candPhones, 0, 4);
   }
 
-  $exprAccess = $hasAccessBahanAjarCol ? 'access_bahan_ajar' : '1';
+  $exprAccess = $hasAccessBahanAjarCol ? 'access_bahan_ajar_komik' : '1';
   $phoneExpr = "REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(no_hp,' ',''),'-',''),'(',''),')',''),'+','')";
   $stmt = null;
   try {

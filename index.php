@@ -598,14 +598,16 @@ session_write_close();
       const ACCESS_REKAP = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_rekap_nilai']) && (int)$_SESSION['access_rekap_nilai'] === 0) ? 'false' : 'true'); ?>;
       const ACCESS_BUAT_SOAL = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_buat_soal']) && (int)$_SESSION['access_buat_soal'] === 0) ? 'false' : 'true'); ?>;
       const ACCESS_MODUL_AJAR = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_modul_ajar']) && (int)$_SESSION['access_modul_ajar'] === 0) ? 'false' : 'true'); ?>;
-      const ACCESS_BAHAN_AJAR = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_bahan_ajar']) && (int)$_SESSION['access_bahan_ajar'] === 0) ? 'false' : 'true'); ?>;
-      const ACCESS_LKPD_INTERAKTIF = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_lkpd_interaktif']) && (int)$_SESSION['access_lkpd_interaktif'] === 0) ? 'false' : 'true'); ?>;
+      const ACCESS_BAHAN_AJAR_KOMIK = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_bahan_ajar_komik']) && (int)$_SESSION['access_bahan_ajar_komik'] === 1) ? 'true' : 'false'); ?>;
+      const ACCESS_BAHAN_AJAR_SLIDE = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_bahan_ajar_slide']) && (int)$_SESSION['access_bahan_ajar_slide'] === 1) ? 'true' : 'false'); ?>;
+      const ACCESS_LKPD_INTERAKTIF = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_lkpd_interaktif']) && (int)$_SESSION['access_lkpd_interaktif'] === 1) ? 'true' : 'false'); ?>;
       const ACCESS_RPP = <?php echo (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') ? 'true' : ((isset($_SESSION['access_rpp']) && (int)$_SESSION['access_rpp'] === 0) ? 'false' : 'true'); ?>;
       const HAS_QUIZ_ACCESS = IS_ADMIN || ACCESS_QUIZ;
       const HAS_REKAP_ACCESS = IS_ADMIN || ACCESS_REKAP;
       const HAS_BUAT_SOAL_ACCESS = IS_ADMIN || ACCESS_BUAT_SOAL;
       const HAS_MODUL_AJAR_ACCESS = IS_ADMIN || ACCESS_MODUL_AJAR;
-      const HAS_BAHAN_AJAR_ACCESS = IS_ADMIN || ACCESS_BAHAN_AJAR;
+      const HAS_BAHAN_AJAR_KOMIK_ACCESS = IS_ADMIN || ACCESS_BAHAN_AJAR_KOMIK;
+      const HAS_BAHAN_AJAR_SLIDE_ACCESS = IS_ADMIN || ACCESS_BAHAN_AJAR_SLIDE;
       const HAS_LKPD_INTERAKTIF_ACCESS = IS_ADMIN || ACCESS_LKPD_INTERAKTIF;
       const HAS_RPP_ACCESS = IS_ADMIN || ACCESS_RPP;
       const USER_PROFILE = <?php echo json_encode($__userProfile, JSON_UNESCAPED_UNICODE); ?>;
@@ -622,7 +624,8 @@ session_write_close();
       const VIEWS = [
         { id: "preview", label: "Buat Soal", icon: "description" },
         { id: "modul_ajar", label: "Modul Ajar", icon: "menu_book" },
-        { id: "bahan_ajar", label: "Bahan Ajar", icon: "library_books" },
+        { id: "bahan_ajar_komik", label: "Bahan Ajar (Komik)", icon: "library_books" },
+        { id: "bahan_ajar_slide", label: "Bahan Ajar (Slide)", icon: "slideshow" },
         { id: "lkpd_interaktif", label: "LKPD Interaktif", icon: "auto_stories" },
         { id: "rpp", label: "RPP", icon: "event_note" },
         { id: "quiz", label: "Quiz", icon: "quiz" },
@@ -5042,15 +5045,7 @@ session_write_close();
                   ${inputText("Nama Sekolah", "bahanAjar.namaSekolah", B.namaSekolah, "Contoh: SMA Negeri 1 Bandung")}
                   ${inputText("Username Instagram/TikTok untuk watermark", "bahanAjar.usernameWatermark", B.usernameWatermark, "Contoh: @gurusains.id")}
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div class="flex flex-col gap-2">
-                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Format rasio</label>
-                    <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm" data-path="bahanAjar.formatRasio">
-                      <option value="story_9_16"${String(B.formatRasio||'')==='story_9_16'?' selected':''}>Story 9:16</option>
-                      <option value="portrait_4_5"${String(B.formatRasio||'')==='portrait_4_5'?' selected':''}>Portrait 4:5</option>
-                    </select>
-                  </div>
-                </div>
+
               </div>
             </details>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -5088,16 +5083,20 @@ session_write_close();
                     onclick="window.__sp.copyBahanAjarPrompt(this)" title="Salin">
                     <span class="material-symbols-outlined text-[18px]">content_copy</span>
                   </button>
+                  ${state.activeView !== 'bahan_ajar_slide' ? `
                   <button class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold"
-                    onclick="window.open('https://chatgpt.com/g/g-6a12a09069248191a7d76d45beb44c50-komik-pembelajaran-by-gurupintar','_blank','noopener')">
+                    onclick="window.__sp.openBahanAjarKomik()">
                     <span class="material-symbols-outlined text-[18px]">smart_toy</span>
                     Buat Bahan Ajar Komik
                   </button>
-                  <button class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold"
-                    onclick="window.open('https://chatgpt.com/g/g-6a1c0d8225388191bb1496c9b2bcafb5-eduslide-ppt-by-gurupintar/c/6a1c490c-f8d0-83ec-8df3-578b44758426','_blank','noopener')">
+                  ` : ''}
+                  ${state.activeView !== 'bahan_ajar_komik' ? `
+                  <button class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold"
+                    onclick="window.__sp.openBahanAjarSlide()">
                     <span class="material-symbols-outlined text-[18px]">slideshow</span>
-                    Buat Bahan Ajar Formal (ppt)
+                    Buat Bahan Ajar Formal (Slide)
                   </button>
+                  ` : ''}
                 </div>
               </div>
               <textarea class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm min-h-[180px]"
@@ -5434,9 +5433,9 @@ session_write_close();
                     <span class="material-symbols-outlined text-[18px]">content_copy</span>
                   </button>
                   <button class="inline-flex items-center gap-2 h-9 px-4 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm font-bold"
-                    onclick="window.open('https://chatgpt.com/g/g-6a13d61020b08191910e219eb19937f9-lkpd-interaktif-by-gurupintar','_blank','noopener')">
+                    onclick="window.__sp.openLkpdInteraktif()">
                     <span class="material-symbols-outlined text-[18px]">smart_toy</span>
-                    LKPD Komik
+                    LKPD Interaktif
                   </button>
                 </div>
               </div>
@@ -9292,7 +9291,8 @@ ${baselineModulAjar}
         `;
         if (state.activeView === "preview" && !HAS_BUAT_SOAL_ACCESS) return noAccessBox("Buat Soal");
         if (state.activeView === "modul_ajar" && !HAS_MODUL_AJAR_ACCESS) return noAccessBox("Modul Ajar");
-        if (state.activeView === "bahan_ajar" && !HAS_BAHAN_AJAR_ACCESS) return noAccessBox("Bahan Ajar");
+        if (state.activeView === "bahan_ajar_komik" && !HAS_BAHAN_AJAR_KOMIK_ACCESS) return noAccessBox("Bahan Ajar (Komik)");
+        if (state.activeView === "bahan_ajar_slide" && !HAS_BAHAN_AJAR_SLIDE_ACCESS) return noAccessBox("Bahan Ajar (Slide)");
         if (state.activeView === "lkpd_interaktif" && !HAS_LKPD_INTERAKTIF_ACCESS) return noAccessBox("LKPD Interaktif");
         if (state.activeView === "rpp" && !HAS_RPP_ACCESS) return noAccessBox("RPP");
         if (state.activeView === "preview") {
@@ -9441,7 +9441,7 @@ ${baselineModulAjar}
           return `<div class="pb-6 md:pb-0">${tabBar}${body}${globalHelp}${tutorialModal}</div>`;
         }
         if (state.activeView === "lkpd") return renderLKPD();
-        if (state.activeView === "bahan_ajar") return renderBahanAjar();
+        if (state.activeView === "bahan_ajar" || state.activeView === "bahan_ajar_komik" || state.activeView === "bahan_ajar_slide") return renderBahanAjar();
         if (state.activeView === "lkpd_interaktif") return renderLKPDInteraktif();
         if (state.activeView === "modul_ajar") return renderModulAjar();
         if (state.activeView === "rpp") return renderRPP();
@@ -9471,7 +9471,7 @@ ${baselineModulAjar}
         const root = el("viewRoot");
         root.innerHTML = computeView();
         wireInputs(root);
-        if (state.activeView === "bahan_ajar" && String(state.bahanAjarTab || "").trim() === "interaktif") {
+        if ((state.activeView === "bahan_ajar" || state.activeView === "bahan_ajar_komik" || state.activeView === "bahan_ajar_slide") && String(state.bahanAjarTab || "").trim() === "interaktif") {
           try { initBahanAjarInteraktif(); } catch {}
         }
         if (state.activeView === "quiz" && state.quizSubtab === "share" && state.quizShareTab === "hasil") {
@@ -14988,8 +14988,7 @@ ${out}`;
         const modeLabel = mode === "lengkap" ? "Lengkap (10 slide)" : "Cepat (5 slide)";
         const carousel = String(B?.jenisCarousel || "").trim() || "literasi";
         const carouselLabel = carousel === "numerasi" ? "Numerasi (ada angka, rumus, contoh soal)" : "Literasi (fokus konsep & cerita)";
-        const rasio = String(B?.formatRasio || "").trim() || "story_9_16";
-        const rasioLabel = rasio === "portrait_4_5" ? "Portrait 4:5" : "Story 9:16";
+        const rasioLabel = state.activeView === "bahan_ajar_slide" ? "16:9" : "9:16";
         const watermark = String(B?.usernameWatermark || "").trim();
         const sekolah = String(B?.namaSekolah || "").trim();
         return [
@@ -15030,6 +15029,22 @@ ${out}`;
             setTimeout(() => { el.innerHTML = prev; }, 1200);
           }
         } catch {}
+      };
+      const openBahanAjarKomik = () => {
+        const p = String(getBahanAjarPromptText(state.bahanAjar) || "").trim();
+        let url = "https://chatgpt.com/g/g-6a37c9583f788191b8ebde597698b42d-eduslide-komik-by-gurupintar-versi-2-0";
+        if (p) {
+          url += "?prompt=" + encodeURIComponent(p);
+        }
+        window.open(url, '_blank', 'noopener');
+      };
+      const openBahanAjarSlide = () => {
+        const p = String(getBahanAjarPromptText(state.bahanAjar) || "").trim();
+        let url = "https://chatgpt.com/g/g-6a39369760d081919c8032ab7e42cd5d-eduslide-ppt-by-gurupintar-versi-2-0";
+        if (p) {
+          url += "?prompt=" + encodeURIComponent(p);
+        }
+        window.open(url, '_blank', 'noopener');
       };
       const copyFromModulAjarToLkpdInteraktif = () => {
         const M = state.modulAjar || {};
@@ -15092,6 +15107,14 @@ ${out}`;
             setTimeout(() => { el.innerHTML = prev; }, 1200);
           }
         } catch {}
+      };
+      const openLkpdInteraktif = () => {
+        const p = String(getLkpdInteraktifPromptText(state.lkpdInteraktif) || "").trim();
+        let url = "https://chatgpt.com/g/g-6a3994f58b3c819197d79f62ce66f159-lkpd-interaktif-by-gurupintar-versi-2-0/c/6a3996ac-ba70-83ec-b677-f4526fab6851";
+        if (p) {
+          url += "?prompt=" + encodeURIComponent(p);
+        }
+        window.open(url, '_blank', 'noopener');
       };
       const pickLkpdImage = () => {
         const elp = el("lkpdImgUpload");
@@ -18457,7 +18480,10 @@ table.rubric td{border:1px solid #000;padding:8px;vertical-align:top}
         copyFromModulAjarToBahanAjar,
         buildBahanAjarPrompt,
         copyBahanAjarPrompt,
+        openBahanAjarKomik,
+        openBahanAjarSlide,
         copyLkpdInteraktifPrompt,
+        openLkpdInteraktif,
         copyFromModulAjarToLkpdInteraktif,
         buildLKPD,
         pickLkpdImage,

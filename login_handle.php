@@ -39,7 +39,8 @@ $hasAccessQuizCol = false;
 $hasAccessRekapCol = false;
 $hasAccessBuatSoalCol = false;
 $hasAccessModulAjarCol = false;
-$hasAccessBahanAjarCol = false;
+$hasAccessBahanAjarKomikCol = false;
+$hasAccessBahanAjarSlideCol = false;
 $hasAccessLkpdInteraktifCol = false;
 $hasAccessRppCol = false;
 $hasNamaCol = false;
@@ -54,7 +55,8 @@ try {
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_rekap_nilai'")) { $hasAccessRekapCol = $rs->num_rows > 0; $rs->close(); }
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_buat_soal'")) { $hasAccessBuatSoalCol = $rs->num_rows > 0; $rs->close(); }
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_modul_ajar'")) { $hasAccessModulAjarCol = $rs->num_rows > 0; $rs->close(); }
-  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_bahan_ajar'")) { $hasAccessBahanAjarCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_bahan_ajar_komik'")) { $hasAccessBahanAjarKomikCol = $rs->num_rows > 0; $rs->close(); }
+  if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_bahan_ajar_slide'")) { $hasAccessBahanAjarSlideCol = $rs->num_rows > 0; $rs->close(); }
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_lkpd_interaktif'")) { $hasAccessLkpdInteraktifCol = $rs->num_rows > 0; $rs->close(); }
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'access_rpp'")) { $hasAccessRppCol = $rs->num_rows > 0; $rs->close(); }
   if ($rs = $mysqli->query("SHOW COLUMNS FROM users LIKE 'nama'")) { $hasNamaCol = $rs->num_rows > 0; $rs->close(); }
@@ -66,7 +68,8 @@ try {
   $hasAccessRekapCol = false;
   $hasAccessBuatSoalCol = false;
   $hasAccessModulAjarCol = false;
-  $hasAccessBahanAjarCol = false;
+  $hasAccessBahanAjarKomikCol = false;
+  $hasAccessBahanAjarSlideCol = false;
   $hasAccessLkpdInteraktifCol = false;
   $hasAccessRppCol = false;
   $hasNamaCol = false;
@@ -88,8 +91,9 @@ $exprAccessQuiz = $hasAccessQuizCol ? 'access_quiz' : '1';
 $exprAccessRekap = $hasAccessRekapCol ? 'access_rekap_nilai' : '1';
 $exprAccessBuatSoal = $hasAccessBuatSoalCol ? 'access_buat_soal' : '1';
 $exprAccessModulAjar = $hasAccessModulAjarCol ? 'access_modul_ajar' : '1';
-$exprAccessBahanAjar = $hasAccessBahanAjarCol ? 'access_bahan_ajar' : '1';
-$exprAccessLkpdInteraktif = $hasAccessLkpdInteraktifCol ? 'access_lkpd_interaktif' : '1';
+$exprAccessBahanAjarKomik = $hasAccessBahanAjarKomikCol ? 'access_bahan_ajar_komik' : '0';
+$exprAccessBahanAjarSlide = $hasAccessBahanAjarSlideCol ? 'access_bahan_ajar_slide' : '0';
+$exprAccessLkpdInteraktif = $hasAccessLkpdInteraktifCol ? 'access_lkpd_interaktif' : '0';
 $exprAccessRpp = $hasAccessRppCol ? 'access_rpp' : '1';
 $exprNama = $hasNamaCol ? 'nama' : "''";
 $exprJenjang = $hasJenjangCol ? 'jenjang' : "''";
@@ -98,9 +102,9 @@ $stmt = null;
 try {
   if ($hasNoHpCol && !$isEmail && count($candPhones) > 0) {
     $ph = implode(',', array_fill(0, count($candPhones), '?'));
-    $stmt = $mysqli->prepare("SELECT id, username, password, role, ($exprAccessQuiz) AS access_quiz, ($exprAccessRekap) AS access_rekap_nilai, ($exprAccessBuatSoal) AS access_buat_soal, ($exprAccessModulAjar) AS access_modul_ajar, ($exprAccessBahanAjar) AS access_bahan_ajar, ($exprAccessLkpdInteraktif) AS access_lkpd_interaktif, ($exprAccessRpp) AS access_rpp, ($exprNama) AS nama, ($exprJenjang) AS jenjang, ($exprNamaSekolah) AS nama_sekolah FROM users WHERE username = ? OR ($phoneExpr IN ($ph)) LIMIT 1");
+    $stmt = $mysqli->prepare("SELECT id, username, password, role, ($exprAccessQuiz) AS access_quiz, ($exprAccessRekap) AS access_rekap_nilai, ($exprAccessBuatSoal) AS access_buat_soal, ($exprAccessModulAjar) AS access_modul_ajar, ($exprAccessBahanAjarKomik) AS access_bahan_ajar_komik, ($exprAccessBahanAjarSlide) AS access_bahan_ajar_slide, ($exprAccessLkpdInteraktif) AS access_lkpd_interaktif, ($exprAccessRpp) AS access_rpp, ($exprNama) AS nama, ($exprJenjang) AS jenjang, ($exprNamaSekolah) AS nama_sekolah FROM users WHERE username = ? OR ($phoneExpr IN ($ph)) LIMIT 1");
   } else {
-    $stmt = $mysqli->prepare("SELECT id, username, password, role, ($exprAccessQuiz) AS access_quiz, ($exprAccessRekap) AS access_rekap_nilai, ($exprAccessBuatSoal) AS access_buat_soal, ($exprAccessModulAjar) AS access_modul_ajar, ($exprAccessBahanAjar) AS access_bahan_ajar, ($exprAccessLkpdInteraktif) AS access_lkpd_interaktif, ($exprAccessRpp) AS access_rpp, ($exprNama) AS nama, ($exprJenjang) AS jenjang, ($exprNamaSekolah) AS nama_sekolah FROM users WHERE username = ? LIMIT 1");
+    $stmt = $mysqli->prepare("SELECT id, username, password, role, ($exprAccessQuiz) AS access_quiz, ($exprAccessRekap) AS access_rekap_nilai, ($exprAccessBuatSoal) AS access_buat_soal, ($exprAccessModulAjar) AS access_modul_ajar, ($exprAccessBahanAjarKomik) AS access_bahan_ajar_komik, ($exprAccessBahanAjarSlide) AS access_bahan_ajar_slide, ($exprAccessLkpdInteraktif) AS access_lkpd_interaktif, ($exprAccessRpp) AS access_rpp, ($exprNama) AS nama, ($exprJenjang) AS jenjang, ($exprNamaSekolah) AS nama_sekolah FROM users WHERE username = ? LIMIT 1");
   }
 } catch (mysqli_sql_exception $e) {
   $stmt = null;
@@ -123,13 +127,14 @@ if ($stmt) {
   $accessRekap = 1;
   $accessBuatSoal = 1;
   $accessModulAjar = 1;
-  $accessBahanAjar = 1;
-  $accessLkpdInteraktif = 1;
+  $accessBahanAjarKomik = 0;
+  $accessBahanAjarSlide = 0;
+  $accessLkpdInteraktif = 0;
   $accessRpp = 1;
   $nama = '';
   $jenjang = '';
   $namaSekolah = '';
-  $stmt->bind_result($id, $dbUsername, $hash, $role, $accessQuiz, $accessRekap, $accessBuatSoal, $accessModulAjar, $accessBahanAjar, $accessLkpdInteraktif, $accessRpp, $nama, $jenjang, $namaSekolah);
+  $stmt->bind_result($id, $dbUsername, $hash, $role, $accessQuiz, $accessRekap, $accessBuatSoal, $accessModulAjar, $accessBahanAjarKomik, $accessBahanAjarSlide, $accessLkpdInteraktif, $accessRpp, $nama, $jenjang, $namaSekolah);
   if ($stmt->fetch() && password_verify($p, $hash)) {
     session_regenerate_id(true);
     $sid = session_id();
@@ -157,7 +162,8 @@ if ($stmt) {
     $_SESSION['access_rekap_nilai'] = $isAdminLogin ? 1 : (int)$accessRekap;
     $_SESSION['access_buat_soal'] = $isAdminLogin ? 1 : (int)$accessBuatSoal;
     $_SESSION['access_modul_ajar'] = $isAdminLogin ? 1 : (int)$accessModulAjar;
-    $_SESSION['access_bahan_ajar'] = $isAdminLogin ? 1 : (int)$accessBahanAjar;
+    $_SESSION['access_bahan_ajar_komik'] = $isAdminLogin ? 1 : (int)$accessBahanAjarKomik;
+    $_SESSION['access_bahan_ajar_slide'] = $isAdminLogin ? 1 : (int)$accessBahanAjarSlide;
     $_SESSION['access_lkpd_interaktif'] = $isAdminLogin ? 1 : (int)$accessLkpdInteraktif;
     $_SESSION['access_rpp'] = $isAdminLogin ? 1 : (int)$accessRpp;
     $_SESSION['nama'] = (string)$nama;
@@ -205,8 +211,9 @@ if ($stmt) {
     $_SESSION['access_rekap_nilai'] = 1;
     $_SESSION['access_buat_soal'] = 1;
     $_SESSION['access_modul_ajar'] = 1;
-    $_SESSION['access_bahan_ajar'] = 1;
-    $_SESSION['access_lkpd_interaktif'] = 1;
+    $_SESSION['access_bahan_ajar_komik'] = 0;
+    $_SESSION['access_bahan_ajar_slide'] = 0;
+    $_SESSION['access_lkpd_interaktif'] = 0;
     $_SESSION['access_rpp'] = 1;
     $_SESSION['nama'] = '';
     $_SESSION['jenjang'] = '';
