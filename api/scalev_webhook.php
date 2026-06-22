@@ -370,10 +370,8 @@ if (!$exists) {
   $cleanProductsText = preg_replace('/[^a-z0-9]/', '', $productsText);
   $isEducomicBasic = strpos($cleanProductsText, 'educomicbasic') !== false;
   $isEducomicPro = strpos($cleanProductsText, 'educomicpro') !== false;
-  
-  $abak = ($isEducomicBasic || $isEducomicPro) ? 1 : 0;
-  $abas = $isEducomicPro ? 1 : 0;
-  $ali = $isEducomicPro ? 1 : 0;
+  $isGuruPintarBasic = strpos($cleanProductsText, 'gurupintarbasic') !== false;
+  $isGuruPintarPro = strpos($cleanProductsText, 'gurupintarpro') !== false;
   
   $cols = ['username', 'password', 'role', 'limitpaket', 'limitgambar'];
   $types = 'sssii';
@@ -422,42 +420,58 @@ if ($stmt) {
   $stmt->close();
 }
 
-if ($uidFinal !== null && ($isEducomicBasic || $isEducomicPro)) {
-  $upCols = [];
-  $upTypes = '';
-  $upVals = [];
-  
+if ($uidFinal !== null && ($isEducomicBasic || $isEducomicPro || $isGuruPintarBasic || $isGuruPintarPro)) {
   $isNewUser = ($createdUserId !== null);
+  $accessUpdates = [];
   
-  if (column_exists($mysqli, 'users', 'access_bahan_ajar_komik')) {
-    $upCols[] = 'access_bahan_ajar_komik=?'; $upTypes .= 'i'; $upVals[] = 1;
-  }
-  if (column_exists($mysqli, 'users', 'access_bahan_ajar_slide') && $isEducomicPro) {
-    $upCols[] = 'access_bahan_ajar_slide=?'; $upTypes .= 'i'; $upVals[] = 1;
-  }
-  if (column_exists($mysqli, 'users', 'access_lkpd_interaktif') && $isEducomicPro) {
-    $upCols[] = 'access_lkpd_interaktif=?'; $upTypes .= 'i'; $upVals[] = 1;
+  // EDUCOMIC
+  if ($isEducomicBasic || $isEducomicPro) {
+    if (column_exists($mysqli, 'users', 'access_bahan_ajar_komik')) $accessUpdates['access_bahan_ajar_komik'] = 1;
+    if ($isEducomicPro) {
+      if (column_exists($mysqli, 'users', 'access_bahan_ajar_slide')) $accessUpdates['access_bahan_ajar_slide'] = 1;
+      if (column_exists($mysqli, 'users', 'access_lkpd_interaktif')) $accessUpdates['access_lkpd_interaktif'] = 1;
+    }
   }
   
+  // GURU PINTAR
+  if ($isGuruPintarBasic || $isGuruPintarPro) {
+    if (column_exists($mysqli, 'users', 'access_buat_soal')) $accessUpdates['access_buat_soal'] = 1;
+    if ($isGuruPintarPro) {
+      if (column_exists($mysqli, 'users', 'access_modul_ajar')) $accessUpdates['access_modul_ajar'] = 1;
+      if (column_exists($mysqli, 'users', 'access_rpp')) $accessUpdates['access_rpp'] = 1;
+      if (column_exists($mysqli, 'users', 'access_quiz')) $accessUpdates['access_quiz'] = 1;
+      if (column_exists($mysqli, 'users', 'access_rekap_nilai')) $accessUpdates['access_rekap_nilai'] = 1;
+    }
+  }
+  
+  // NEW USER DEFAULTS
   if ($isNewUser) {
-    if (column_exists($mysqli, 'users', 'access_buat_soal')) {
-      $upCols[] = 'access_buat_soal=?'; $upTypes .= 'i'; $upVals[] = 0;
+    $defaultsToZero = [];
+    if ($isEducomicBasic || $isEducomicPro) {
+      $defaultsToZero = array_merge($defaultsToZero, ['access_buat_soal', 'access_modul_ajar', 'access_rpp', 'access_quiz', 'access_rekap_nilai']);
     }
-    if (column_exists($mysqli, 'users', 'access_modul_ajar')) {
-      $upCols[] = 'access_modul_ajar=?'; $upTypes .= 'i'; $upVals[] = 0;
+    if ($isGuruPintarBasic || $isGuruPintarPro) {
+      $defaultsToZero = array_merge($defaultsToZero, ['access_bahan_ajar_komik', 'access_bahan_ajar_slide', 'access_lkpd_interaktif']);
+      if ($isGuruPintarBasic && !$isGuruPintarPro) {
+        $defaultsToZero = array_merge($defaultsToZero, ['access_modul_ajar', 'access_rpp', 'access_quiz', 'access_rekap_nilai']);
+      }
     }
-    if (column_exists($mysqli, 'users', 'access_rpp')) {
-      $upCols[] = 'access_rpp=?'; $upTypes .= 'i'; $upVals[] = 0;
-    }
-    if (column_exists($mysqli, 'users', 'access_quiz')) {
-      $upCols[] = 'access_quiz=?'; $upTypes .= 'i'; $upVals[] = 0;
-    }
-    if (column_exists($mysqli, 'users', 'access_rekap_nilai')) {
-      $upCols[] = 'access_rekap_nilai=?'; $upTypes .= 'i'; $upVals[] = 0;
+    foreach ($defaultsToZero as $col) {
+      if (!isset($accessUpdates[$col]) && column_exists($mysqli, 'users', $col)) {
+        $accessUpdates[$col] = 0;
+      }
     }
   }
   
-  if (!empty($upCols)) {
+  if (!empty($accessUpdates)) {
+    $upCols = [];
+    $upTypes = '';
+    $upVals = [];
+    foreach ($accessUpdates as $col => $val) {
+      $upCols[] = "$col=?";
+      $upTypes .= 'i';
+      $upVals[] = $val;
+    }
     $upTypes .= 'i';
     $upVals[] = $uidFinal;
     $sql = "UPDATE users SET " . implode(', ', $upCols) . " WHERE id=?";
