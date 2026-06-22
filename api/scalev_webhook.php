@@ -312,13 +312,64 @@ if (!$exists) {
   $role = 'user';
   $limitGambar = 0;
   $noHp = extract_customer_phone($data);
-  $hasNoHp = column_exists($mysqli, 'users', 'no_hp');
-  $stmt = $hasNoHp
-    ? $mysqli->prepare("INSERT INTO users (username, no_hp, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?, ?)")
-    : $mysqli->prepare("INSERT INTO users (username, password, role, limitpaket, limitgambar) VALUES (?, ?, ?, ?, ?)");
+
+  $productsText = '';
+  if (isset($data['lines']) && is_array($data['lines'])) {
+    foreach ($data['lines'] as $line) {
+      if (isset($line['product']['name'])) $productsText .= ' ' . $line['product']['name'];
+      elseif (isset($line['name'])) $productsText .= ' ' . $line['name'];
+    }
+  }
+  if (isset($data['items']) && is_array($data['items'])) {
+    foreach ($data['items'] as $item) {
+      if (isset($item['product']['name'])) $productsText .= ' ' . $item['product']['name'];
+      elseif (isset($item['name'])) $productsText .= ' ' . $item['name'];
+      elseif (isset($item['product_name'])) $productsText .= ' ' . $item['product_name'];
+    }
+  }
+  if (isset($data['products']) && is_array($data['products'])) {
+    foreach ($data['products'] as $p) {
+      if (isset($p['name'])) $productsText .= ' ' . $p['name'];
+      elseif (is_string($p)) $productsText .= ' ' . $p;
+    }
+  }
+  if (isset($data['product']['name'])) {
+    $productsText .= ' ' . $data['product']['name'];
+  }
+  
+  $productsText = strtolower(trim($productsText));
+  
+  $isEducomicBasic = strpos($productsText, 'educomic basic') !== false;
+  $isEducomicPro = strpos($productsText, 'educomic pro') !== false;
+  
+  $abak = ($isEducomicBasic || $isEducomicPro) ? 1 : 0;
+  $abas = $isEducomicPro ? 1 : 0;
+  $ali = $isEducomicPro ? 1 : 0;
+  
+  $cols = ['username', 'password', 'role', 'limitpaket', 'limitgambar'];
+  $types = 'sssii';
+  $vals = [$email, $hash, $role, $initLimit, $limitGambar];
+  
+  if (column_exists($mysqli, 'users', 'no_hp')) {
+    $cols[] = 'no_hp'; $types .= 's'; $vals[] = $noHp;
+  }
+  if (column_exists($mysqli, 'users', 'access_bahan_ajar_komik')) {
+    $cols[] = 'access_bahan_ajar_komik'; $types .= 'i'; $vals[] = $abak;
+  }
+  if (column_exists($mysqli, 'users', 'access_bahan_ajar_slide')) {
+    $cols[] = 'access_bahan_ajar_slide'; $types .= 'i'; $vals[] = $abas;
+  }
+  if (column_exists($mysqli, 'users', 'access_lkpd_interaktif')) {
+    $cols[] = 'access_lkpd_interaktif'; $types .= 'i'; $vals[] = $ali;
+  }
+  
+  $ph = implode(',', array_fill(0, count($cols), '?'));
+  $stmt = $mysqli->prepare("INSERT INTO users (" . implode(',', $cols) . ") VALUES ($ph)");
   if ($stmt) {
-    if ($hasNoHp) $stmt->bind_param('ssssii', $email, $noHp, $hash, $role, $initLimit, $limitGambar);
-    else $stmt->bind_param('sssii', $email, $hash, $role, $initLimit, $limitGambar);
+    $bind = [];
+    $bind[] = $types;
+    foreach ($vals as $i => $v) $bind[] = &$vals[$i];
+    call_user_func_array([$stmt, 'bind_param'], $bind);
     if ($stmt->execute()) $createdUserId = (int)$stmt->insert_id;
     $stmt->close();
   }
