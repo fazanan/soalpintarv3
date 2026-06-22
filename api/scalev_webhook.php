@@ -230,9 +230,11 @@ $mysqli->query("CREATE TABLE IF NOT EXISTS scalev_webhook_events (
   created_user_id INT UNSIGNED NULL,
   received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   processed_at TIMESTAMP NULL DEFAULT NULL,
+  products_text TEXT NULL,
   UNIQUE KEY uniq_unique_id (unique_id),
   INDEX idx_event_received (event, received_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+$mysqli->query("ALTER TABLE scalev_webhook_events ADD COLUMN products_text TEXT NULL");
 
 $mysqli->query("CREATE TABLE IF NOT EXISTS whapify_notifications (
   id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -252,13 +254,46 @@ $mysqli->query("CREATE TABLE IF NOT EXISTS whapify_notifications (
   INDEX idx_user_created (user_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+$productsText = '';
+if (isset($data['orderlines']) && is_array($data['orderlines'])) {
+  foreach ($data['orderlines'] as $line) {
+    if (isset($line['product_name'])) $productsText .= ' ' . $line['product_name'];
+  }
+}
+if (isset($data['lines']) && is_array($data['lines'])) {
+  foreach ($data['lines'] as $line) {
+    if (isset($line['product']['name'])) $productsText .= ' ' . $line['product']['name'];
+    elseif (isset($line['name'])) $productsText .= ' ' . $line['name'];
+  }
+}
+if (isset($data['items']) && is_array($data['items'])) {
+  foreach ($data['items'] as $item) {
+    if (isset($item['product']['name'])) $productsText .= ' ' . $item['product']['name'];
+    elseif (isset($item['name'])) $productsText .= ' ' . $item['name'];
+    elseif (isset($item['product_name'])) $productsText .= ' ' . $item['product_name'];
+  }
+}
+if (isset($data['products']) && is_array($data['products'])) {
+  foreach ($data['products'] as $p) {
+    if (isset($p['name'])) $productsText .= ' ' . $p['name'];
+    elseif (is_string($p)) $productsText .= ' ' . $p;
+  }
+}
+if (isset($data['product']['name'])) {
+  $productsText .= ' ' . $data['product']['name'];
+}
+if (isset($data['message_variables']['items_name'])) {
+  $productsText .= ' ' . $data['message_variables']['items_name'];
+}
+$productsText = strtolower(trim($productsText));
+
 if ($uniqueId !== '') {
-  $stmt = $mysqli->prepare("INSERT IGNORE INTO scalev_webhook_events (unique_id, event, order_id, email, payment_status) VALUES (?,?,?,?,?)");
+  $stmt = $mysqli->prepare("INSERT IGNORE INTO scalev_webhook_events (unique_id, event, order_id, email, payment_status, products_text) VALUES (?,?,?,?,?,?)");
   if ($stmt) {
     $orderIdIns = isset($data['order_id']) ? (string)$data['order_id'] : '';
     $emailIns = extract_customer_email($data);
     $payIns = isset($data['payment_status']) ? (string)$data['payment_status'] : '';
-    $stmt->bind_param('sssss', $uniqueId, $event, $orderIdIns, $emailIns, $payIns);
+    $stmt->bind_param('ssssss', $uniqueId, $event, $orderIdIns, $emailIns, $payIns, $productsText);
     $stmt->execute();
     $inserted = $stmt->affected_rows;
     $stmt->close();
@@ -312,35 +347,29 @@ if (!$exists) {
   $role = 'user';
   $limitGambar = 0;
   $noHp = extract_customer_phone($data);
-
-  $productsText = '';
-  if (isset($data['lines']) && is_array($data['lines'])) {
-    foreach ($data['lines'] as $line) {
-      if (isset($line['product']['name'])) $productsText .= ' ' . $line['product']['name'];
-      elseif (isset($line['name'])) $productsText .= ' ' . $line['name'];
+  
+  if ($productsText === '') {
+    $orderIdIns = isset($data['order_id']) ? (string)$data['order_id'] : '';
+    if ($orderIdIns !== '') {
+      $stmtQuery = $mysqli->prepare("SELECT products_text FROM scalev_webhook_events WHERE order_id=? AND event='order.created' AND products_text IS NOT NULL LIMIT 1");
+      if ($stmtQuery) {
+        $stmtQuery->bind_param('s', $orderIdIns);
+        $stmtQuery->execute();
+        $stmtQuery->bind_result($pt);
+        if ($stmtQuery->fetch() && $pt !== null) {
+          $productsText = (string)$pt;
+        }
+        $stmtQuery->close();
+      }
     }
-  }
-  if (isset($data['items']) && is_array($data['items'])) {
-    foreach ($data['items'] as $item) {
-      if (isset($item['product']['name'])) $productsText .= ' ' . $item['product']['name'];
-      elseif (isset($item['name'])) $productsText .= ' ' . $item['name'];
-      elseif (isset($item['product_name'])) $productsText .= ' ' . $item['product_name'];
-    }
-  }
-  if (isset($data['products']) && is_array($data['products'])) {
-    foreach ($data['products'] as $p) {
-      if (isset($p['name'])) $productsText .= ' ' . $p['name'];
-      elseif (is_string($p)) $productsText .= ' ' . $p;
-    }
-  }
-  if (isset($data['product']['name'])) {
-    $productsText .= ' ' . $data['product']['name'];
   }
   
-  $productsText = strtolower(trim($productsText));
+  // Debug log to a local file so we can inspect the payload if it fails again
+  @file_put_contents(__DIR__ . '/scalev_last_payload.json', json_encode(['products_text' => $productsText, 'data' => $data], JSON_PRETTY_PRINT));
   
-  $isEducomicBasic = strpos($productsText, 'educomic basic') !== false;
-  $isEducomicPro = strpos($productsText, 'educomic pro') !== false;
+  $cleanProductsText = preg_replace('/[^a-z0-9]/', '', $productsText);
+  $isEducomicBasic = strpos($cleanProductsText, 'educomicbasic') !== false;
+  $isEducomicPro = strpos($cleanProductsText, 'educomicpro') !== false;
   
   $abak = ($isEducomicBasic || $isEducomicPro) ? 1 : 0;
   $abas = $isEducomicPro ? 1 : 0;
