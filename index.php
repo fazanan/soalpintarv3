@@ -622,6 +622,7 @@ session_write_close();
       const GEN_MAX_ATTEMPTS = 12;
       const MA_MAX_PERTEMUAN = 4;
       const VIEWS = [
+        { id: "tutorial", label: "Tutorial", icon: "play_circle" },
         { id: "preview", label: "Buat Soal", icon: "description" },
         { id: "modul_ajar", label: "Modul Ajar", icon: "menu_book" },
         { id: "bahan_ajar_komik", label: "Bahan Ajar (Komik)", icon: "library_books" },
@@ -787,10 +788,13 @@ session_write_close();
           "Pendidikan Agama Hindu dan Budi Pekerti",
           "Pendidikan Agama Buddha dan Budi Pekerti",
           "Pendidikan Agama Khonghucu dan Budi Pekerti",
+          "Al-Qur'an Hadis",
           "Tahsin / Tahfizh",
-          "Bahasa Arab",
-          "Sejarah Kebudayaan Islam (SKI)",
+          "Akidah Akhlak",
+          "Fikih",
           "Kaidah & Usul Fiqih",
+          "Sejarah Kebudayaan Islam (SKI)",
+          "Bahasa Arab",
           "Pendidikan Pancasila",
           "Bahasa Indonesia",
           "Bahasa Indramayu",
@@ -9440,6 +9444,7 @@ ${baselineModulAjar}
           `;
           return `<div class="pb-6 md:pb-0">${tabBar}${body}${globalHelp}${tutorialModal}</div>`;
         }
+        if (state.activeView === "tutorial") return renderTutorial();
         if (state.activeView === "lkpd") return renderLKPD();
         if (state.activeView === "bahan_ajar" || state.activeView === "bahan_ajar_komik" || state.activeView === "bahan_ajar_slide") return renderBahanAjar();
         if (state.activeView === "lkpd_interaktif") return renderLKPDInteraktif();
@@ -9450,6 +9455,100 @@ ${baselineModulAjar}
         if (state.activeView === "limit") { state.activeView = "preview"; return ""; }
         if (state.activeView === "riwayat") return renderRiwayat();
         return "";
+      };
+
+      window.filterTutorial = (category, btn) => {
+        const grid = document.getElementById("tutorialGrid");
+        if (!grid) return;
+        const cards = grid.querySelectorAll(".tutorial-card");
+        cards.forEach(card => {
+          if (category === "semua" || card.getAttribute("data-category") === category) {
+            card.style.display = "flex";
+          } else {
+            card.style.display = "none";
+          }
+        });
+        
+        const btns = document.getElementById("tutorialFilters").querySelectorAll("button");
+        btns.forEach(b => {
+          b.className = "px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300";
+        });
+        btn.className = "px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-primary text-white border border-primary";
+      };
+
+      const renderTutorial = () => {
+        return `
+          <div class="p-5 md:p-7 w-full">
+            <!-- Tab / Filter Buttons -->
+            <div class="flex flex-wrap gap-2 mb-6" id="tutorialFilters">
+              <button onclick="window.filterTutorial('semua', this)" class="px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-primary text-white border border-primary">Semua</button>
+              <button onclick="window.filterTutorial('buat-soal', this)" class="px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">Buat Soal</button>
+              <button onclick="window.filterTutorial('modul-ajar-rpp', this)" class="px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">Modul Ajar/RPP</button>
+              <button onclick="window.filterTutorial('quiz-rekap', this)" class="px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">Quiz/Rekap</button>
+              <button onclick="window.filterTutorial('bahan-ajar', this)" class="px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">Bahan Ajar</button>
+              <button onclick="window.filterTutorial('lkpd', this)" class="px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">LKPD</button>
+            </div>
+
+            <!-- Grid Tutorial -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="tutorialGrid">
+              
+              <!-- Video 1 -->
+              <div data-category="buat-soal" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
+                <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
+                  <div class="text-slate-400 dark:text-slate-500 text-sm font-medium">Video belum tersedia</div>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Tutorial Menyusun Perangkat Ajar</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Panduan langkah demi langkah cara membuat Modul Ajar, RPP, dan LKPD secara otomatis menggunakan Aplikasi Guru Pintar.</p>
+              </div>
+
+              <!-- Video 2 -->
+              <div data-category="modul-ajar-rpp" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
+                <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
+                  <div class="text-slate-400 dark:text-slate-500 text-sm font-medium">Video belum tersedia</div>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Tutorial Menyusun Perangkat Ajar</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Panduan langkah demi langkah cara membuat Modul Ajar dan RPP secara otomatis.</p>
+              </div>
+
+              <!-- Video 3 -->
+              <div data-category="quiz-rekap" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
+                <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
+                  <div class="text-slate-400 dark:text-slate-500 text-sm font-medium">Video belum tersedia</div>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Tutorial Manajemen Quiz Online</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Pelajari cara men-generate dan merekap nilai peserta didik.</p>
+              </div>
+
+              <!-- Video 4 -->
+              <div data-category="bahan-ajar" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
+                <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
+                  <div class="text-slate-400 dark:text-slate-500 text-sm font-medium">Video belum tersedia</div>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Tutorial Manajemen Quiz Online</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Tempat untuk video tutorial fitur lainnya nanti.</p>
+              </div>
+
+              <!-- Video 5 -->
+              <div data-category="lkpd" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
+                <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
+                  <div class="text-slate-400 dark:text-slate-500 text-sm font-medium">Video belum tersedia</div>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Tutorial Menggunakan LKPD Interaktif</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Membagikan LKPD Interaktif langsung kepada siswa-siswi Anda.</p>
+              </div>
+
+              <!-- Video 6 -->
+              <div data-category="buat-soal" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
+                <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
+                  <div class="text-slate-400 dark:text-slate-500 text-sm font-medium">Video belum tersedia</div>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Trik Cepat Edit RPP</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Tempat untuk video tutorial fitur lainnya nanti.</p>
+              </div>
+
+            </div>
+          </div>
+        `;
       };
 
       const render = async () => {
