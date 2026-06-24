@@ -5024,33 +5024,27 @@ session_write_close();
                 Ambil
               </button>
             </div>
-            <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5">
-              <div class="font-bold text-sm mb-2">Pengaturan Sekolah & Tampilan</div>
-              <div class="mt-4 space-y-5">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div class="flex flex-col gap-2">
-                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
-                    <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="bahanAjar.jenjang">
-                      <option value="">Pilih...</option>
-                      ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(B.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
-                    </select>
-                    <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
-                      <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
-                      <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="bahanAjar.kesetaraanPaket">
-                        <option value="">Pilih Paket...</option>
-                        ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(B.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
-                      </select>
-                    </div>
-                  </div>
-                  ${selectField("Fase", "bahanAjar.fase", B.fase, faseOpts)}
-                  ${selectField("Kelas", "bahanAjar.kelas", B.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              ${inputText("Nama Sekolah", "bahanAjar.namaSekolah", B.namaSekolah, "Contoh: SMA Negeri 1 Bandung")}
+              ${inputText("Username Instagram/TikTok untuk watermark", "bahanAjar.usernameWatermark", B.usernameWatermark, "Contoh: @gurusains.id")}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
+                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="bahanAjar.jenjang">
+                  <option value="">Pilih...</option>
+                  ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(B.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                </select>
+                <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
+                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
+                  <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="bahanAjar.kesetaraanPaket">
+                    <option value="">Pilih Paket...</option>
+                    ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(B.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                  </select>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  ${inputText("Nama Sekolah", "bahanAjar.namaSekolah", B.namaSekolah, "Contoh: SMA Negeri 1 Bandung")}
-                  ${inputText("Username Instagram/TikTok untuk watermark", "bahanAjar.usernameWatermark", B.usernameWatermark, "Contoh: @gurusains.id")}
-                </div>
-
               </div>
+              ${selectField("Fase", "bahanAjar.fase", B.fase, faseOpts)}
+              ${selectField("Kelas", "bahanAjar.kelas", B.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
               ${selectField("Mata Pelajaran", "bahanAjar.mataPelajaran", B.mataPelajaran, SUBJECT_OPTIONS[jenjangEfektif] || [])}
@@ -5364,40 +5358,35 @@ session_write_close();
                 Ambil
               </button>
             </div>
-            <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5">
-              <div class="font-bold text-sm mb-2">Pengaturan Sekolah & Tampilan</div>
-              <div class="mt-4 space-y-5">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <div class="flex flex-col gap-2">
-                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
-                    <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="lkpdInteraktif.jenjang">
-                      <option value="">Pilih...</option>
-                      ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(X.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
-                    </select>
-                    <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
-                      <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
-                      <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="lkpdInteraktif.kesetaraanPaket">
-                        <option value="">Pilih Paket...</option>
-                        ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(X.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
-                      </select>
-                    </div>
-                  </div>
-                  ${selectField("Fase", "lkpdInteraktif.fase", X.fase, faseOpts)}
-                  ${selectField("Kelas", "lkpdInteraktif.kelas", X.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              ${inputText("Nama Sekolah", "lkpdInteraktif.namaSekolah", X.namaSekolah, "Contoh: SMA Negeri 1 Bandung")}
+              ${inputText("Username Instagram/TikTok untuk watermark", "lkpdInteraktif.usernameWatermark", X.usernameWatermark, "Contoh: @gurusains.id")}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Jenjang</label>
+                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="lkpdInteraktif.jenjang">
+                  <option value="">Pilih...</option>
+                  ${["PAUD","TK","SD/MI","SMP/MTs","SMA/MA","SMK/MAK","Kesetaraan"].map(v => `<option value="${safeText(v)}"${String(X.jenjang||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                </select>
+                <div class="${isKesetaraan ? "" : "hidden"} mt-2 flex flex-col gap-2">
+                  <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Paket</label>
+                  <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary px-4 py-3 text-sm" data-path="lkpdInteraktif.kesetaraanPaket">
+                    <option value="">Pilih Paket...</option>
+                    ${KES_PAKET_OPTIONS.map(v => `<option value="${safeText(v)}"${String(X.kesetaraanPaket||"")===v ? " selected" : ""}>${safeText(v)}</option>`).join("")}
+                  </select>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  ${inputText("Nama Sekolah", "lkpdInteraktif.namaSekolah", X.namaSekolah, "Contoh: SMA Negeri 1 Bandung")}
-                  ${inputText("Username Instagram/TikTok untuk watermark", "lkpdInteraktif.usernameWatermark", X.usernameWatermark, "Contoh: @gurusains.id")}
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div class="flex flex-col gap-2">
-                    <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Format rasio</label>
-                    <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm" data-path="lkpdInteraktif.formatRasio">
-                      <option value="story_9_16"${String(X.formatRasio||'')==='story_9_16'?' selected':''}>Story 9:16</option>
-                      <option value="portrait_4_5"${String(X.formatRasio||'')==='portrait_4_5'?' selected':''}>Portrait 4:5</option>
-                    </select>
-                  </div>
-                </div>
+              </div>
+              ${selectField("Fase", "lkpdInteraktif.fase", X.fase, faseOpts)}
+              ${selectField("Kelas", "lkpdInteraktif.kelas", X.kelas, CLASS_OPTIONS[jenjangEfektif] || [])}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div class="flex flex-col gap-2">
+                <label class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark">Format rasio</label>
+                <select class="w-full rounded-lg border-border-light dark:border-border-dark bg-background-light dark:bg-background-dark/40 focus:border-primary focus:ring-primary h-11 px-4 text-sm" data-path="lkpdInteraktif.formatRasio">
+                  <option value="story_9_16"${String(X.formatRasio||'')==='story_9_16'?' selected':''}>Story 9:16</option>
+                  <option value="portrait_4_5"${String(X.formatRasio||'')==='portrait_4_5'?' selected':''}>Portrait 4:5</option>
+                </select>
               </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
