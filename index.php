@@ -15120,7 +15120,7 @@ ${out}`;
       };
       const openBahanAjarKomik = () => {
         const p = String(getBahanAjarPromptText(state.bahanAjar) || "").trim();
-        let url = "https://chatgpt.com/g/g-6a37c9583f788191b8ebde597698b42d-eduslide-komik-by-gurupintar-versi-2-0";
+        let url = "https://chatgpt.com/g/g-6a3bf4c5b1108191bbaedca16266228b-eduslide-komik-by-gurupintar-versi-3-0";
         if (p) {
           url += "?prompt=" + encodeURIComponent(p);
         }
