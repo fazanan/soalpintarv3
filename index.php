@@ -5024,8 +5024,8 @@ session_write_close();
                 Ambil
               </button>
             </div>
-            <details class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5" ${state.bahanAjarAdvancedOpen ? 'open' : ''} ontoggle="window.__sp.setBahanAjarAdvancedOpen(this.open)">
-              <summary class="cursor-pointer select-none font-bold text-sm">Pengaturan Sekolah & Tampilan</summary>
+            <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5">
+              <div class="font-bold text-sm mb-2">Pengaturan Sekolah & Tampilan</div>
               <div class="mt-4 space-y-5">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
                   <div class="flex flex-col gap-2">
@@ -5051,7 +5051,7 @@ session_write_close();
                 </div>
 
               </div>
-            </details>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
               ${selectField("Mata Pelajaran", "bahanAjar.mataPelajaran", B.mataPelajaran, SUBJECT_OPTIONS[jenjangEfektif] || [])}
               ${selectField("Bahasa", "bahanAjar.bahasa", B.bahasa, ["Bahasa Indonesia","Bahasa Inggris","Bilingual","Bahasa Arab"])}
@@ -5364,8 +5364,8 @@ session_write_close();
                 Ambil
               </button>
             </div>
-            <details class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5" ${state.lkpdInteraktifAdvancedOpen ? 'open' : ''} ontoggle="window.__sp.setLkpdInteraktifAdvancedOpen(this.open)">
-              <summary class="cursor-pointer select-none font-bold text-sm">Pengaturan Sekolah & Tampilan</summary>
+            <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5">
+              <div class="font-bold text-sm mb-2">Pengaturan Sekolah & Tampilan</div>
               <div class="mt-4 space-y-5">
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
                   <div class="flex flex-col gap-2">
@@ -5399,7 +5399,7 @@ session_write_close();
                   </div>
                 </div>
               </div>
-            </details>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
               ${selectField("Mata Pelajaran", "lkpdInteraktif.mataPelajaran", X.mataPelajaran, SUBJECT_OPTIONS[jenjangEfektif] || [])}
               ${selectField("Bahasa", "lkpdInteraktif.bahasa", X.bahasa, ["Bahasa Indonesia","Bahasa Inggris","Bilingual","Bahasa Arab"])}
