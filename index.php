@@ -5070,6 +5070,12 @@ session_write_close();
                 </select>
               </div>
             </div>
+            ${state.activeView !== 'bahan_ajar_slide' ? `
+            <div class="flex items-center gap-3">
+              <input type="checkbox" id="bahanAjarIncludeFoto" class="rounded border-border-light dark:border-border-dark text-primary focus:ring-primary h-5 w-5 bg-white dark:bg-surface-dark cursor-pointer" data-path="bahanAjar.includeFoto"${B.includeFoto ? ' checked' : ''} />
+              <label for="bahanAjarIncludeFoto" class="text-sm font-semibold text-text-sub-light dark:text-text-sub-dark cursor-pointer select-none">Tambahkan foto guru di komik</label>
+            </div>
+            ` : ''}
             <div class="rounded-xl border border-border-light dark:border-border-dark bg-white dark:bg-surface-dark p-5 space-y-3">
               <div class="flex items-center justify-between gap-3">
                 <div>
@@ -15079,7 +15085,7 @@ ${out}`;
         const rasioLabel = state.activeView === "bahan_ajar_slide" ? "16:9" : "9:16";
         const watermark = String(B?.usernameWatermark || "").trim();
         const sekolah = String(B?.namaSekolah || "").trim();
-        return [
+        const ret = [
           { label: "Jenjang", value: jenjang || "-" },
           { label: "Kelas", value: kelas || "-" },
           { label: "Mata pelajaran", value: mapel || "-" },
@@ -15092,6 +15098,10 @@ ${out}`;
           { label: "Username Instagram/TikTok untuk watermark", value: watermark || "-" },
           { label: "Nama sekolah", value: sekolah || "-" },
         ];
+        if (state.activeView !== "bahan_ajar_slide") {
+          ret.push({ label: "Foto Referensi Karakter", value: B?.includeFoto ? "Ya" : "Tidak" });
+        }
+        return ret;
       };
       const getBahanAjarPromptText = (B) => {
         const pairs = getBahanAjarPromptPairs(B) || [];
