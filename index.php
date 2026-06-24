@@ -4997,9 +4997,9 @@ session_write_close();
           <div class="flex items-center justify-between gap-3">
             <div class="inline-flex rounded-lg border bg-white dark:bg-surface-dark overflow-x-auto no-scrollbar">
               ${[
-                { id: "info", label: "1. Informasi Bahan Ajar" },
-                { id: "gabung", label: "2. Gabungkan ke Modul Ajar" },
-                { id: "interaktif", label: "3. Bahan Ajar Interaktif" },
+                { id: "info", label: state.activeView === "bahan_ajar_slide" ? "Buat Slide Edukasi" : "Buat Komik Edukasi" },
+                { id: "gabung", label: "Gabungkan Ke Modul Ajar/RPP" },
+                { id: "interaktif", label: "Rubah Menjadi Video Interaktif" },
               ].map(t => {
                 const active = tab === t.id;
                 return `<button class="${active ? 'bg-primary text-white' : 'bg-white dark:bg-surface-dark'} px-4 h-10 rounded-lg text-sm font-bold whitespace-nowrap" onclick="window.__sp.setBahanAjarTab('${t.id}')">${t.label}</button>`;
