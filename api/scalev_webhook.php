@@ -367,9 +367,9 @@ if (!$exists) {
   // Debug log to a local file so we can inspect the payload if it fails again
   @file_put_contents(__DIR__ . '/scalev_last_payload.json', json_encode(['products_text' => $productsText, 'data' => $data], JSON_PRETTY_PRINT));
   
-  $cleanProductsText = preg_replace('/[^a-z0-9]/', '', $productsText);
-  $isEducomicBasic = strpos($cleanProductsText, 'educomicbasic') !== false;
-  $isEducomicPro = strpos($cleanProductsText, 'educomicpro') !== false;
+  $cleanProductsText = preg_replace('/[^a-z0-9]/', '', strtolower($productsText));
+  $isEducomicBasic = strpos($cleanProductsText, 'komikedukasibasic') !== false;
+  $isEducomicPro = strpos($cleanProductsText, 'komikedukasipro') !== false;
   $isGuruPintarBasic = strpos($cleanProductsText, 'gurupintarbasic') !== false;
   $isGuruPintarPro = strpos($cleanProductsText, 'gurupintarpro') !== false;
   
