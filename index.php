@@ -14860,11 +14860,12 @@ ${out}`;
           };
           const val = getByPath(path);
           if (node.tagName === "SELECT") node.value = String(val ?? "");
+          else if (node.type === "checkbox") node.checked = !!val;
           else node.value = String(val ?? "");
 
           const updateValue = () => {
             const path = node.getAttribute("data-path");
-            const v = node.type === "number" ? Number(node.value) : node.value;
+            const v = node.type === "checkbox" ? node.checked : (node.type === "number" ? Number(node.value) : node.value);
             setByPath(path, v);
             if (state.soalError) state.soalError = null;
             autoFillPaket();
