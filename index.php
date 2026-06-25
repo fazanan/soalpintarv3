@@ -9489,84 +9489,6 @@ ${baselineModulAjar}
               <button onclick="window.filterTutorial('bahan-ajar', this)" class="px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">Bahan Ajar</button>
               <button onclick="window.filterTutorial('lkpd', this)" class="px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">LKPD</button>
             </div>
-
-            <!-- Marquee Bahan Ajar (Hidden by default unless selected) -->
-            <div id="bahanAjarMarquee" style="display: none;" class="mb-8">
-              <style>
-                @keyframes scroll-left {
-                  0% { transform: translateX(0); }
-                  100% { transform: translateX(-50%); }
-                }
-                @keyframes scroll-right {
-                  0% { transform: translateX(-50%); }
-                  100% { transform: translateX(0); }
-                }
-                .mq-container {
-                  display: flex;
-                  overflow: hidden;
-                  width: 100%;
-                  gap: 1rem;
-                  margin-bottom: 1rem;
-                }
-                .mq-track-left {
-                  display: flex;
-                  gap: 1rem;
-                  width: max-content;
-                  animation: scroll-left 30s linear infinite;
-                }
-                .mq-track-right {
-                  display: flex;
-                  gap: 1rem;
-                  width: max-content;
-                  animation: scroll-right 30s linear infinite;
-                }
-                .mq-img {
-                  width: 220px;
-                  height: 310px;
-                  object-fit: cover;
-                  border-radius: 0.75rem;
-                  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-                  flex-shrink: 0;
-                }
-                .mq-track-left:hover, .mq-track-right:hover {
-                  animation-play-state: paused;
-                }
-              </style>
-              
-              <div class="bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 p-5 rounded-2xl shadow-sm">
-                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200 mb-5 text-center">Inspirasi Cover Bahan Ajar</h2>
-                <!-- Panel 1 (Scroll Left) -->
-                <div class="mq-container">
-                  <div class="mq-track-left">
-                    <img src="assets/tutor_images/1.png" class="mq-img"/>
-                    <img src="assets/tutor_images/2.png" class="mq-img"/>
-                    <img src="assets/tutor_images/3.png" class="mq-img"/>
-                    <img src="assets/tutor_images/4.png" class="mq-img"/>
-                    <img src="assets/tutor_images/5.png" class="mq-img"/>
-                    <img src="assets/tutor_images/1.png" class="mq-img"/>
-                    <img src="assets/tutor_images/2.png" class="mq-img"/>
-                    <img src="assets/tutor_images/3.png" class="mq-img"/>
-                    <img src="assets/tutor_images/4.png" class="mq-img"/>
-                    <img src="assets/tutor_images/5.png" class="mq-img"/>
-                  </div>
-                </div>
-
-                <!-- Panel 2 (Scroll Right) -->
-                <div class="mq-container" style="margin-bottom: 0;">
-                  <div class="mq-track-right">
-                    <img src="assets/tutor_images/6.png" class="mq-img"/>
-                    <img src="assets/tutor_images/7.png" class="mq-img"/>
-                    <img src="assets/tutor_images/8.png" class="mq-img"/>
-                    <img src="assets/tutor_images/9.png" class="mq-img"/>
-                    <img src="assets/tutor_images/10.png" class="mq-img"/>
-                    <img src="assets/tutor_images/6.png" class="mq-img"/>
-                    <img src="assets/tutor_images/7.png" class="mq-img"/>
-                    <img src="assets/tutor_images/8.png" class="mq-img"/>
-                    <img src="assets/tutor_images/9.png" class="mq-img"/>
-                    <img src="assets/tutor_images/10.png" class="mq-img"/>
-                  </div>
-                </div>
-              </div>
             </div>
 
             <!-- Grid Tutorial -->
@@ -9626,6 +9548,85 @@ ${baselineModulAjar}
                 <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Tempat untuk video tutorial fitur lainnya nanti.</p>
               </div>
 
+            </div>
+
+            <!-- Marquee Bahan Ajar (Hidden by default unless selected) -->
+            <div id="bahanAjarMarquee" style="display: none;">
+              <style>
+                @keyframes scroll-left {
+                  0% { transform: translateX(0); }
+                  100% { transform: translateX(-50%); }
+                }
+                @keyframes scroll-right {
+                  0% { transform: translateX(-50%); }
+                  100% { transform: translateX(0); }
+                }
+                .mq-container {
+                  display: flex;
+                  overflow: hidden;
+                  width: 100%;
+                  gap: 1rem;
+                  margin-bottom: 1rem;
+                }
+                .mq-track-left {
+                  display: flex;
+                  gap: 1rem;
+                  width: max-content;
+                  animation: scroll-left 30s linear infinite;
+                }
+                .mq-track-right {
+                  display: flex;
+                  gap: 1rem;
+                  width: max-content;
+                  animation: scroll-right 30s linear infinite;
+                }
+                .mq-img {
+                  width: 220px;
+                  height: 310px;
+                  object-fit: cover;
+                  border-radius: 0.75rem;
+                  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+                  flex-shrink: 0;
+                }
+                .mq-track-left:hover, .mq-track-right:hover {
+                  animation-play-state: paused;
+                }
+              </style>
+              
+              <div class="bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 p-5 rounded-2xl shadow-sm mt-8">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200 mb-5 text-center">Inspirasi Cover Bahan Ajar</h2>
+                <!-- Panel 1 (Scroll Left) -->
+                <div class="mq-container">
+                  <div class="mq-track-left">
+                    <img src="assets/tutor_images/1.png" class="mq-img"/>
+                    <img src="assets/tutor_images/2.png" class="mq-img"/>
+                    <img src="assets/tutor_images/3.png" class="mq-img"/>
+                    <img src="assets/tutor_images/4.png" class="mq-img"/>
+                    <img src="assets/tutor_images/5.png" class="mq-img"/>
+                    <img src="assets/tutor_images/1.png" class="mq-img"/>
+                    <img src="assets/tutor_images/2.png" class="mq-img"/>
+                    <img src="assets/tutor_images/3.png" class="mq-img"/>
+                    <img src="assets/tutor_images/4.png" class="mq-img"/>
+                    <img src="assets/tutor_images/5.png" class="mq-img"/>
+                  </div>
+                </div>
+
+                <!-- Panel 2 (Scroll Right) -->
+                <div class="mq-container" style="margin-bottom: 0;">
+                  <div class="mq-track-right">
+                    <img src="assets/tutor_images/6.png" class="mq-img"/>
+                    <img src="assets/tutor_images/7.png" class="mq-img"/>
+                    <img src="assets/tutor_images/8.png" class="mq-img"/>
+                    <img src="assets/tutor_images/9.png" class="mq-img"/>
+                    <img src="assets/tutor_images/10.png" class="mq-img"/>
+                    <img src="assets/tutor_images/6.png" class="mq-img"/>
+                    <img src="assets/tutor_images/7.png" class="mq-img"/>
+                    <img src="assets/tutor_images/8.png" class="mq-img"/>
+                    <img src="assets/tutor_images/9.png" class="mq-img"/>
+                    <img src="assets/tutor_images/10.png" class="mq-img"/>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         `;
