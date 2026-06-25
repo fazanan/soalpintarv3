@@ -9530,6 +9530,15 @@ ${baselineModulAjar}
                 <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Caranya ketiganya sama yang membedakan hanya link menunya saja.</p>
               </div>
 
+              <!-- Video 4.1 -->
+              <div data-category="bahan-ajar" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
+                <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
+                  <iframe class="absolute inset-0 w-full h-full" src="https://www.youtube.com/embed/T8BVynPxqT8" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Menggabungkan Modul Ajar/RPP dengan Bahan Ajar</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1"></p>
+              </div>
+
               <!-- Video 5 -->
               <div data-category="lkpd" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
                 <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
