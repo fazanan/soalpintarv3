@@ -9494,33 +9494,6 @@ ${baselineModulAjar}
             <!-- Grid Tutorial -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="tutorialGrid">
               
-              <!-- Video 1 -->
-              <div data-category="buat-soal" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
-                <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
-                  <div class="text-slate-400 dark:text-slate-500 text-sm font-medium">Video belum tersedia</div>
-                </div>
-                <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Tutorial Menyusun Perangkat Ajar</h3>
-                <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Panduan langkah demi langkah cara membuat Modul Ajar, RPP, dan LKPD secara otomatis menggunakan Aplikasi Guru Pintar.</p>
-              </div>
-
-              <!-- Video 2 -->
-              <div data-category="modul-ajar-rpp" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
-                <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
-                  <div class="text-slate-400 dark:text-slate-500 text-sm font-medium">Video belum tersedia</div>
-                </div>
-                <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Tutorial Menyusun Perangkat Ajar</h3>
-                <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Panduan langkah demi langkah cara membuat Modul Ajar dan RPP secara otomatis.</p>
-              </div>
-
-              <!-- Video 3 -->
-              <div data-category="quiz-rekap" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
-                <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
-                  <div class="text-slate-400 dark:text-slate-500 text-sm font-medium">Video belum tersedia</div>
-                </div>
-                <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Tutorial Manajemen Quiz Online</h3>
-                <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Pelajari cara men-generate dan merekap nilai peserta didik.</p>
-              </div>
-
               <!-- Video 4 -->
               <div data-category="bahan-ajar" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
                 <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
@@ -9546,6 +9519,33 @@ ${baselineModulAjar}
                 </div>
                 <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Membuat Video Bahan Ajar Interaktif (Voice Over + Music)</h3>
                 <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Buat lebih menarik menjadi video slide dengan penjelasan (voice over) tinggal copy dari GPT lalu pilih music yang sesuai. Langsung Jadi.</p>
+              </div>
+
+              <!-- Video 1 -->
+              <div data-category="buat-soal" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
+                <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
+                  <div class="text-slate-400 dark:text-slate-500 text-sm font-medium">Video belum tersedia</div>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Tutorial Menyusun Perangkat Ajar</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Panduan langkah demi langkah cara membuat Modul Ajar, RPP, dan LKPD secara otomatis menggunakan Aplikasi Guru Pintar.</p>
+              </div>
+
+              <!-- Video 2 -->
+              <div data-category="modul-ajar-rpp" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
+                <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
+                  <div class="text-slate-400 dark:text-slate-500 text-sm font-medium">Video belum tersedia</div>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Tutorial Menyusun Perangkat Ajar</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Panduan langkah demi langkah cara membuat Modul Ajar dan RPP secara otomatis.</p>
+              </div>
+
+              <!-- Video 3 -->
+              <div data-category="quiz-rekap" class="tutorial-card bg-white dark:bg-surface-dark p-5 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col transition hover:shadow-md">
+                <div class="aspect-video rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-4 relative flex items-center justify-center">
+                  <div class="text-slate-400 dark:text-slate-500 text-sm font-medium">Video belum tersedia</div>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-900 dark:text-white leading-tight">Tutorial Manajemen Quiz Online</h3>
+                <p class="text-slate-500 dark:text-slate-400 text-sm mt-2 flex-1">Pelajari cara men-generate dan merekap nilai peserta didik.</p>
               </div>
 
               <!-- Video 5 -->
@@ -9612,7 +9612,13 @@ ${baselineModulAjar}
               </style>
               
               <div class="bg-white dark:bg-surface-dark border border-slate-200 dark:border-slate-700 p-5 rounded-2xl shadow-sm mt-8">
-                <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200 mb-5 text-center">Inspirasi Cover Bahan Ajar</h2>
+                <div class="flex flex-col md:flex-row md:items-center justify-between mb-5 gap-3">
+                  <h2 class="text-xl font-bold text-slate-800 dark:text-slate-200">Buat Bahan Ajar Menarik By Guru Pintar</h2>
+                  <div class="text-sm text-slate-600 dark:text-slate-400 md:text-right">
+                    Informasi lengkap <a href="https://aplikasigurupintar.my.id/bahan-ajar-interaktif" target="_blank" class="text-primary hover:underline font-semibold">di sini</a><br/>
+                    (diskon khusus dengan kode VIPMEMBER)
+                  </div>
+                </div>
                 <!-- Panel 1 (Scroll Left) -->
                 <div class="mq-container">
                   <div class="mq-track-left">
