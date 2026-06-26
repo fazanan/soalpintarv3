@@ -331,6 +331,31 @@ if ($stmt) {
   $stmt->close();
 }
 
+if ($productsText === '') {
+  $orderIdIns = isset($data['order_id']) ? (string)$data['order_id'] : '';
+  if ($orderIdIns !== '') {
+    $stmtQuery = $mysqli->prepare("SELECT products_text FROM scalev_webhook_events WHERE order_id=? AND event='order.created' AND products_text IS NOT NULL LIMIT 1");
+    if ($stmtQuery) {
+      $stmtQuery->bind_param('s', $orderIdIns);
+      $stmtQuery->execute();
+      $stmtQuery->bind_result($pt);
+      if ($stmtQuery->fetch() && $pt !== null) {
+        $productsText = (string)$pt;
+      }
+      $stmtQuery->close();
+    }
+  }
+}
+
+// Debug log to a local file so we can inspect the payload if it fails again
+@file_put_contents(__DIR__ . '/scalev_last_payload.json', json_encode(['products_text' => $productsText, 'data' => $data], JSON_PRETTY_PRINT));
+
+$cleanProductsText = preg_replace('/[^a-z0-9]/', '', strtolower($productsText));
+$isEducomicBasic = strpos($cleanProductsText, 'komikedukasibasic') !== false;
+$isEducomicPro = strpos($cleanProductsText, 'komikedukasipro') !== false;
+$isGuruPintarBasic = strpos($cleanProductsText, 'gurupintarbasic') !== false;
+$isGuruPintarPro = strpos($cleanProductsText, 'gurupintarpro') !== false;
+
 $createdUserId = null;
 if (!$exists) {
   $initLimit = 300;
@@ -347,31 +372,6 @@ if (!$exists) {
   $role = 'user';
   $limitGambar = 0;
   $noHp = extract_customer_phone($data);
-  
-  if ($productsText === '') {
-    $orderIdIns = isset($data['order_id']) ? (string)$data['order_id'] : '';
-    if ($orderIdIns !== '') {
-      $stmtQuery = $mysqli->prepare("SELECT products_text FROM scalev_webhook_events WHERE order_id=? AND event='order.created' AND products_text IS NOT NULL LIMIT 1");
-      if ($stmtQuery) {
-        $stmtQuery->bind_param('s', $orderIdIns);
-        $stmtQuery->execute();
-        $stmtQuery->bind_result($pt);
-        if ($stmtQuery->fetch() && $pt !== null) {
-          $productsText = (string)$pt;
-        }
-        $stmtQuery->close();
-      }
-    }
-  }
-  
-  // Debug log to a local file so we can inspect the payload if it fails again
-  @file_put_contents(__DIR__ . '/scalev_last_payload.json', json_encode(['products_text' => $productsText, 'data' => $data], JSON_PRETTY_PRINT));
-  
-  $cleanProductsText = preg_replace('/[^a-z0-9]/', '', strtolower($productsText));
-  $isEducomicBasic = strpos($cleanProductsText, 'komikedukasibasic') !== false;
-  $isEducomicPro = strpos($cleanProductsText, 'komikedukasipro') !== false;
-  $isGuruPintarBasic = strpos($cleanProductsText, 'gurupintarbasic') !== false;
-  $isGuruPintarPro = strpos($cleanProductsText, 'gurupintarpro') !== false;
   
   $cols = ['username', 'password', 'role', 'limitpaket', 'limitgambar'];
   $types = 'sssii';
