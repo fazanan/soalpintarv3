@@ -15227,6 +15227,23 @@ ${out}`;
         saveDebounced(true);
         render();
       };
+      const recordActivityToRiwayat = (title, obj) => {
+        try {
+          const snapshot = {
+            identity: {
+              mataPelajaran: obj?.mataPelajaran || "",
+              kelas: obj?.kelas || "",
+              jenjang: obj?.jenjang || ""
+            },
+            questions: []
+          };
+          fetch("api/soal_user.php", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ type: "save", title, state: snapshot, token_input: 0, token_output: 0, model: "Bahan Ajar" })
+          });
+        } catch {}
+      };
       const copyBahanAjarPrompt = async (el) => {
         try {
           const p = String(getBahanAjarPromptText(state.bahanAjar) || "").trim();
@@ -15245,6 +15262,7 @@ ${out}`;
         if (p) {
           url += "?prompt=" + encodeURIComponent(p);
         }
+        recordActivityToRiwayat(`Bahan Ajar Komik - ${state.bahanAjar?.mataPelajaran || ''}`, state.bahanAjar);
         window.open(url, '_blank', 'noopener');
       };
       const openBahanAjarSlide = () => {
@@ -15253,6 +15271,7 @@ ${out}`;
         if (p) {
           url += "?prompt=" + encodeURIComponent(p);
         }
+        recordActivityToRiwayat(`Bahan Ajar Slide - ${state.bahanAjar?.mataPelajaran || ''}`, state.bahanAjar);
         window.open(url, '_blank', 'noopener');
       };
       const copyFromModulAjarToLkpdInteraktif = () => {
@@ -15323,6 +15342,7 @@ ${out}`;
         if (p) {
           url += "?prompt=" + encodeURIComponent(p);
         }
+        recordActivityToRiwayat(`LKPD Interaktif - ${state.lkpdInteraktif?.mataPelajaran || ''}`, state.lkpdInteraktif);
         window.open(url, '_blank', 'noopener');
       };
       const pickLkpdImage = () => {
@@ -15985,6 +16005,7 @@ ${out}`;
         const rt = baiRt();
         const cfg = baiCfg();
         if (!rt.images.length || rt.recording) return;
+        recordActivityToRiwayat(`Buat Video Interaktif - ${state.bahanAjar?.mataPelajaran || ''}`, state.bahanAjar);
         await baiEnsureMediaDurations();
         if (rt.playing) stopBahanAjarInteraktif();
         try { if (rt.videoUrl) URL.revokeObjectURL(rt.videoUrl); } catch {}
@@ -16593,6 +16614,7 @@ ${out}`;
         const imgs = Array.isArray(files.images) ? files.images : [];
         if (!pdf) { alert("Upload Modul Ajar (PDF) dulu."); return; }
         if (!imgs.length) { alert("Upload Bahan Ajar (Image) dulu."); return; }
+        recordActivityToRiwayat(`Gabung Bahan Ajar & Modul - ${state.bahanAjar?.mataPelajaran || ''}`, state.bahanAjar);
         const btn = el("btnBahanAjarMerge");
         const original = btn ? btn.innerHTML : "";
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">progress_activity</span> Menggabungkan...'; }
